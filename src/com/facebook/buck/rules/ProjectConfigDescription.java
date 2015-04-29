@@ -45,8 +45,10 @@ public class ProjectConfigDescription implements Description<ProjectConfigDescri
         new SourcePathResolver(resolver),
         args.srcTarget.map(resolver::getRule).orElse(null),
         args.srcRoots,
+        args.srcResourceRoots,
         args.testTarget.map(resolver::getRule).orElse(null),
         args.testRoots,
+        args.testResourceRoots,
         args.isIntellijPlugin.orElse(false));
   }
 
@@ -55,8 +57,10 @@ public class ProjectConfigDescription implements Description<ProjectConfigDescri
     public static class Arg extends AbstractDescriptionArg {
     public Optional<BuildTarget> srcTarget;
     public ImmutableList<String> srcRoots = ImmutableList.of();
+    public ImmutableList<String> srcResourceRoots = ImmutableList.of();
     public Optional<BuildTarget> testTarget;
     public ImmutableList<String> testRoots = ImmutableList.of();
+    public ImmutableList<String> testResourceRoots = ImmutableList.of();
     public Optional<Boolean> isIntellijPlugin;
   }
 }

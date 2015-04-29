@@ -300,7 +300,19 @@ def write_modules(modules, generate_minimum_project, android_auto_generation_dis
         # Source folders under module's base path can all live under one <content>.
         xml += '\n    <content url="file://$MODULE_DIR$">'
         for source_folder in source_folders_under_base_path:
-            xml += '\n      ' + formatSourceFolderXMLTag(source_folder)
+            if 'packagePrefix' in source_folder:
+                package_prefix = 'packagePrefix="%s" ' % source_folder['packagePrefix']
+            else:
+                package_prefix = ''
+            if source_folder['isResource']:
+                resource_folder_type = 'java-test-resource' if source_folder['isTestSource'] else 'java-resource'
+                xml += '\n      <sourceFolder url="%(url)s" type="%(resource_folder_type)s" %(package_prefix)s/>' % {
+                    'url': source_folder['url'],
+                    'resource_folder_type': resource_folder_type,
+                    'package_prefix': package_prefix
+                }
+            else:
+                xml += '\n      ' + formatSourceFolderXMLTag(source_folder)
         for exclude_folder in module['excludeFolders']:
             xml += '\n      <excludeFolder url="%s" />' % exclude_folder['url']
         for exclude_folder in sorted(additional_excludes[module['pathToImlFile']]):
