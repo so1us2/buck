@@ -530,12 +530,16 @@ public class ProjectTest {
         .addDep(guava.getBuildTarget())
         .build(ruleResolver);
 
+    String jdkName = "1.8";
+    String jdkType = "JavaSDK";
     ProjectConfig projectConfig = (ProjectConfig) ProjectConfigBuilder
         .createBuilder(
             BuildTargetFactory.newInstance("//java/com/example/base:project_config"))
         .setSrcRule(baseBuildRule.getBuildTarget())
         .setTestRule(testBuildRule.getBuildTarget())
         .setTestRoots(ImmutableList.of("tests"))
+        .setJdkName(jdkName)
+        .setJdkType(jdkType)
         .build(ruleResolver);
 
     ProjectWithModules projectWithModules = getModulesForActionGraph(

@@ -108,9 +108,13 @@ class SerializableDependentModule {
 
   static SerializableDependentModule newStandardJdk(Optional<String> jdkName,
       Optional<String> jdkType) {
+    return newStandardJdk(jdkName.orElse("1.7"), jdkType.orElse("JavaSDK"));
+  }
+
+  static SerializableDependentModule newStandardJdk(String jdkName, String jdkType) {
     SerializableDependentModule dependentModule = new SerializableDependentModule("jdk", null);
-    dependentModule.jdkName = jdkName.orElse("1.7");
-    dependentModule.jdkType = jdkType.orElse("JavaSDK");
+    dependentModule.jdkName = jdkName;
+    dependentModule.jdkType = jdkType;
     return dependentModule;
   }
 

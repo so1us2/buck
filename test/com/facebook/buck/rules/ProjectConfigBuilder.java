@@ -42,7 +42,8 @@ public class ProjectConfigBuilder extends AbstractNodeBuilder<ProjectConfigDescr
     return this;
   }
 
-  public ProjectConfigBuilder setSrcResourceRoots(@Nullable ImmutableList<String> srcResourceRoots) {
+  public ProjectConfigBuilder setSrcResourceRoots(@Nullable ImmutableList<String> srcResourceRoots)
+  {
     arg.srcResourceRoots = Optional.fromNullable(srcResourceRoots);
     return this;
   }
@@ -57,8 +58,19 @@ public class ProjectConfigBuilder extends AbstractNodeBuilder<ProjectConfigDescr
     return this;
   }
 
-  public ProjectConfigBuilder setTestResourceRoots(@Nullable ImmutableList<String> testResourceRoots) {
+  public ProjectConfigBuilder setTestResourceRoots(@Nullable ImmutableList<String>
+      testResourceRoots) {
     arg.testResourceRoots = Optional.fromNullable(testResourceRoots);
+    return this;
+  }
+
+  public ProjectConfigBuilder setJdkName(@Nullable String jdkName) {
+    arg.jdkName = Optional.fromNullable(jdkName);
+    return this;
+  }
+
+  public ProjectConfigBuilder setJdkType(@Nullable String jdkType) {
+    arg.jdkType = Optional.fromNullable(jdkType);
     return this;
   }
 }

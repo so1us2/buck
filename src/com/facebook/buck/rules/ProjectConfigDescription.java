@@ -49,6 +49,8 @@ public class ProjectConfigDescription implements Description<ProjectConfigDescri
         args.testTarget.map(resolver::getRule).orElse(null),
         args.testRoots,
         args.testResourceRoots,
+        args.jdkName.orElse(null),
+        args.jdkType.orElse(null),
         args.isIntellijPlugin.orElse(false));
   }
 
@@ -61,6 +63,8 @@ public class ProjectConfigDescription implements Description<ProjectConfigDescri
     public Optional<BuildTarget> testTarget;
     public ImmutableList<String> testRoots = ImmutableList.of();
     public ImmutableList<String> testResourceRoots = ImmutableList.of();
+    public Optional<String> jdkName;
+    public Optional<String> jdkType;
     public Optional<Boolean> isIntellijPlugin;
   }
 }

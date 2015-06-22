@@ -478,10 +478,16 @@ public class Project {
       if (module.isIntelliJPlugin()) {
         jdkDependency = SerializableDependentModule.newIntelliJPluginJdk();
       } else {
-        jdkDependency = SerializableDependentModule.newStandardJdk(
-            intellijConfig.getJdkName(),
-            intellijConfig.getJdkType()
-        );
+        if (projectConfig.getJdkName() == null || projectConfig.getJdkType() == null) {
+          // If either the JDK name or type are unset, use the IntelliJ config instead.
+          jdkDependency = SerializableDependentModule.newStandardJdk(
+              intellijConfig.getJdkName(),
+              intellijConfig.getJdkType()
+          );
+        } else {
+          jdkDependency = SerializableDependentModule.newStandardJdk(
+              projectConfig.getJdkName(), projectConfig.getJdkType());
+        }
       }
     }
 
