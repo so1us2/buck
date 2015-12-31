@@ -25,7 +25,7 @@ NAILGUN_CONNECTION_REFUSED_CODE = 230
 NAILGUN_UNEXPECTED_CHUNK_TYPE = 229
 NAILGUN_CONNECTION_BROKEN_CODE = 227
 
-JAVA_MAX_HEAP_SIZE_MB = 1000
+JAVA_MAX_HEAP_SIZE_MB = 2500
 
 # Describes a resource used by this driver.
 #  - name: logical name of the resources
