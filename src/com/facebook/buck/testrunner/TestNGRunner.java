@@ -50,7 +50,6 @@ public final class TestNGRunner extends BaseRunner {
 
   @Override
   public void run() throws Throwable {
-
     for (String className : testClassNames) {
       if (!shouldIncludeTest(className)) {
         continue;
@@ -147,7 +146,6 @@ public final class TestNGRunner extends BaseRunner {
    * properly reporting both output and exceptions to child test cases
    */
   private static class TestSuiteFailureListener extends TestListenerAdapter {
-
     private PrintStream originalOut, originalErr, stdOutStream, stdErrStream;
     private ByteArrayOutputStream rawStdOutBytes, rawStdErrBytes;
     private Throwable throwable;
@@ -156,6 +154,7 @@ public final class TestNGRunner extends BaseRunner {
     private String stdOut;
     private String stdErr;
 
+    @Override
     public void beforeConfiguration(ITestResult tr) {
       super.beforeConfiguration(tr);
       // Create an intermediate stdout/stderr to capture any debugging statements (usually in the
@@ -170,17 +169,20 @@ public final class TestNGRunner extends BaseRunner {
       System.setErr(stdErrStream);
     }
 
+    @Override
     public void onConfigurationFailure(ITestResult itr) {
       super.onConfigurationFailure(itr);
       throwable = itr.getThrowable();
       stopStreamCapture();
     }
 
+    @Override
     public void onConfigurationSkip(ITestResult itr) {
       super.onConfigurationSkip(itr);
       stopStreamCapture();
     }
 
+    @Override
     public void onConfigurationSuccess(ITestResult itr) {
       super.onConfigurationSuccess(itr);
       stopStreamCapture();
