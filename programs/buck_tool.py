@@ -23,7 +23,7 @@ MAX_BUCKD_RUN_COUNT = 64
 BUCKD_CLIENT_TIMEOUT_MILLIS = 60000
 GC_MAX_PAUSE_TARGET = 15000
 
-JAVA_MAX_HEAP_SIZE_MB = 1000
+JAVA_MAX_HEAP_SIZE_MB = 2500
 
 # While waiting for the daemon to terminate, print a message at most
 # every DAEMON_BUSY_MESSAGE_SECONDS seconds.
