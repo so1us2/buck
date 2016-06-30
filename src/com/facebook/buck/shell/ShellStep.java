@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -91,7 +92,12 @@ public abstract class ShellStep implements Step {
     // Kick off a Process in which this ShellCommand will be run.
     ProcessExecutorParams.Builder builder = ProcessExecutorParams.builder();
 
-    builder.setCommand(getShellCommand(context));
+    List<String> cmds = getShellCommand(context);
+    builder.setCommand(cmds);
+
+    String name = Thread.currentThread().getName();
+    LOG.debug("Running command: %s in Thread %s", Joiner.on(" ").join(cmds), name);
+
     Map<String, String> environment = Maps.newHashMap();
     setProcessEnvironment(context, environment, workingDirectory.toFile());
     builder.setEnvironment(environment);
