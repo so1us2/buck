@@ -16,28 +16,33 @@
 
 package com.facebook.buck.cli;
 
+import static com.facebook.buck.util.BuckConstant.DEFAULT_CACHE_DIR;
+
+import com.facebook.buck.config.Config;
 import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.DefaultJavaPackageFinder;
-import com.facebook.buck.log.Logger;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.Pair;
 import com.facebook.buck.parser.BuildTargetParseException;
 import com.facebook.buck.parser.BuildTargetParser;
 import com.facebook.buck.parser.BuildTargetPatternParser;
-import com.facebook.buck.rules.BinaryBuildRule;
-import com.facebook.buck.rules.BuildRule;
+import com.facebook.buck.rules.BinaryBuildRuleToolProvider;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.CachingBuildEngine;
+import com.facebook.buck.rules.ConstantToolProvider;
 import com.facebook.buck.rules.HashedFileTool;
 import com.facebook.buck.rules.PathSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.ToolProvider;
 import com.facebook.buck.util.Ansi;
 import com.facebook.buck.util.AnsiEnvironmentChecking;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.SampleRate;
 import com.facebook.buck.util.environment.Architecture;
+import com.facebook.buck.util.environment.EnvironmentFilter;
 import com.facebook.buck.util.environment.Platform;
 import com.facebook.buck.util.network.HostnameFetching;
 import com.google.common.annotations.Beta;
@@ -45,15 +50,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -71,11 +77,11 @@ import javax.annotation.concurrent.Immutable;
 @Immutable
 public class BuckConfig {
 
-  private static final Logger LOG = Logger.get(BuckConfig.class);
-
   public static final String DEFAULT_BUCK_CONFIG_OVERRIDE_FILE_NAME = ".buckconfig.local";
 
   private static final String ALIAS_SECTION_HEADER = "alias";
+
+  private static final Float DEFAULT_THREAD_CORE_RATIO = Float.valueOf(1.0F);
 
   /**
    * This pattern is designed so that a fully-qualified build target cannot be a valid alias name
@@ -87,6 +93,13 @@ public class BuckConfig {
   static final String BUCK_BUCKD_DIR_KEY = "buck.buckd_dir";
 
   private static final String DEFAULT_MAX_TRACES = "25";
+
+  private static final ImmutableMap<String, ImmutableSet<String>> IGNORE_FIELDS_FOR_DAEMON_RESTART =
+      ImmutableMap.of(
+          "build", ImmutableSet.of("threads", "load_limit"),
+          "client", ImmutableSet.of("id"),
+          "project", ImmutableSet.of("ide_prompt")
+  );
 
   private static final Function<String, URI> TO_URI = new Function<String, URI>() {
     @Override
@@ -125,6 +138,7 @@ public class BuckConfig {
   private final Platform platform;
 
   private final ImmutableMap<String, String> environment;
+  private final ImmutableMap<String, String> filteredEnvironment;
 
   public BuckConfig(
       Config config,
@@ -143,6 +157,8 @@ public class BuckConfig {
 
     this.platform = platform;
     this.environment = environment;
+    this.filteredEnvironment = ImmutableMap.copyOf(
+        Maps.filterKeys(environment, EnvironmentFilter.NOT_IGNORED_ENV_PREDICATE));
   }
 
   /**
@@ -171,38 +187,6 @@ public class BuckConfig {
     }
 
     throw new HumanReadableException("Not a valid %s: %s.", fieldName.toLowerCase(), aliasName);
-  }
-
-  @SafeVarargs
-  @VisibleForTesting
-  static BuckConfig createFromReaders(
-      Map<Path, Reader> readers,
-      ProjectFilesystem projectFilesystem,
-      Architecture architecture,
-      Platform platform,
-      ImmutableMap<String, String> environment,
-      ImmutableMap<String, ImmutableMap<String, String>>... configOverrides)
-  throws IOException {
-    ImmutableList.Builder<ImmutableMap<String, ImmutableMap<String, String>>> builder =
-        ImmutableList.builder();
-    for (Map.Entry<Path, Reader> entry : readers.entrySet()) {
-      Path filePath = entry.getKey();
-      Reader reader = entry.getValue();
-      ImmutableMap<String, ImmutableMap<String, String>> parsedConfiguration = Inis.read(reader);
-      LOG.debug("Loaded a configuration file %s: %s", filePath, parsedConfiguration);
-      builder.add(parsedConfiguration);
-    }
-    for (ImmutableMap<String, ImmutableMap<String, String>> configOverride : configOverrides) {
-      LOG.debug("Adding configuration overrides: %s", configOverride);
-      builder.add(configOverride);
-    }
-    Config config = new Config(builder.build());
-    return new BuckConfig(
-        config,
-        projectFilesystem,
-        architecture,
-        platform,
-        environment);
   }
 
   public Architecture getArchitecture() {
@@ -238,6 +222,11 @@ public class BuckConfig {
   public Optional<ImmutableList<String>> getOptionalListWithoutComments(
       String section, String field) {
     return config.getOptionalListWithoutComments(section, field);
+  }
+
+  public Optional<ImmutableList<String>> getOptionalListWithoutComments(
+      String section, String field, char splitChar) {
+    return config.getOptionalListWithoutComments(section, field, splitChar);
   }
 
   @Nullable
@@ -302,6 +291,23 @@ public class BuckConfig {
   }
 
   /**
+   * @return the parsed BuildTarget in the given section and field, if set and a valid build target.
+   *
+   * This is useful if you use getTool to get the target, if any, but allow filesystem references.
+   */
+  public Optional<BuildTarget> getMaybeBuildTarget(String section, String field) {
+    Optional<String> value = getValue(section, field);
+    if (!value.isPresent()) {
+      return Optional.absent();
+    }
+    try {
+      return Optional.of(getBuildTargetForFullyQualifiedTarget(value.get()));
+    } catch (BuildTargetParseException e) {
+      return Optional.absent();
+    }
+  }
+
+  /**
    * @return the parsed BuildTarget in the given section and field.
    */
   public BuildTarget getRequiredBuildTarget(String section, String field) {
@@ -352,31 +358,32 @@ public class BuckConfig {
    * @return a {@link Tool} identified by a @{link BuildTarget} or {@link Path} reference
    *     by the given section:field, if set.
    */
-  public Optional<Tool> getTool(String section, String field, BuildRuleResolver resolver) {
+  public Optional<ToolProvider> getToolProvider(String section, String field) {
     Optional<String> value = getValue(section, field);
     if (!value.isPresent()) {
       return Optional.absent();
     }
-    try {
-      BuildTarget target = getBuildTargetForFullyQualifiedTarget(value.get());
-      Optional<BuildRule> rule = resolver.getRuleOptional(target);
-      if (!rule.isPresent()) {
-        throw new HumanReadableException("[%s] %s: no rule found for %s", section, field, target);
-      }
-      if (!(rule.get() instanceof BinaryBuildRule)) {
-        throw new HumanReadableException(
-            "[%s] %s: %s must be an executable rule",
-            section,
-            field,
-            target);
-      }
-      return Optional.of(((BinaryBuildRule) rule.get()).getExecutableCommand());
-    } catch (BuildTargetParseException e) {
+    Optional<BuildTarget> target = getMaybeBuildTarget(section, field);
+    if (target.isPresent()) {
+      return Optional.<ToolProvider>of(
+          new BinaryBuildRuleToolProvider(
+              target.get(),
+              String.format("[%s] %s", section, field)));
+    } else {
       checkPathExists(
           value.get(),
           String.format("Overridden %s:%s path not found: ", section, field));
-      return Optional.<Tool>of(new HashedFileTool(getPathFromVfs(value.get())));
+      return Optional.<ToolProvider>of(
+          new ConstantToolProvider(new HashedFileTool(getPathFromVfs(value.get()))));
     }
+  }
+
+  public Optional<Tool> getTool(String section, String field, BuildRuleResolver resolver) {
+    Optional<ToolProvider> provider = getToolProvider(section, field);
+    if (!provider.isPresent()) {
+      return Optional.absent();
+    }
+    return Optional.of(provider.get().resolve(resolver));
   }
 
   public Tool getRequiredTool(String section, String field, BuildRuleResolver resolver) {
@@ -480,8 +487,7 @@ public class BuckConfig {
     return ImmutableSet.copyOf(getListWithoutComments("java", "src_roots"));
   }
 
-  @VisibleForTesting
-  DefaultJavaPackageFinder createDefaultJavaPackageFinder() {
+  public DefaultJavaPackageFinder createDefaultJavaPackageFinder() {
     Set<String> srcRoots = getSrcRoots();
     return DefaultJavaPackageFinder.createDefaultJavaPackageFinder(srcRoots);
   }
@@ -489,7 +495,7 @@ public class BuckConfig {
   /**
    * Return Strings so as to avoid a dependency on {@link LabelSelector}!
    */
-  ImmutableList<String> getDefaultRawExcludedLabelSelectors() {
+  public ImmutableList<String> getDefaultRawExcludedLabelSelectors() {
     return getListWithoutComments("test", "excluded_labels");
   }
 
@@ -569,23 +575,24 @@ public class BuckConfig {
     return getValue("log", "remote_log_url").transform(TO_URI);
   }
 
-  public Optional<Float> getRemoteLogSampleRate() {
+  public Optional<SampleRate> getRemoteLogSampleRate() {
     Optional<Float> sampleRate = config.getFloat("log", "remote_log_sample_rate");
     if (sampleRate.isPresent()) {
-      if (sampleRate.get() > 1.0f) {
-        throw new HumanReadableException(
-            ".buckconfig: remote_log_sample_rate should be less than or equal to 1.0.");
-      }
-      if (sampleRate.get() < 0.0f) {
-        throw new HumanReadableException(
-            ".buckconfig: remote_log_sample_rate should be greater than or equal to 0.");
-      }
+      return Optional.of(SampleRate.of(sampleRate.get()));
     }
-    return sampleRate;
+    return Optional.absent();
  }
+
+  public boolean hasUserDefinedValue(String sectionName, String propertyName) {
+    return config.get(sectionName).containsKey(propertyName);
+  }
 
   public Optional<String> getValue(String sectionName, String propertyName) {
     return config.getValue(sectionName, propertyName);
+  }
+
+  public Optional<Integer> getInteger(String sectionName, String propertyName) {
+    return config.getInteger(sectionName, propertyName);
   }
 
   public Optional<Long> getLong(String sectionName, String propertyName) {
@@ -600,6 +607,10 @@ public class BuckConfig {
     return config.getBooleanValue(sectionName, propertyName, defaultValue);
   }
 
+  public Optional<URI> getUrl(String section, String field) {
+    return config.getUrl(section, field);
+  }
+
   private <T> T required(String section, String field, Optional<T> value) {
     if (!value.isPresent()) {
       throw new HumanReadableException(String.format(
@@ -608,6 +619,14 @@ public class BuckConfig {
           field));
     }
     return value.get();
+  }
+
+  // This is a hack. A cleaner approach would be to expose a narrow view of the config to any code
+  // that affects the state cached by the Daemon.
+  public boolean equalsForDaemonRestart(BuckConfig other) {
+    return this.config.equalsIgnoring(
+        other.config,
+        IGNORE_FIELDS_FOR_DAEMON_RESTART);
   }
 
   @Override
@@ -633,6 +652,10 @@ public class BuckConfig {
 
   public ImmutableMap<String, String> getEnvironment() {
     return environment;
+  }
+
+  public ImmutableMap<String, String> getFilteredEnvironment() {
+    return filteredEnvironment;
   }
 
   public String[] getEnv(String propertyName, String separator) {
@@ -678,6 +701,13 @@ public class BuckConfig {
   }
 
   /**
+   * @return the local cache directory
+   */
+  public String getLocalCacheDirectory() {
+    return getValue("cache", "dir").or(DEFAULT_CACHE_DIR);
+  }
+
+  /**
    * @return the selected execution order of the build work queue.
    */
   public WorkQueueExecutionOrder getWorkQueueExecutionOrder() {
@@ -704,7 +734,94 @@ public class BuckConfig {
    * @return the number of threads Buck should use.
    */
   public int getNumThreads() {
-    return getNumThreads((int) (Runtime.getRuntime().availableProcessors() * 1.25));
+    return getNumThreads(getDefaultMaximumNumberOfThreads());
+  }
+
+  private int getDefaultMaximumNumberOfThreads() {
+    return getDefaultMaximumNumberOfThreads(Runtime.getRuntime().availableProcessors());
+  }
+
+  @VisibleForTesting
+  int getDefaultMaximumNumberOfThreads(int detectedProcessorCount) {
+    double ratio = config
+                      .getFloat("build", "thread_core_ratio")
+                      .or(DEFAULT_THREAD_CORE_RATIO);
+    if (ratio <= 0.0F) {
+      throw new HumanReadableException(
+          "thread_core_ratio must be greater than zero (was " + ratio + ")");
+    }
+
+    int scaledValue = (int) Math.ceil(ratio * detectedProcessorCount);
+
+    int threadLimit = detectedProcessorCount;
+
+    Optional<Long> reservedCores = getNumberOfReservedCores();
+    if (reservedCores.isPresent()) {
+      threadLimit -= reservedCores.get();
+    }
+
+    if (scaledValue > threadLimit) {
+      scaledValue = threadLimit;
+    }
+
+    Optional<Long> minThreads = getThreadCoreRatioMinThreads();
+    if (minThreads.isPresent()) {
+      scaledValue = Math.max(scaledValue, minThreads.get().intValue());
+    }
+
+    Optional<Long> maxThreads = getThreadCoreRatioMaxThreads();
+    if (maxThreads.isPresent()) {
+      long maxThreadsValue = maxThreads.get();
+
+      if (minThreads.isPresent() && minThreads.get() > maxThreadsValue) {
+        throw new HumanReadableException(
+            "thread_core_ratio_max_cores must be larger than thread_core_ratio_min_cores"
+        );
+      }
+
+      if (maxThreadsValue > threadLimit) {
+        throw new HumanReadableException(
+            "thread_core_ratio_max_cores is larger than thread_core_ratio_reserved_cores allows"
+        );
+      }
+
+      scaledValue = Math.min(scaledValue, (int) maxThreadsValue);
+    }
+
+
+    if (scaledValue <= 0) {
+      throw new HumanReadableException(
+          "Configuration resulted in an invalid number of build threads (" +
+              scaledValue +
+              ").");
+    }
+
+    return scaledValue;
+  }
+
+  private Optional<Long> getNumberOfReservedCores() {
+    Optional<Long> reservedCores = config.getLong("build", "thread_core_ratio_reserved_cores");
+    if (reservedCores.isPresent() && reservedCores.get() < 0) {
+      throw new HumanReadableException("thread_core_ratio_reserved_cores must be larger than zero");
+    }
+    return reservedCores;
+  }
+
+  private Optional<Long> getThreadCoreRatioMaxThreads() {
+    Optional<Long> maxThreads = config.getLong("build", "thread_core_ratio_max_threads");
+    if (maxThreads.isPresent() && maxThreads.get() < 0) {
+      throw new HumanReadableException("thread_core_ratio_max_threads must be larger than zero");
+    }
+    return maxThreads;
+  }
+
+
+  private Optional<Long> getThreadCoreRatioMinThreads() {
+    Optional<Long> minThreads = config.getLong("build", "thread_core_ratio_min_threads");
+    if (minThreads.isPresent() && minThreads.get() <= 0) {
+      throw new HumanReadableException("thread_core_ratio_min_threads must be larger than zero");
+    }
+    return minThreads;
   }
 
   /**
@@ -722,6 +839,14 @@ public class BuckConfig {
   public float getLoadLimit() {
     return config.getFloat("build", "load_limit")
         .or(Float.POSITIVE_INFINITY);
+  }
+
+  public long getCountersFirstFlushIntervalMillis() {
+    return config.getLong("counters", "first_flush_interval_millis").or(5000L);
+  }
+
+  public long getCountersFlushIntervalMillis() {
+    return config.getLong("counters", "flush_interval_millis").or(30000L);
   }
 
   public Optional<Path> getPath(String sectionName, String name, boolean isCellRootRelative) {
@@ -761,6 +886,48 @@ public class BuckConfig {
     return config.getSectionToEntries().keySet();
   }
 
+  public ImmutableMap<String, ImmutableMap<String, String>> getRawConfigForParser() {
+    ImmutableMap<String, ImmutableMap<String, String>> rawSections =
+        config.getSectionToEntries();
+
+    // If the raw config doesn't have sections which have ignored fields, then just return it as-is.
+    ImmutableSet<String> sectionsWithIgnoredFields = IGNORE_FIELDS_FOR_DAEMON_RESTART.keySet();
+    if (Sets.intersection(rawSections.keySet(), sectionsWithIgnoredFields).isEmpty()) {
+      return rawSections;
+    }
+
+    // Otherwise, iterate through the config to do finer-grain filtering.
+    ImmutableMap.Builder<String, ImmutableMap<String, String>> filtered = ImmutableMap.builder();
+    for (Map.Entry<String, ImmutableMap<String, String>> sectionEnt : rawSections.entrySet()) {
+      String sectionName = sectionEnt.getKey();
+
+      // If this section doesn't have a corresponding ignored section, then just add it as-is.
+      if (!sectionsWithIgnoredFields.contains(sectionName)) {
+        filtered.put(sectionEnt);
+        continue;
+      }
+
+      // If none of this section's entries are ignored, then add it as-is.
+      ImmutableMap<String, String> fields = sectionEnt.getValue();
+      ImmutableSet<String> ignoredFieldNames =
+          IGNORE_FIELDS_FOR_DAEMON_RESTART.get(sectionName);
+      if (Sets.intersection(fields.keySet(), ignoredFieldNames).isEmpty()) {
+        filtered.put(sectionEnt);
+        continue;
+      }
+
+      // Otherwise, filter out the ignored fields.
+      ImmutableMap<String, String> remainingKeys = ImmutableMap.copyOf(
+          Maps.filterKeys(fields, Predicates.not(Predicates.in(ignoredFieldNames))));
+
+      if (!remainingKeys.isEmpty()) {
+        filtered.put(sectionName, remainingKeys);
+      }
+    }
+
+    return filtered.build();
+  }
+
   public Optional<ImmutableList<String>> getExternalTestRunner() {
     Optional<String> value = getValue("test", "external_runner");
     if (!value.isPresent()) {
@@ -768,5 +935,4 @@ public class BuckConfig {
     }
     return Optional.of(ImmutableList.copyOf(Splitter.on(' ').splitToList(value.get())));
   }
-
 }

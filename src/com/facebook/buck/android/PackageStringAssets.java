@@ -29,6 +29,7 @@ import com.facebook.buck.rules.Sha1HashCode;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
+import com.facebook.buck.zip.ZipCompressionLevel;
 import com.facebook.buck.zip.ZipStep;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -58,6 +59,7 @@ public class PackageStringAssets extends AbstractBuildRule
   private static final String STRING_ASSETS_ZIP_HASH = "STRING_ASSETS_ZIP_HASH";
   @VisibleForTesting
   static final String STRING_ASSET_FILE_EXTENSION = ".fbstr";
+  public static final String STRING_ASSETS_DIR_FORMAT = "__strings_%s__";
 
   private final FilteredResourcesProvider filteredResourcesProvider;
   private final AaptPackageResources aaptPackageResources;
@@ -118,14 +120,14 @@ public class PackageStringAssets extends AbstractBuildRule
             pathToAllLocalesStringAssetsZip,
             ImmutableSet.<Path>of(),
             false,
-            ZipStep.MAX_COMPRESSION_LEVEL,
+        ZipCompressionLevel.MAX_COMPRESSION_LEVEL,
             pathToDirContainingAssetsDir));
     steps.add(new ZipStep(
             getProjectFilesystem(),
             pathToStringAssetsZip,
             FluentIterable.from(locales).transform(assetPathBuilder).toSet(),
             false,
-            ZipStep.MAX_COMPRESSION_LEVEL,
+        ZipCompressionLevel.MAX_COMPRESSION_LEVEL,
             pathToDirContainingAssetsDir));
     steps.add(
         new RecordFileSha1Step(
@@ -176,6 +178,6 @@ public class PackageStringAssets extends AbstractBuildRule
   }
 
   private Path getPathToStringAssetsDir() {
-    return BuildTargets.getScratchPath(getBuildTarget(), "__strings_%s__");
+    return BuildTargets.getScratchPath(getBuildTarget(), STRING_ASSETS_DIR_FORMAT);
   }
 }

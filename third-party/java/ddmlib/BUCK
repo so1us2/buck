@@ -5,8 +5,10 @@ prebuilt_jar(
   deps = [
     '//third-party/java/kxml2:kxml2',
   ],
+  licenses = [
+    'NOTICE',
+  ],
   visibility = [
     'PUBLIC',
   ],
 )
-

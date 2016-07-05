@@ -19,7 +19,7 @@ package com.facebook.buck.python;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.rules.BuildRule;
@@ -89,6 +89,7 @@ public class PythonPackagedBinaryTest {
             ImmutableMap.<Path, SourcePath>of(),
             ImmutableSet.<SourcePath>of(),
             Optional.<Boolean>absent()),
+        ImmutableSortedSet.<String>of(),
         ImmutableSortedSet.<BuildRule>of());
 
     // Calculate and return the rule key.
@@ -97,9 +98,9 @@ public class PythonPackagedBinaryTest {
 
   @Test
   public void testRuleKeysFromModuleLayouts() throws IOException {
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver resolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+     );
 
     // Create two different sources, which we'll swap in as different modules.
     Path main = tmpDir.newFile().toPath();

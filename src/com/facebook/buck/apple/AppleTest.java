@@ -17,15 +17,16 @@
 package com.facebook.buck.apple;
 
 import com.facebook.buck.model.Pair;
+import com.facebook.buck.rules.AbstractBuildRule;
 import com.facebook.buck.rules.AddToRuleKey;
 import com.facebook.buck.rules.BuildContext;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
+import com.facebook.buck.rules.BuildableContext;
 import com.facebook.buck.rules.ExternalTestRunnerRule;
 import com.facebook.buck.rules.ExternalTestRunnerTestSpec;
 import com.facebook.buck.rules.HasRuntimeDeps;
 import com.facebook.buck.rules.Label;
-import com.facebook.buck.rules.NoopBuildRule;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TestRule;
@@ -64,9 +65,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import javax.annotation.Nullable;
+
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class AppleTest
-    extends NoopBuildRule
+    extends AbstractBuildRule
     implements TestRule, HasRuntimeDeps, ExternalTestRunnerRule {
 
   @AddToRuleKey
@@ -108,6 +111,7 @@ public class AppleTest
   private final String testBundleExtension;
 
   private Optional<AppleTestXctoolStdoutReader> xctoolStdoutReader;
+  private Optional<AppleTestXctestOutputReader> xctestOutputReader;
 
   private final String testLogDirectoryEnvironmentVariable;
   private final String testLogLevelEnvironmentVariable;
@@ -141,6 +145,31 @@ public class AppleTest
 
     public ImmutableList<TestCaseSummary> getTestCaseSummaries() {
       return xctoolEventHandler.getTestCaseSummaries();
+    }
+  }
+
+  private static class AppleTestXctestOutputReader
+    implements XctestRunTestsStep.OutputReadingCallback {
+
+    private final TestCaseSummariesBuildingXctestEventHandler xctestEventHandler;
+
+    public AppleTestXctestOutputReader(TestRule.TestReportingCallback testReportingCallback) {
+      this.xctestEventHandler = new TestCaseSummariesBuildingXctestEventHandler(
+          testReportingCallback);
+    }
+
+    @Override
+    public void readOutput(InputStream output) throws IOException {
+      try (InputStreamReader outputReader =
+               new InputStreamReader(output, StandardCharsets.UTF_8);
+           BufferedReader outputBufferedReader = new BufferedReader(outputReader)) {
+        XctestOutputParsing.streamOutput(
+            outputBufferedReader, xctestEventHandler);
+      }
+    }
+
+    public ImmutableList<TestCaseSummary> getTestCaseSummaries() {
+      return xctestEventHandler.getTestCaseSummaries();
     }
   }
 
@@ -183,6 +212,7 @@ public class AppleTest
     this.testOutputPath = getPathToTestOutputDirectory().resolve("test-output.json");
     this.testLogsPath = getPathToTestOutputDirectory().resolve("logs");
     this.xctoolStdoutReader = Optional.absent();
+    this.xctestOutputReader = Optional.absent();
     this.xcodeDeveloperDirSupplier = xcodeDeveloperDirSupplier;
     this.testLogDirectoryEnvironmentVariable = testLogDirectoryEnvironmentVariable;
     this.testLogLevelEnvironmentVariable = testLogLevelEnvironmentVariable;
@@ -248,7 +278,7 @@ public class AppleTest
       if (!xctool.isPresent()) {
         throw new HumanReadableException(
             "Set xctool_path = /path/to/xctool or xctool_zip_target = //path/to:xctool-zip " +
-            "in the [apple] section of .buckconfig to run this test");
+                "in the [apple] section of .buckconfig to run this test");
       }
 
       ImmutableSet.Builder<Path> logicTestPathsBuilder = ImmutableSet.builder();
@@ -300,6 +330,8 @@ public class AppleTest
       externalSpec.setCommand(xctoolStep.getCommand());
       externalSpec.setEnv(xctoolStep.getEnv(context));
     } else {
+      xctestOutputReader = Optional.of(new AppleTestXctestOutputReader(testReportingCallback));
+
       Tool testRunningTool;
       if (testBundleExtension.equals("xctest")) {
         testRunningTool = xctest;
@@ -318,6 +350,7 @@ public class AppleTest
               (testBundleExtension.equals("xctest") ? "-XCTest" : "-SenTest"),
               resolvedTestBundleDirectory,
               resolvedTestOutputPath,
+              xctestOutputReader,
               xcodeDeveloperDirSupplier);
       steps.add(xctestStep);
       externalSpec.setType("xctest");
@@ -350,12 +383,19 @@ public class AppleTest
           // We've already run the tests with 'xctool' and parsed
           // their output; no need to parse the same output again.
           testCaseSummaries = xctoolStdoutReader.get().getTestCaseSummaries();
+        } else if (xctestOutputReader.isPresent()) {
+          // We've already run the tests with 'xctest' and parsed
+          // their output; no need to parse the same output again.
+          testCaseSummaries = xctestOutputReader.get().getTestCaseSummaries();
         } else {
           Path resolvedOutputPath = getProjectFilesystem().resolve(testOutputPath);
           try (BufferedReader reader =
               Files.newBufferedReader(resolvedOutputPath, StandardCharsets.UTF_8)) {
             if (useXctest) {
-              testCaseSummaries = XctestOutputParsing.parseOutputFromReader(reader);
+              TestCaseSummariesBuildingXctestEventHandler xctestEventHandler =
+                  new TestCaseSummariesBuildingXctestEventHandler(NOOP_REPORTING_CALLBACK);
+              XctestOutputParsing.streamOutput(reader, xctestEventHandler);
+              testCaseSummaries = xctestEventHandler.getTestCaseSummaries();
             } else {
               TestCaseSummariesBuildingXctoolEventHandler xctoolEventHandler =
                   new TestCaseSummariesBuildingXctoolEventHandler(NOOP_REPORTING_CALLBACK);
@@ -420,14 +460,31 @@ public class AppleTest
 
   @Override
   public boolean supportsStreamingTests() {
-    return !useXctest;
+    return true;
   }
 
   @Override
   public ExternalTestRunnerTestSpec getExternalTestRunnerSpec(
-      ExecutionContext executionContext, TestRunningOptions testRunningOptions) {
+      ExecutionContext executionContext,
+      TestRunningOptions testRunningOptions) {
     return getTestCommand(
-        executionContext, testRunningOptions, NOOP_REPORTING_CALLBACK).getSecond();
+        executionContext,
+        testRunningOptions,
+        NOOP_REPORTING_CALLBACK)
+        .getSecond();
+  }
+
+  @Override
+  public ImmutableList<Step> getBuildSteps(
+      BuildContext context,
+      BuildableContext buildableContext) {
+    return ImmutableList.of();
+  }
+
+  @Nullable
+  @Override
+  public Path getPathToOutput() {
+    return testBundle.getPathToOutput();
   }
 
 }

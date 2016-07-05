@@ -16,10 +16,10 @@
 
 package com.facebook.buck.slb;
 
+import com.facebook.buck.event.BuckEventBus;
 import com.squareup.okhttp.Call;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
-import com.squareup.okhttp.Response;
 
 import java.io.IOException;
 import java.net.URI;
@@ -27,24 +27,37 @@ import java.net.URI;
 public class LoadBalancedService implements HttpService {
   private final HttpLoadBalancer slb;
   private final OkHttpClient client;
+  private final BuckEventBus eventBus;
 
-  public LoadBalancedService(HttpLoadBalancer slb, OkHttpClient client) {
+  public LoadBalancedService(HttpLoadBalancer slb, OkHttpClient client, BuckEventBus eventBus) {
     this.slb = slb;
     this.client = client;
+    this.eventBus = eventBus;
   }
 
   @Override
-  public Response makeRequest(
+  public HttpResponse makeRequest(
       String path, Request.Builder requestBuilder) throws IOException {
     URI server = slb.getBestServer();
-    requestBuilder.url(server.resolve(path).toURL());
+    LoadBalancedServiceEventData.Builder data = LoadBalancedServiceEventData.builder()
+        .setServer(server);
+    requestBuilder.url(SingleUriService.getFullUrl(server, path));
     Request request = requestBuilder.build();
+    if (request.body() != null && request.body().contentLength() != -1) {
+      data.setRequestSizeBytes(request.body().contentLength());
+    }
     Call call = client.newCall(request);
     try {
-      return call.execute();
+      HttpResponse response = new LoadBalancedHttpResponse(server, slb, call.execute());
+      if (response.contentLength() != -1) {
+        data.setResponseSizeBytes(response.contentLength());
+      }
+      return response;
     } catch (IOException e) {
-      slb.reportException(server);
+      data.setException(e);
       throw new IOException(e);
+    } finally {
+      eventBus.post(new LoadBalancedServiceEvent(data.build()));
     }
   }
 

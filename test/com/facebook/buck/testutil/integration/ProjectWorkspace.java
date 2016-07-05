@@ -18,6 +18,7 @@ package com.facebook.buck.testutil.integration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
@@ -27,9 +28,11 @@ import com.dd.plist.NSDictionary;
 import com.dd.plist.NSObject;
 import com.facebook.buck.android.DefaultAndroidDirectoryResolver;
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Config;
 import com.facebook.buck.cli.Main;
 import com.facebook.buck.cli.TestRunning;
+import com.facebook.buck.config.Configs;
+import com.facebook.buck.config.RawConfig;
 import com.facebook.buck.event.BuckEvent;
 import com.facebook.buck.event.BuckEventListener;
 import com.facebook.buck.event.ConsoleEvent;
@@ -38,10 +41,15 @@ import com.facebook.buck.io.MoreFiles;
 import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.io.Watchman;
+import com.facebook.buck.jvm.java.JavaCompilationConstants;
 import com.facebook.buck.model.BuckVersion;
 import com.facebook.buck.model.BuildId;
+import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.Cell;
 import com.facebook.buck.rules.KnownBuildRuleTypesFactory;
+import com.facebook.buck.rules.TestRunEvent;
+import com.facebook.buck.test.TestResults;
 import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.timing.DefaultClock;
 import com.facebook.buck.util.BuckConstant;
@@ -61,11 +69,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 import com.martiansoftware.nailgun.NGContext;
 
+import org.hamcrest.Matchers;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.file.FileAlreadyExistsException;
@@ -216,6 +227,14 @@ public class ProjectWorkspace {
       };
       Files.walkFileTree(destPath, copyDirVisitor);
     }
+
+    // Disable the directory cache by default.  Tests that want to enable it can call
+    // `enableDirCache` on this object.  Only do this if a .buckconfig.local file does not already
+    // exist, however (we assume the test knows what it is doing at that point).
+    if (!Files.exists(getPath(".buckconfig.local"))) {
+      writeContentsToPath("[cache]\n  mode =", ".buckconfig.local");
+    }
+
     isSetUp = true;
     return this;
   }
@@ -247,7 +266,7 @@ public class ProjectWorkspace {
       ImmutableList<String> vmArgs,
       String... args)  throws IOException, InterruptedException {
     List<String> command = ImmutableList.<String>builder()
-        .add("java")
+        .add(JavaCompilationConstants.DEFAULT_JAVA_OPTIONS.getJavaRuntimeLauncher().getCommand())
         .addAll(vmArgs)
         .add("-jar")
         .add(jar.toString())
@@ -361,6 +380,7 @@ public class ProjectWorkspace {
     assertTrue("setUp() must be run before this method is invoked", isSetUp);
     CapturingPrintStream stdout = new CapturingPrintStream();
     final CapturingPrintStream stderr = new CapturingPrintStream();
+    InputStream stdin = new ByteArrayInputStream("".getBytes());
 
     final ImmutableList.Builder<BuckEvent> capturedEventsListBuilder =
         new ImmutableList.Builder<>();
@@ -396,7 +416,11 @@ public class ProjectWorkspace {
         "ANDROID_NDK",
         "ANDROID_NDK_REPOSITORY",
         "ANDROID_SDK",
+        // TODO(grumpyjames) Write an equivalent of the groovyc and startGroovy
+        // scripts provided by the groovy distribution in order to remove these two.
         "GROOVY_HOME",
+        "JAVA_HOME",
+
         "NDK_HOME",
         "PATH",
         "PATHEXT",
@@ -417,7 +441,7 @@ public class ProjectWorkspace {
     }
     ImmutableMap<String, String> sanizitedEnv = envBuilder.build();
 
-    Main main = new Main(stdout, stderr, eventListeners.build());
+    Main main = new Main(stdout, stderr, stdin, eventListeners.build());
     int exitCode = 0;
     try {
       exitCode = main.runMainWithExitCode(
@@ -439,16 +463,56 @@ public class ProjectWorkspace {
         capturedEventsListBuilder.build());
   }
 
+  public ImmutableList<TestResults> runBuckTest(String... args) throws IOException {
+    final ImmutableList.Builder<TestResults> resultsBuilder = ImmutableList.builder();
+    BuckEventListener eventListener =
+        new BuckEventListener() {
+          @Subscribe
+          public void onEvent(TestRunEvent.Finished event) {
+            resultsBuilder.addAll(event.getResults());
+          }
+          @Override
+          public void outputTrace(BuildId buildId) throws InterruptedException {
+          }
+        };
+    String[] totalArgs = new String[args.length + 1];
+    totalArgs[0] = "test";
+    System.arraycopy(args, 0, totalArgs, 1, args.length);
+    ProcessResult result =
+        runBuckCommandWithEnvironmentAndContext(
+            destPath,
+            Optional.<NGContext>absent(),
+            Optional.of(eventListener),
+            Optional.<ImmutableMap<String, String>>absent(),
+            totalArgs);
+    assertThat(
+        result.getStdout() + result.getStderr(),
+        result.getExitCode(),
+        Matchers.in(new Integer[]{0, TestRunning.TEST_FAILURES_EXIT_CODE}));
+    return resultsBuilder.build();
+  }
+
   public Path getDestPath() {
     return destPath;
+  }
+
+  public Path getPath(Path pathRelativeToProjectRoot) {
+    return destPath.resolve(pathRelativeToProjectRoot);
   }
 
   public Path getPath(String pathRelativeToProjectRoot) {
     return destPath.resolve(pathRelativeToProjectRoot);
   }
 
+  public String getFileContents(Path pathRelativeToProjectRoot) throws IOException {
+    return getFileContentsWithAbsolutePath(getPath(pathRelativeToProjectRoot));
+  }
+
   public String getFileContents(String pathRelativeToProjectRoot) throws IOException {
-    Path path = getPath(pathRelativeToProjectRoot);
+    return getFileContentsWithAbsolutePath(getPath(pathRelativeToProjectRoot));
+  }
+
+  private String getFileContentsWithAbsolutePath(Path path) throws IOException {
     String platformExt = null;
     switch (Platform.detect()) {
       case LINUX:
@@ -530,15 +594,14 @@ public class ProjectWorkspace {
   }
 
   public Cell asCell() throws IOException, InterruptedException {
-    Config config = Config.createDefaultConfig(
-        getDestPath(),
-        ImmutableMap.<String, ImmutableMap<String, String>>of());
+    Config config = Configs.createDefaultConfig(getDestPath(), RawConfig.of());
 
     ProjectFilesystem filesystem = new ProjectFilesystem(getDestPath(), config);
     TestConsole console = new TestConsole();
     ImmutableMap<String, String> env = ImmutableMap.copyOf(System.getenv());
     DefaultAndroidDirectoryResolver directoryResolver = new DefaultAndroidDirectoryResolver(
         filesystem,
+        Optional.<String>absent(),
         Optional.<String>absent(),
         new DefaultPropertyFinder(filesystem, env));
     return Cell.createCell(
@@ -552,6 +615,11 @@ public class ProjectWorkspace {
             Optional.<Path>absent()),
         directoryResolver,
         new DefaultClock());
+  }
+
+  public BuildTarget newBuildTarget(String fullyQualifiedName)
+      throws IOException, InterruptedException {
+    return BuildTargetFactory.newInstance(asCell().getFilesystem(), fullyQualifiedName);
   }
 
   /** The result of running {@code buck} from the command line. */
@@ -643,6 +711,89 @@ public class ProjectWorkspace {
     }
   }
 
+  public void assertFilesEqual(Path expected, Path actual) throws IOException {
+    if (!expected.isAbsolute()) {
+      expected = templatePath.resolve(expected);
+    }
+    if (!actual.isAbsolute()) {
+      actual = destPath.resolve(actual);
+    }
+    if (!Files.isRegularFile(actual)) {
+      fail("Expected file " + actual + " could not be found.");
+    }
+
+    String extension = MorePaths.getFileExtension(actual);
+    String cleanPathToObservedFile = MoreStrings.withoutSuffix(
+        templatePath.relativize(expected).toString(), EXPECTED_SUFFIX);
+
+    switch (extension) {
+      // For Apple .plist and .stringsdict files, we define equivalence if:
+      // 1. The two files are the same type (XML or binary)
+      // 2. If binary: unserialized objects are deeply-equivalent.
+      //    Otherwise, fall back to exact string match.
+      case "plist":
+      case "stringsdict":
+        NSObject expectedObject;
+        try {
+          expectedObject = BinaryPropertyListParser.parse(expected.toFile());
+        } catch (Exception e) {
+          // Not binary format.
+          expectedObject = null;
+        }
+
+        NSObject observedObject;
+        try {
+          observedObject = BinaryPropertyListParser.parse(actual.toFile());
+        } catch (Exception e) {
+          // Not binary format.
+          observedObject = null;
+        }
+
+        assertTrue(
+            String.format(
+                "In %s, expected plist to be of %s type.",
+                cleanPathToObservedFile,
+                (expectedObject != null) ? "binary" : "XML"),
+            (expectedObject != null) == (observedObject != null));
+
+        if (expectedObject != null) {
+          // These keys depend on the locally installed version of Xcode, so ignore them
+          // in comparisons.
+          String[] ignoredKeys = {
+              "DTSDKName",
+              "DTPlatformName",
+              "DTPlatformVersion",
+              "MinimumOSVersion",
+              "DTSDKBuild",
+              "DTPlatformBuild",
+              "DTXcode",
+              "DTXcodeBuild"
+          };
+          if (observedObject instanceof NSDictionary &&
+              expectedObject instanceof NSDictionary) {
+            for (String key : ignoredKeys) {
+              ((NSDictionary) observedObject).remove(key);
+              ((NSDictionary) expectedObject).remove(key);
+            }
+          }
+
+          assertEquals(
+              String.format(
+                  "In %s, expected binary plist contents to match.",
+                  cleanPathToObservedFile),
+              expectedObject,
+              observedObject);
+          break;
+        } else {
+          assertFileContentsEqual(expected, actual);
+        }
+        break;
+
+      default:
+        assertFileContentsEqual(expected, actual);
+    }
+  }
+
   private void assertFileContentsEqual(Path expectedFile, Path observedFile) throws IOException {
     String cleanPathToObservedFile = MoreStrings.withoutSuffix(
         templatePath.relativize(expectedFile).toString(), EXPECTED_SUFFIX);
@@ -668,106 +819,41 @@ public class ProjectWorkspace {
    * For every file in the template directory whose name ends in {@code .expected}, checks that an
    * equivalent file has been written in the same place under the destination directory.
    *
-   * @param subDirectory An optional subdirectory to check. Only files in this directory will be
-   *                     compared.
+   * @param templateSubdirectory An optional subdirectory to check. Only files in this directory
+   *                     will be compared.
    */
-  public void verify(final Optional<Path> subDirectory) throws IOException {
+  private void assertPathsEqual(final Path templateSubdirectory, final Path destinationSubdirectory)
+      throws IOException {
     SimpleFileVisitor<Path> copyDirVisitor = new SimpleFileVisitor<Path>() {
       @Override
       public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
         String fileName = file.getFileName().toString();
         if (fileName.endsWith(EXPECTED_SUFFIX)) {
           // Get File for the file that should be written, but without the ".expected" suffix.
-          Path generatedFileWithSuffix = destPath.resolve(templatePath.relativize(file));
+          Path generatedFileWithSuffix =
+              destinationSubdirectory.resolve(templateSubdirectory.relativize(file));
           Path directory = generatedFileWithSuffix.getParent();
           Path observedFile = directory.resolve(MorePaths.getNameWithoutExtension(file));
-
-          if (!Files.isRegularFile(observedFile)) {
-            fail("Expected file " + observedFile + " could not be found.");
-          }
-
-          String extension = MorePaths.getFileExtension(observedFile);
-          String cleanPathToObservedFile = MoreStrings.withoutSuffix(
-              templatePath.relativize(file).toString(), EXPECTED_SUFFIX);
-
-          switch (extension) {
-            // For Apple .plist and .stringsdict files, we define equivalence if:
-            // 1. The two files are the same type (XML or binary)
-            // 2. If binary: unserialized objects are deeply-equivalent.
-            //    Otherwise, fall back to exact string match.
-            case "plist":
-            case "stringsdict":
-              NSObject expectedObject;
-              try {
-                expectedObject = BinaryPropertyListParser.parse(file.toFile());
-              } catch (Exception e) {
-                // Not binary format.
-                expectedObject = null;
-              }
-
-              NSObject observedObject;
-              try {
-                observedObject = BinaryPropertyListParser.parse(observedFile.toFile());
-              } catch (Exception e) {
-                // Not binary format.
-                observedObject = null;
-              }
-
-              assertTrue(
-                  String.format(
-                      "In %s, expected plist to be of %s type.",
-                      cleanPathToObservedFile,
-                      (expectedObject != null) ? "binary" : "XML"),
-                  !((expectedObject != null) ^ (observedObject != null)));
-
-              if (expectedObject != null && observedObject != null) {
-                // These keys depend on the locally installed version of Xcode, so ignore them
-                // in comparisons.
-                String[] ignoredKeys = {
-                    "DTSDKName",
-                    "DTPlatformName",
-                    "DTPlatformVersion",
-                    "MinimumOSVersion",
-                    "DTSDKBuild",
-                    "DTPlatformBuild"
-                };
-                if (observedObject instanceof NSDictionary &&
-                    expectedObject instanceof NSDictionary) {
-                  for (String key : ignoredKeys) {
-                    ((NSDictionary) observedObject).remove(key);
-                    ((NSDictionary) expectedObject).remove(key);
-                  }
-                }
-
-                assertEquals(
-                    String.format(
-                        "In %s, expected binary plist contents to match.",
-                        cleanPathToObservedFile),
-                    expectedObject,
-                    observedObject);
-                break;
-              } else {
-                assertFileContentsEqual(file, observedFile);
-              }
-              break;
-
-            default:
-              assertFileContentsEqual(file, observedFile);
-          }
+          assertFilesEqual(file, observedFile);
         }
         return FileVisitResult.CONTINUE;
       }
     };
 
-    Path root = subDirectory.isPresent() ? templatePath.resolve(subDirectory.get()) : templatePath;
-    Files.walkFileTree(root, copyDirVisitor);
+    Files.walkFileTree(templateSubdirectory, copyDirVisitor);
+  }
+
+  public void verify(Path templateSubdirectory, Path destinationSubdirectory) throws IOException {
+    assertPathsEqual(
+        templatePath.resolve(templateSubdirectory),
+        destPath.resolve(destinationSubdirectory));
   }
 
   public void verify() throws IOException {
-    verify(Optional.<Path>absent());
+    assertPathsEqual(templatePath, destPath);
   }
 
-  public void verify(Path subDirectory) throws IOException {
-    verify(Optional.of(subDirectory));
+  public void verify(Path subdirectory) throws IOException {
+    assertPathsEqual(templatePath.resolve(subdirectory), destPath.resolve(subdirectory));
   }
 }

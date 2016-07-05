@@ -27,7 +27,7 @@ import com.facebook.buck.android.AndroidLibraryBuilder;
 import com.facebook.buck.android.AndroidResourceRuleBuilder;
 import com.facebook.buck.android.NdkLibrary;
 import com.facebook.buck.android.NdkLibraryBuilder;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.core.JavaPackageFinder;
@@ -53,7 +53,7 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.testutil.BuckTestConstant;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -94,7 +94,7 @@ public class ProjectTest {
   public Pair<ProjectWithModules, BuildRuleResolver> createActionGraphForTesting(
       @Nullable JavaPackageFinder javaPackageFinder) throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     // prebuilt_jar //third_party/guava:guava
     guava = PrebuiltJarBuilder
@@ -217,7 +217,8 @@ public class ProjectTest {
             projectConfigForResource,
             projectConfigUsingNoDx,
             projectConfig),
-        javaPackageFinder),
+        javaPackageFinder,
+        null  /* intellijConfig */),
         ruleResolver);
   }
 
@@ -279,7 +280,9 @@ public class ProjectTest {
         ImmutableList.of(
             SerializableDependentModule.newSourceFolder(),
             guavaAsProvidedDep,
-            SerializableDependentModule.newInheritedJdk()),
+            SerializableDependentModule.newStandardJdk(
+                Optional.<String>absent(),
+                Optional.<String>absent())),
         javaLibraryModule.getDependencies());
 
     // Check the values of the module that corresponds to the android_library.
@@ -408,7 +411,7 @@ public class ProjectTest {
   @Test
   public void testPrebuiltJarIncludesDeps() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     // Build up a the graph that corresponds to:
     //
@@ -473,7 +476,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules = getModulesForActionGraph(
         ruleResolver,
         ImmutableSortedSet.of(projectConfig),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
     List<SerializableModule> modules = projectWithModules.modules;
 
     // Verify that the single Module that is created transitively includes all JAR files.
@@ -498,7 +502,7 @@ public class ProjectTest {
   @Test
   public void testIfModuleIsBothTestAndCompileDepThenTreatAsCompileDep() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     // Create a java_library() and a java_test() that both depend on Guava.
     // When they are part of the same project_config() rule, then the resulting module should
@@ -533,7 +537,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules = getModulesForActionGraph(
         ruleResolver,
         ImmutableSortedSet.of(projectConfig),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /*intellijConfig */);
     List<SerializableModule> modules = projectWithModules.modules;
     assertEquals(1, modules.size());
     SerializableModule comExampleBaseModule = Iterables.getOnlyElement(modules);
@@ -544,7 +549,9 @@ public class ProjectTest {
             SerializableDependentModule.newLibrary(
                 guava.getBuildTarget(),
                 "buck_out_gen_third_party_java_guava_guava_jar"),
-            SerializableDependentModule.newStandardJdk(jdkName, jdkType)),
+            SerializableDependentModule.newStandardJdk(
+                Optional.<String>absent(),
+                Optional.<String>absent())),
         comExampleBaseModule.getDependencies());
   }
 
@@ -564,7 +571,7 @@ public class ProjectTest {
   @Test
   public void testThatJarsAreListedBeforeModules() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     BuildRule supportV4 = JavaLibraryBuilder
         .createBuilder(BuildTargetFactory.newInstance("//java/com/android/support/v4:v4"))
@@ -595,7 +602,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules = getModulesForActionGraph(
         ruleResolver,
         ImmutableSortedSet.of(projectConfig),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
     List<SerializableModule> modules = projectWithModules.modules;
     assertEquals("Should be one module for the android_library", 1, modules.size());
     SerializableModule robolectricModule = Iterables.getOnlyElement(modules);
@@ -612,7 +620,9 @@ public class ProjectTest {
                 "buck_out_gen_third_party_java_httpcore_httpcore_jar"),
             SerializableDependentModule.newModule(
                 supportV4.getBuildTarget(), "module_java_com_android_support_v4"),
-            SerializableDependentModule.newInheritedJdk()),
+            SerializableDependentModule.newStandardJdk(
+                Optional.<String>absent(),
+                Optional.<String>absent())),
         robolectricModule.getDependencies());
   }
 
@@ -638,7 +648,7 @@ public class ProjectTest {
   public void testSrcRoots() throws Exception {
     // Create a project_config() with src_roots=None.
     BuildRuleResolver ruleResolver1 =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     BuildRule resBuildRule = ruleResolver1.addToIndex(
         AndroidResourceRuleBuilder.newBuilder()
@@ -654,7 +664,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules1 = getModulesForActionGraph(
         ruleResolver1,
         ImmutableSortedSet.of(projectConfigNullSrcRoots),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
 
     // Verify that the correct source folders are created.
     assertEquals(1, projectWithModules1.modules.size());
@@ -666,7 +677,7 @@ public class ProjectTest {
 
     // Create a project_config() with src_roots=[].
     BuildRuleResolver ruleResolver2 =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule baseBuildRule = AndroidLibraryBuilder
         .createBuilder(BuildTargetFactory.newInstance("//java/com/example/base:base"))
         .build(ruleResolver2);
@@ -688,7 +699,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules2 = getModulesForActionGraph(
         ruleResolver2,
         ImmutableSortedSet.of(inPackageProjectConfig),
-        javaPackageFinder);
+        javaPackageFinder,
+        null /* intellijConfig */);
     EasyMock.verify(javaPackageFinder);
     assertEquals(1, projectWithModules2.modules.size());
     SerializableModule moduleWithPackagePrefix = projectWithModules2.modules.get(0);
@@ -702,7 +714,7 @@ public class ProjectTest {
 
     // Create a project_config() with src_roots=['src'].
     BuildRuleResolver ruleResolver3 =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule baseBuildRule3 = AndroidLibraryBuilder
         .createBuilder(BuildTargetFactory.newInstance("//java/com/example/base:base"))
         .build(ruleResolver3);
@@ -715,7 +727,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules3 = getModulesForActionGraph(
         ruleResolver3,
         ImmutableSortedSet.of(hasSrcFolderProjectConfig),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
 
     // Verify that the correct source folders are created.
     assertEquals(1, projectWithModules3.modules.size());
@@ -726,6 +739,50 @@ public class ProjectTest {
             new SourceFolder("file://$MODULE_DIR$/src", false /* isTestSource */),
             SerializableModule.SourceFolder.GEN),
         moduleHasSrcFolder.sourceFolders);
+  }
+
+  @Test
+  public void testIntellijJdkConfig() throws Exception {
+    IntellijConfig intellijConfig = new IntellijConfig(
+        FakeBuckConfig.builder().setSections(
+            ImmutableMap.of("intellij", ImmutableMap.of("jdk_name", "1.8")))
+            .build()
+    );
+    BuildRuleResolver ruleResolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    BuildRule baseBuildRule = JavaLibraryBuilder
+        .createBuilder(BuildTargetFactory.newInstance("//java/com/example/base:base"))
+        .build(ruleResolver);
+    ProjectConfig packageProjectConfig = (ProjectConfig) ProjectConfigBuilder
+        .createBuilder(
+            BuildTargetFactory.newInstance("//java/com/example/base:project_config"))
+        .setSrcRule(baseBuildRule.getBuildTarget())
+        .setSrcRoots(ImmutableList.<String>of())
+        .build(ruleResolver);
+
+    ProjectWithModules projectWithJdkOverride = getModulesForActionGraph(
+        ruleResolver,
+        ImmutableSortedSet.of(packageProjectConfig),
+        null /* javaPackageFinder */,
+        intellijConfig);
+    SerializableModule moduleWithJdkOverride = projectWithJdkOverride.modules.get(0);
+    assertListEquals(
+        ImmutableList.of(
+            SerializableDependentModule.newSourceFolder(),
+            SerializableDependentModule.newStandardJdk(Optional.of("1.8"), Optional.of("JavaSDK"))),
+        moduleWithJdkOverride.getDependencies());
+
+    ProjectWithModules projectWithDefaultJdk = getModulesForActionGraph(
+        ruleResolver,
+        ImmutableSortedSet.of(packageProjectConfig),
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
+    SerializableModule moduleWithDefaultJdk = projectWithDefaultJdk.modules.get(0);
+    assertListEquals(
+        ImmutableList.of(
+            SerializableDependentModule.newSourceFolder(),
+            SerializableDependentModule.newStandardJdk(Optional.of("1.7"), Optional.of("JavaSDK"))),
+        moduleWithDefaultJdk.getDependencies());
   }
 
   private static class ProjectWithModules {
@@ -740,9 +797,13 @@ public class ProjectTest {
   private ProjectWithModules getModulesForActionGraph(
       BuildRuleResolver ruleResolver,
       ImmutableSortedSet<ProjectConfig> projectConfigs,
-      @Nullable JavaPackageFinder javaPackageFinder) throws IOException {
+      @Nullable JavaPackageFinder javaPackageFinder,
+      @Nullable IntellijConfig intellijConfig) throws IOException {
     if (javaPackageFinder == null) {
       javaPackageFinder = new FakeJavaPackageFinder();
+    }
+    if (intellijConfig == null) {
+      intellijConfig = new IntellijConfig(FakeBuckConfig.builder().build());
     }
 
     ActionGraph actionGraph = new ActionGraph(ruleResolver.getBuildRules());
@@ -781,10 +842,10 @@ public class ProjectTest {
                 BuildTarget.TO_TARGET)),
         projectFilesystem,
         /* pathToDefaultAndroidManifest */ Optional.<String>absent(),
-        new IntellijConfig(FakeBuckConfig.builder().build()),
+        intellijConfig,
         /* pathToPostProcessScript */ Optional.<String>absent(),
         BuckTestConstant.PYTHON_INTERPRETER,
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         true);
 
     // Execute Project's business logic.
@@ -805,7 +866,7 @@ public class ProjectTest {
   @Test
   public void testNdkLibraryHasCorrectPath() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
 
     // Build up a the graph that corresponds to:
     //
@@ -833,7 +894,8 @@ public class ProjectTest {
     ProjectWithModules projectWithModules = getModulesForActionGraph(
         ruleResolver,
         ImmutableSortedSet.of(ndkProjectConfig),
-        null /* javaPackageFinder */);
+        null /* javaPackageFinder */,
+        null /* intellijConfig */);
     List<SerializableModule> modules = projectWithModules.modules;
 
     assertEquals("Should be one module for the ndk_library.", 1, modules.size());
@@ -849,9 +911,9 @@ public class ProjectTest {
 
   @Test
   public void testDoNotIgnoreAllOfBuckOut() {
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver resolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+     );
     ProjectFilesystem projectFilesystem = EasyMock.createMock(ProjectFilesystem.class);
     ImmutableSet<Path> ignorePaths = ImmutableSet.of(Paths.get("buck-out"), Paths.get(".git"));
     EasyMock.expect(projectFilesystem.getRootPath()).andStubReturn(Paths.get("/opt/src/buck"));

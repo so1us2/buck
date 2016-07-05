@@ -1,2 +1,2 @@
 [react-native]
-  packager = //js:packager
+  packager_worker = //js:packager_worker

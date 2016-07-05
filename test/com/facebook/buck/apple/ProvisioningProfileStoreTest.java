@@ -20,8 +20,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
+import com.dd.plist.NSArray;
+import com.dd.plist.NSObject;
+import com.dd.plist.NSString;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.HashCode;
 
 import org.junit.Test;
 
@@ -31,13 +37,35 @@ import java.util.Date;
 public class ProvisioningProfileStoreTest {
   private static ProvisioningProfileMetadata makeTestMetadata(
       String appID, Date expirationDate, String uuid) throws Exception {
+    return makeTestMetadata(appID, expirationDate, uuid, ImmutableMap.<String, NSObject>of());
+  }
+
+  private static ProvisioningProfileMetadata makeTestMetadata(
+      String appID,
+      Date expirationDate,
+      String uuid,
+      ImmutableMap<String, NSObject> entitlements
+  ) throws Exception {
+    return makeTestMetadata(appID, expirationDate, uuid, entitlements, ImmutableSet.<HashCode>of());
+  }
+
+  private static ProvisioningProfileMetadata makeTestMetadata(
+      String appID,
+      Date expirationDate,
+      String uuid,
+      ImmutableMap<String, NSObject> entitlements,
+      ImmutableSet<HashCode> fingerprints
+  ) throws Exception {
     return ProvisioningProfileMetadata.builder()
         .setAppID(ProvisioningProfileMetadata.splitAppID(appID))
         .setExpirationDate(expirationDate)
         .setUUID(uuid)
         .setProfilePath(Paths.get("dummy.mobileprovision"))
+        .setEntitlements(entitlements)
+        .setDeveloperCertificateFingerprints(fingerprints)
         .build();
   }
+
 
   @Test
   public void testExpiredProfilesAreIgnored() throws Exception {
@@ -48,8 +76,10 @@ public class ProvisioningProfileStoreTest {
                 new Date(0),
                 "00000000-0000-0000-0000-000000000000")));
 
-    Optional<ProvisioningProfileMetadata> actual =
-        profiles.getBestProvisioningProfile("com.facebook.test", Optional.<String>absent());
+    Optional<ProvisioningProfileMetadata> actual =  profiles.getBestProvisioningProfile(
+        "com.facebook.test",
+        ProvisioningProfileStore.MATCH_ANY_ENTITLEMENT,
+        ProvisioningProfileStore.MATCH_ANY_IDENTITY);
 
     assertThat(actual, is(equalTo(Optional.<ProvisioningProfileMetadata>absent())));
   }
@@ -66,8 +96,96 @@ public class ProvisioningProfileStoreTest {
             makeTestMetadata("BBBBBBBBBB.com.facebook.test", new Date(Long.MAX_VALUE),
                 "00000000-0000-0000-0000-000000000000")));
 
+    NSString[] fakeKeychainAccessGroups = { new NSString("AAAAAAAAAA.*") };
+    ImmutableMap<String, NSObject> fakeEntitlements =
+        ImmutableMap.<String, NSObject>of(
+            "keychain-access-groups",
+            new NSArray(fakeKeychainAccessGroups));
+
     Optional<ProvisioningProfileMetadata> actual =
-        profiles.getBestProvisioningProfile("com.facebook.test", Optional.of("AAAAAAAAAA"));
+        profiles.getBestProvisioningProfile(
+            "com.facebook.test",
+            Optional.of(fakeEntitlements),
+            ProvisioningProfileStore.MATCH_ANY_IDENTITY);
+
+    assertThat(actual.get(), is(equalTo(expected)));
+  }
+
+  @Test
+  public void testEntitlementKeysAreMatched() throws Exception {
+    final NSString[] fakeKeychainAccessGroups = { new NSString("AAAAAAAAAA.*") };
+    final NSArray fakeKeychainAccessGroupsArray = new NSArray(fakeKeychainAccessGroups);
+
+    ImmutableMap<String, NSObject> fakeDevelopmentEntitlements =
+        ImmutableMap.of(
+            "keychain-access-groups",
+            fakeKeychainAccessGroupsArray,
+            "aps-environment",
+            new NSString("development"));
+
+    ImmutableMap<String, NSObject> fakeProductionEntitlements =
+        ImmutableMap.of(
+            "keychain-access-groups",
+            fakeKeychainAccessGroupsArray,
+            "aps-environment",
+            new NSString("production"));
+
+    ProvisioningProfileMetadata expected =
+        makeTestMetadata("AAAAAAAAAA.com.facebook.test", new Date(Long.MAX_VALUE),
+            "11111111-1111-1111-1111-111111111111", fakeProductionEntitlements);
+
+    ProvisioningProfileStore profiles = ProvisioningProfileStore.fromProvisioningProfiles(
+        ImmutableList.of(
+            makeTestMetadata("AAAAAAAAAA.com.facebook.test", new Date(Long.MAX_VALUE),
+                "00000000-0000-0000-0000-000000000000", fakeDevelopmentEntitlements),
+            expected));
+
+    Optional<ProvisioningProfileMetadata> actual =
+        profiles.getBestProvisioningProfile(
+            "com.facebook.test",
+            Optional.of(fakeProductionEntitlements),
+            ProvisioningProfileStore.MATCH_ANY_IDENTITY);
+
+    assertThat(actual.get(), is(equalTo(expected)));
+  }
+
+  @Test
+  public void testOnlyProfilesContainingValidFingerprintsAreMatched() throws Exception {
+    CodeSignIdentity validIdentity = CodeSignIdentity.builder()
+        .setFingerprint(
+            CodeSignIdentity.toFingerprint("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"))
+        .setSubjectCommonName("iPhone Developer: Foo Bar (54321EDCBA)")
+        .build();
+
+    CodeSignIdentity otherIdentity = CodeSignIdentity.builder()
+        .setFingerprint(
+            CodeSignIdentity.toFingerprint("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        .setSubjectCommonName("iPhone Developer: Foo Bar (ABCDE12345)")
+        .build();
+
+    ProvisioningProfileMetadata expected =
+        makeTestMetadata("AAAAAAAAAA.com.facebook.test",
+            new Date(Long.MAX_VALUE),
+            "11111111-1111-1111-1111-111111111111",
+            ImmutableMap.<String, NSObject>of(),
+            ImmutableSet.<HashCode>of(
+                validIdentity.getFingerprint().get(),
+                otherIdentity.getFingerprint().get()));
+
+    ProvisioningProfileStore profiles = ProvisioningProfileStore.fromProvisioningProfiles(
+        ImmutableList.of(
+            makeTestMetadata("AAAAAAAAAA.com.facebook.test",
+                new Date(Long.MAX_VALUE),
+                "00000000-0000-0000-0000-000000000000",
+                ImmutableMap.<String, NSObject>of(),
+                ImmutableSet.<HashCode>of(otherIdentity.getFingerprint().get())),
+            expected));
+
+    Optional<ProvisioningProfileMetadata> actual =
+        profiles.getBestProvisioningProfile(
+            "com.facebook.test",
+            ProvisioningProfileStore.MATCH_ANY_ENTITLEMENT,
+            Optional.of(ImmutableList.<CodeSignIdentity>of(validIdentity)));
 
     assertThat(actual.get(), is(equalTo(expected)));
   }
@@ -105,8 +223,10 @@ public class ProvisioningProfileStoreTest {
                 new Date(Long.MAX_VALUE),
                 "11111111-1111-1111-1111-111111111111")));
 
-    Optional<ProvisioningProfileMetadata> actual =
-        profiles.getBestProvisioningProfile("com.facebook.test", Optional.<String>absent());
+    Optional<ProvisioningProfileMetadata> actual = profiles.getBestProvisioningProfile(
+          "com.facebook.test",
+          ProvisioningProfileStore.MATCH_ANY_ENTITLEMENT,
+          ProvisioningProfileStore.MATCH_ANY_IDENTITY);
 
     assertThat(actual.get(), is(equalTo(expected)));
   }
@@ -120,8 +240,10 @@ public class ProvisioningProfileStoreTest {
     ProvisioningProfileStore profiles = ProvisioningProfileStore.fromProvisioningProfiles(
         ImmutableList.of(expected));
 
-    Optional<ProvisioningProfileMetadata> actual =
-        profiles.getBestProvisioningProfile("com.facebook.test", Optional.<String>absent());
+    Optional<ProvisioningProfileMetadata> actual = profiles.getBestProvisioningProfile(
+        "com.facebook.test",
+        ProvisioningProfileStore.MATCH_ANY_ENTITLEMENT,
+        ProvisioningProfileStore.MATCH_ANY_IDENTITY);
 
     assertThat(actual.get(), is(equalTo(expected)));
   }

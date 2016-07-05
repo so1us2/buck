@@ -30,6 +30,7 @@ import com.facebook.buck.rules.CommandTool;
 import com.facebook.buck.rules.HasRuntimeDeps;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirStep;
@@ -54,6 +55,8 @@ public class PythonPackagedBinary extends PythonBinary implements HasRuntimeDeps
   private final PythonPackageComponents components;
   @AddToRuleKey
   private final PythonEnvironment pythonEnvironment;
+  @AddToRuleKey
+  private final ImmutableSet<String> preloadLibraries;
   private final ImmutableSortedSet<BuildRule> runtimeDeps;
 
   protected PythonPackagedBinary(
@@ -67,14 +70,16 @@ public class PythonPackagedBinary extends PythonBinary implements HasRuntimeDeps
       PythonEnvironment pythonEnvironment,
       String mainModule,
       PythonPackageComponents components,
+      ImmutableSet<String> preloadLibraries,
       ImmutableSortedSet<BuildRule> runtimeDeps) {
-    super(params, resolver, pythonPlatform, mainModule, components, pexExtension);
+    super(params, resolver, pythonPlatform, mainModule, components, preloadLibraries, pexExtension);
     this.builder = builder;
     this.buildArgs = buildArgs;
     this.pathToPexExecuter = pathToPexExecuter;
     this.pythonEnvironment = pythonEnvironment;
     this.mainModule = mainModule;
     this.components = components;
+    this.preloadLibraries = preloadLibraries;
     this.runtimeDeps = runtimeDeps;
   }
 
@@ -86,7 +91,10 @@ public class PythonPackagedBinary extends PythonBinary implements HasRuntimeDeps
   @Override
   public Tool getExecutableCommand() {
     return new CommandTool.Builder(pathToPexExecuter)
-        .addArg(new BuildTargetSourcePath(getBuildTarget(), getBinPath()))
+        .addArg(
+            new SourcePathArg(
+                getResolver(),
+                new BuildTargetSourcePath(getBuildTarget(), getBinPath())))
         .build();
   }
 
@@ -123,6 +131,7 @@ public class PythonPackagedBinary extends PythonBinary implements HasRuntimeDeps
             getResolver().getMappedPaths(components.getNativeLibraries()),
             ImmutableSet.copyOf(
                 getResolver().deprecatedAllPaths(components.getPrebuiltLibraries())),
+            preloadLibraries,
             components.isZipSafe().or(true)));
 
     // Record the executable package for caching.

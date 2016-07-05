@@ -20,7 +20,6 @@ import static com.facebook.buck.rules.BuildableProperties.Kind.LIBRARY;
 
 import com.facebook.buck.android.AndroidPackageable;
 import com.facebook.buck.android.AndroidPackageableCollector;
-import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.core.JavaPackageFinder;
 import com.facebook.buck.jvm.core.SuggestBuildRules;
 import com.facebook.buck.model.BuildTarget;
@@ -40,17 +39,20 @@ import com.facebook.buck.rules.InitializableFromDisk;
 import com.facebook.buck.rules.OnDiskBuildInfo;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
+import com.facebook.buck.rules.SourcePaths;
 import com.facebook.buck.rules.keys.SupportsInputBasedRuleKey;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirStep;
 import com.facebook.buck.step.fs.TouchStep;
 import com.facebook.buck.util.HumanReadableException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -71,7 +73,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
- * Suppose this were a rule defined in <code>src/com/facebook/feed/BUILD</code>:
+ * Suppose this were a rule defined in <code>src/com/facebook/feed/BUCK</code>:
  * <pre>
  * java_library(
  *   name = 'feed',
@@ -103,6 +105,7 @@ public class DefaultJavaLibrary extends AbstractBuildRule
   @AddToRuleKey
   private final Optional<String> mavenCoords;
   private final Optional<Path> outputJar;
+  private final Optional<Path> usedClassesFile;
   @AddToRuleKey
   private final Optional<SourcePath> proguardConfig;
   @AddToRuleKey
@@ -139,10 +142,9 @@ public class DefaultJavaLibrary extends AbstractBuildRule
   private static final SuggestBuildRules.JarResolver JAR_RESOLVER =
       new SuggestBuildRules.JarResolver() {
     @Override
-    public ImmutableSet<String> resolve(ProjectFilesystem filesystem, Path relativeClassPath) {
+    public ImmutableSet<String> resolve(Path classPath) {
       ImmutableSet.Builder<String> topLevelSymbolsBuilder = ImmutableSet.builder();
       try {
-        Path classPath = filesystem.getPathForRelativePath(relativeClassPath);
         ClassLoader loader = URLClassLoader.newInstance(
             new URL[]{classPath.toUri().toURL()},
           /* parent */ null);
@@ -249,7 +251,10 @@ public class DefaultJavaLibrary extends AbstractBuildRule
     this.postprocessClassesCommands = postprocessClassesCommands;
     this.exportedDeps = exportedDeps;
     this.providedDeps = providedDeps;
-    this.additionalClasspathEntries = additionalClasspathEntries;
+    this.additionalClasspathEntries = FluentIterable
+        .from(additionalClasspathEntries)
+        .transform(getProjectFilesystem().getAbsolutifier())
+        .toSet();
     this.resourcesRoot = resourcesRoot;
     this.mavenCoords = mavenCoords;
     this.tests = tests;
@@ -259,8 +264,10 @@ public class DefaultJavaLibrary extends AbstractBuildRule
 
     if (!srcs.isEmpty() || !resources.isEmpty()) {
       this.outputJar = Optional.of(getOutputJarPath(getBuildTarget()));
+      this.usedClassesFile = Optional.of(getUsedClassesFilePath(getBuildTarget()));
     } else {
       this.outputJar = Optional.absent();
+      this.usedClassesFile = Optional.absent();
     }
 
     this.outputClasspathEntriesSupplier =
@@ -269,7 +276,8 @@ public class DefaultJavaLibrary extends AbstractBuildRule
           public ImmutableSetMultimap<JavaLibrary, Path> get() {
             return JavaLibraryClasspathProvider.getOutputClasspathEntries(
                 DefaultJavaLibrary.this,
-                outputJar);
+                getResolver(),
+                sourcePathForOutputJar());
           }
         });
 
@@ -279,7 +287,8 @@ public class DefaultJavaLibrary extends AbstractBuildRule
           public ImmutableSetMultimap<JavaLibrary, Path> get() {
             return JavaLibraryClasspathProvider.getTransitiveClasspathEntries(
                 DefaultJavaLibrary.this,
-                outputJar);
+                getResolver(),
+                sourcePathForOutputJar());
           }
         });
 
@@ -290,7 +299,7 @@ public class DefaultJavaLibrary extends AbstractBuildRule
               public ImmutableSet<JavaLibrary> get() {
                 return JavaLibraryClasspathProvider.getTransitiveClasspathDeps(
                     DefaultJavaLibrary.this,
-                    outputJar);
+                    sourcePathForOutputJar());
               }
             });
 
@@ -311,8 +320,12 @@ public class DefaultJavaLibrary extends AbstractBuildRule
     return BuildTargets.getGenPath(getBuildTarget(), "lib__%s__abi");
   }
 
-  private static Path getOutputJarDirPath(BuildTarget target) {
+  public static Path getOutputJarDirPath(BuildTarget target) {
     return BuildTargets.getGenPath(target, "lib__%s__output");
+  }
+
+  private Optional<SourcePath> sourcePathForOutputJar() {
+    return outputJar.transform(SourcePaths.getToBuildTargetSourcePath(getBuildTarget()));
   }
 
   static Path getOutputJarPath(BuildTarget target) {
@@ -323,11 +336,19 @@ public class DefaultJavaLibrary extends AbstractBuildRule
             target.getShortNameAndFlavorPostfix()));
   }
 
+  static Path getUsedClassesFileDirPath(BuildTarget target) {
+    return BuildTargets.getGenPath(target, "lib__%s__used_classes");
+  }
+
+  static Path getUsedClassesFilePath(BuildTarget target) {
+    return getUsedClassesFileDirPath(target).resolve("used-classes.json");
+  }
+
   /**
    * @return directory path relative to the project root where .class files will be generated.
    *     The return value does not end with a slash.
    */
-  private static Path getClassesDir(BuildTarget target) {
+  public static Path getClassesDir(BuildTarget target) {
     return BuildTargets.getScratchPath(target, "lib__%s__classes");
   }
 
@@ -361,8 +382,13 @@ public class DefaultJavaLibrary extends AbstractBuildRule
     return transitiveClasspathDepsSupplier.get();
   }
 
-  @Override
-  public ImmutableSetMultimap<JavaLibrary, Path> getDeclaredClasspathEntries() {
+  /**
+   * @return The set of entries to pass to {@code javac}'s {@code -classpath} flag in order to
+   * compile the {@code srcs} associated with this rule.  This set only contains the classpath
+   * entries for those rules that are declared as direct dependencies of this rule.
+   */
+  @VisibleForTesting
+  ImmutableSetMultimap<JavaLibrary, Path> getDeclaredClasspathEntries() {
     return declaredClasspathEntriesSupplier.get();
   }
 
@@ -455,6 +481,11 @@ public class DefaultJavaLibrary extends AbstractBuildRule
 
     steps.add(new MakeCleanDirectoryStep(getProjectFilesystem(), getOutputJarDirPath(target)));
 
+    final Path usedClassesFileDirPath = getUsedClassesFileDirPath(target);
+    steps.add(
+        new MakeCleanDirectoryStep(getProjectFilesystem(), usedClassesFileDirPath));
+    buildableContext.recordArtifact(usedClassesFileDirPath);
+
     // Only run javac if there are .java files to compile.
     if (!getJavaSrcs().isEmpty()) {
       // This adds the javac command, along with any supporting commands.
@@ -474,13 +505,14 @@ public class DefaultJavaLibrary extends AbstractBuildRule
           declared,
           outputDirectory,
           workingDirectory,
-          Optional.of(pathToSrcsList),
+          pathToSrcsList,
           Optional.of(suggestBuildRule),
           postprocessClassesCommands,
           ImmutableSortedSet.of(outputDirectory),
           /* mainClass */ Optional.<String>absent(),
           /* manifestFile */ Optional.<Path>absent(),
           outputJar.get(),
+          usedClassesFile,
           /* output params */
           steps,
           buildableContext);

@@ -73,6 +73,11 @@ public class WindowsLinker implements Linker {
   }
 
   @Override
+  public Iterable<Arg> linkerMap(Path output) {
+    return ImmutableList.<Arg>of();
+  }
+
+  @Override
   public Iterable<String> soname(String arg) {
     return ImmutableList.of(arg);
   }
@@ -93,6 +98,11 @@ public class WindowsLinker implements Linker {
   }
 
   @Override
+  public String preloadEnvVar() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public ImmutableList<Arg> createUndefinedSymbolsLinkerArgs(
       BuildRuleParams baseParams,
       BuildRuleResolver ruleResolver,
@@ -100,6 +110,16 @@ public class WindowsLinker implements Linker {
       BuildTarget target,
       Iterable<? extends SourcePath> symbolFiles) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Iterable<String> getNoAsNeededSharedLibsFlags() {
+    return ImmutableList.of();
+  }
+
+  @Override
+  public Iterable<String> getIgnoreUndefinedSymbolsFlags() {
+    return ImmutableList.of();
   }
 
   @Override

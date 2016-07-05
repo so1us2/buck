@@ -30,8 +30,8 @@ import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.timing.SettableFakeClock;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -122,6 +122,7 @@ public class ProjectCommandTests {
             isCombinedProjects,
             true /* shouldUseHeaderMaps */),
         ImmutableList.<String>of(),
+        ImmutableList.<BuildTarget>of(),
         projectGenerators,
         isBuildWithBuck,
         isCombinedProjects,
@@ -144,7 +145,7 @@ public class ProjectCommandTests {
         Platform.detect(),
         ImmutableMap.copyOf(System.getenv()),
         new FakeJavaPackageFinder(),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Optional.<WebServer>absent());
   }
 }

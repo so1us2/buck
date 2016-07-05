@@ -18,6 +18,7 @@ package com.facebook.buck.jvm.java;
 
 import com.facebook.buck.cxx.CxxDescriptionEnhancer;
 import com.facebook.buck.cxx.CxxPlatform;
+import com.facebook.buck.cxx.CxxPlatforms;
 import com.facebook.buck.cxx.NativeLinkable;
 import com.facebook.buck.jvm.common.ResourceValidator;
 import com.facebook.buck.model.BuildTarget;
@@ -31,6 +32,7 @@ import com.facebook.buck.rules.BuildRules;
 import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.Description;
 import com.facebook.buck.rules.Hint;
+import com.facebook.buck.rules.ImplicitDepsInferringDescription;
 import com.facebook.buck.rules.Label;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.SourcePaths;
@@ -38,6 +40,7 @@ import com.facebook.buck.rules.SymlinkTree;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.infer.annotation.SuppressFieldNotInitialized;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
@@ -49,21 +52,26 @@ import com.google.common.collect.Iterables;
 import java.nio.file.Path;
 import java.util.logging.Level;
 
-public class JavaTestDescription implements Description<JavaTestDescription.Arg> {
+public class JavaTestDescription implements
+    Description<JavaTestDescription.Arg>,
+    ImplicitDepsInferringDescription<JavaTestDescription.Arg> {
 
   public static final BuildRuleType TYPE = BuildRuleType.of("java_test");
 
-  private final JavacOptions templateOptions;
+  private final JavaOptions javaOptions;
+  private final JavacOptions templateJavacOptions;
   private final Optional<Long> defaultTestRuleTimeoutMs;
   private final CxxPlatform cxxPlatform;
   private final Optional<Path> testTempDirOverride;
 
   public JavaTestDescription(
+      JavaOptions javaOptions,
       JavacOptions templateOptions,
       Optional<Long> defaultTestRuleTimeoutMs,
       CxxPlatform cxxPlatform,
       Optional<Path> testTempDirOverride) {
-    this.templateOptions = templateOptions;
+    this.javaOptions = javaOptions;
+    this.templateJavacOptions = templateOptions;
     this.defaultTestRuleTimeoutMs = defaultTestRuleTimeoutMs;
     this.cxxPlatform = cxxPlatform;
     this.testTempDirOverride = testTempDirOverride;
@@ -89,7 +97,7 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
 
     JavacOptions javacOptions =
         JavacOptionsFactory.create(
-            templateOptions,
+            templateJavacOptions,
             params,
             resolver,
             pathResolver,
@@ -99,14 +107,12 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
     CxxLibraryEnhancement cxxLibraryEnhancement = new CxxLibraryEnhancement(
         params,
         args.useCxxLibraries,
+        resolver,
         pathResolver,
         cxxPlatform);
     params = cxxLibraryEnhancement.updatedParams;
 
-    BuildTarget abiJarTarget =
-        BuildTarget.builder(params.getBuildTarget())
-            .addFlavors(CalculateAbi.FLAVOR)
-            .build();
+    BuildTarget abiJarTarget = params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR);
 
     JavaTest test =
         resolver.addToIndex(
@@ -134,6 +140,7 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
                 /* additionalClasspathEntries */ ImmutableSet.<Path>of(),
                 args.testType.or(TestType.JUNIT),
                 new JavacToJarStepFactory(javacOptions, JavacOptionsAmender.IDENTITY),
+                javaOptions.getJavaRuntimeLauncher(),
                 args.vmArgs.get(),
                 cxxLibraryEnhancement.nativeLibsEnvironment,
                 validateAndGetSourcesUnderTest(
@@ -180,6 +187,18 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
     return sourceUnderTest.build();
   }
 
+  @Override
+  public Iterable<BuildTarget> findDepsForTargetFromConstructorArgs(
+      BuildTarget buildTarget,
+      Function<Optional<String>, Path> cellRoots,
+      Arg constructorArg) {
+    ImmutableSet.Builder<BuildTarget> deps = ImmutableSet.builder();
+    if (constructorArg.useCxxLibraries.or(false)) {
+      deps.addAll(CxxPlatforms.getParseTimeDeps(cxxPlatform));
+    }
+    return deps.build();
+  }
+
   @SuppressFieldNotInitialized
   public static class Arg extends JavaLibraryDescription.Arg implements HasSourceUnderTest {
     public Optional<ImmutableSortedSet<String>> contacts;
@@ -212,6 +231,7 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
     public CxxLibraryEnhancement(
         BuildRuleParams params,
         Optional<Boolean> useCxxLibraries,
+        BuildRuleResolver resolver,
         SourcePathResolver pathResolver,
         CxxPlatform cxxPlatform) throws NoSuchBuildTargetException {
       if (useCxxLibraries.or(false)) {
@@ -226,8 +246,10 @@ public class JavaTestDescription implements Description<JavaTestDescription.Arg>
             // the test results cache.
             .addAll(pathResolver.filterBuildRuleInputs(nativeLibsSymlinkTree.getLinks().values()))
             .build());
-        nativeLibsEnvironment = ImmutableMap.of(
-            cxxPlatform.getLd().searchPathEnvVar(), nativeLibsSymlinkTree.getRoot().toString());
+        nativeLibsEnvironment =
+            ImmutableMap.of(
+                cxxPlatform.getLd().resolve(resolver).searchPathEnvVar(),
+                nativeLibsSymlinkTree.getRoot().toString());
       } else {
         updatedParams = params;
         nativeLibsEnvironment = ImmutableMap.of();

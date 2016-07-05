@@ -18,7 +18,6 @@ package com.facebook.buck.rules;
 
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasSourceUnderTest;
-import com.facebook.buck.util.HumanReadableException;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
@@ -64,11 +63,29 @@ public class TargetGraphAndTargets {
       ImmutableSet<BuildTarget> buildTargets,
       TargetGraph projectGraph,
       boolean shouldIncludeDependenciesTests) {
-    ImmutableSet<TargetNode<?>> projectRoots = checkAndGetTargetNodes(buildTargets, projectGraph);
+    Iterable<TargetNode<?>> projectRoots = projectGraph.getAll(buildTargets);
     if (shouldIncludeDependenciesTests) {
       return getExplicitTestTargets(projectGraph.getSubgraph(projectRoots).getNodes());
     }
     return getExplicitTestTargets(projectRoots);
+  }
+
+  /**
+   * @param targetGraphAndTargetNodes target graph and the set of target nodes for which we would
+   * like to find tests
+   * @param shouldIncludeDependenciesTests Should or not include tests
+   * that test dependencies
+   * @return A set of all test targets that test any of {@code buildTargets} or their dependencies.
+   */
+  public static ImmutableSet<BuildTarget> getExplicitTestTargets(
+      TargetGraphAndTargetNodes targetGraphAndTargetNodes,
+      boolean shouldIncludeDependenciesTests) {
+    Iterable<TargetNode<?>> nodes = targetGraphAndTargetNodes.getTargetNodes();
+    if (shouldIncludeDependenciesTests) {
+      return getExplicitTestTargets(
+          targetGraphAndTargetNodes.getTargetGraph().getSubgraph(nodes).getNodes());
+    }
+    return getExplicitTestTargets(nodes);
   }
 
   /**
@@ -89,20 +106,6 @@ public class TargetGraphAndTargets {
         .toSet();
   }
 
-  public static ImmutableSet<TargetNode<?>> checkAndGetTargetNodes(
-      ImmutableSet<BuildTarget> buildTargets,
-      TargetGraph projectGraph) {
-    ImmutableSet.Builder<TargetNode<?>> targetNodesBuilder = ImmutableSet.builder();
-    for (BuildTarget target : buildTargets) {
-      TargetNode<?> targetNode = projectGraph.get(target);
-      if (targetNode == null) {
-        throw new HumanReadableException("Target '%s' does not exist.", target);
-      }
-      targetNodesBuilder.add(targetNode);
-    }
-    return targetNodesBuilder.build();
-  }
-
   public static TargetGraphAndTargets create(
       final ImmutableSet<BuildTarget> graphRoots,
       final ImmutableSet<BuildTarget> graphRootsWithoutWorkspaces,
@@ -113,7 +116,7 @@ public class TargetGraphAndTargets {
       ImmutableSet<BuildTarget> explicitTests) {
     // Get the roots of the main graph. This contains all the targets in the project slice, or all
     // the valid project roots if a project slice is not specified.
-    ImmutableSet<TargetNode<?>> projectRoots = checkAndGetTargetNodes(graphRoots, projectGraph);
+    Iterable<TargetNode<?>> projectRoots = projectGraph.getAll(graphRoots);
 
     // Optionally get the roots of the test graph. This contains all the tests that cover the roots
     // of the main graph or their dependencies.
@@ -135,7 +138,7 @@ public class TargetGraphAndTargets {
           }
 
           for (BuildTarget buildTargetUnderTest : sourceUnderTest) {
-            if (targetGraph.get(buildTargetUnderTest) != null) {
+            if (targetGraph.getOptional(buildTargetUnderTest).isPresent()) {
               return isWithDependenciesTests ||
                   graphRootsWithoutWorkspaces.contains(buildTargetUnderTest);
             }

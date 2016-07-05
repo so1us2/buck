@@ -25,6 +25,7 @@ import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.event.BuckEventListener;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.BuildRuleSuccessType;
 import com.facebook.buck.testutil.integration.BuckBuildLog;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
@@ -89,8 +90,9 @@ public class CxxPreprocessAndCompileIntegrationTest {
 
   @Test
   public void sanitizeWorkingDirectory() throws IOException {
-    workspace.runBuckBuild("//:simple#default,static").assertSuccess();
-    Path lib = workspace.getPath("buck-out/gen/simple#default,static/libsimple.a");
+    BuildTarget target = BuildTargetFactory.newInstance("//:simple#default,static");
+    workspace.runBuckBuild(target.getFullyQualifiedName()).assertSuccess();
+    Path lib = workspace.getPath(BuildTargets.getGenPath(target, "%s/libsimple.a"));
     String contents =
         Files.asByteSource(lib.toFile())
             .asCharSource(Charsets.ISO_8859_1)
@@ -100,9 +102,9 @@ public class CxxPreprocessAndCompileIntegrationTest {
 
   @Test
   public void sanitizeWorkingDirectoryWhenBuildingAssembly() throws IOException {
-    workspace.runBuckBuild("//:simple_assembly#default,static").assertSuccess();
-    Path lib =
-        workspace.getPath("buck-out/gen/simple_assembly#default,static/libsimple_assembly.a");
+    BuildTarget target = BuildTargetFactory.newInstance("//:simple_assembly#default,static");
+    workspace.runBuckBuild(target.getFullyQualifiedName()).assertSuccess();
+    Path lib = workspace.getPath(BuildTargets.getGenPath(target, "%s/libsimple_assembly.a"));
     String contents =
         Files.asByteSource(lib.toFile())
             .asCharSource(Charsets.ISO_8859_1)
@@ -123,17 +125,19 @@ public class CxxPreprocessAndCompileIntegrationTest {
     // the symlinked directory, even though it's not the right project root.
     Map<String, String> envCopy = Maps.newHashMap(System.getenv());
     envCopy.put("PWD", symlinkedRoot.toString());
-    workspace.runBuckCommandWithEnvironmentAndContext(
-        tmp.getRootPath(),
-        Optional.<NGContext>absent(),
-        Optional.<BuckEventListener>absent(),
-        Optional.of(ImmutableMap.copyOf(envCopy)),
-        "build",
-        "//:simple#default,static")
-            .assertSuccess();
+    BuildTarget target = BuildTargetFactory.newInstance("//:simple#default,static");
+    workspace
+        .runBuckCommandWithEnvironmentAndContext(
+            tmp.getRootPath(),
+            Optional.<NGContext>absent(),
+            Optional.<BuckEventListener>absent(),
+            Optional.of(ImmutableMap.copyOf(envCopy)),
+            "build",
+            target.getFullyQualifiedName())
+        .assertSuccess();
 
     // Verify that we still sanitized this path correctly.
-    Path lib = workspace.getPath("buck-out/gen/simple#default,static/libsimple.a");
+    Path lib = workspace.getPath(BuildTargets.getGenPath(target, "%s/libsimple.a"));
     String contents =
         Files.asByteSource(lib.toFile())
             .asCharSource(Charsets.ISO_8859_1)
@@ -159,14 +163,8 @@ public class CxxPreprocessAndCompileIntegrationTest {
         target,
         cxxPlatform);
     BuildTarget preprocessTarget =
-        cxxSourceRuleFactory.createPreprocessBuildTarget(
-            sourceName,
-            AbstractCxxSource.Type.CXX,
-            CxxSourceRuleFactory.PicType.PDC);
-    BuildTarget compileTarget =
-        cxxSourceRuleFactory.createCompileBuildTarget(
-            sourceName,
-            CxxSourceRuleFactory.PicType.PDC);
+        cxxSourceRuleFactory.createPreprocessBuildTarget(sourceName, AbstractCxxSource.Type.CXX);
+    BuildTarget compileTarget = cxxSourceRuleFactory.createCompileBuildTarget(sourceName);
 
     // Run the build and verify that the C++ source was (preprocessed and) compiled.
     workspace.runBuckBuild(target.toString()).assertSuccess();
@@ -217,14 +215,9 @@ public class CxxPreprocessAndCompileIntegrationTest {
         target,
         cxxPlatform);
     BuildTarget preprocessTarget =
-        cxxSourceRuleFactory.createPreprocessBuildTarget(
-            sourceName,
-            AbstractCxxSource.Type.CXX,
-            CxxSourceRuleFactory.PicType.PDC);
+        cxxSourceRuleFactory.createPreprocessBuildTarget(sourceName, AbstractCxxSource.Type.CXX);
     BuildTarget compileTarget =
-        cxxSourceRuleFactory.createCompileBuildTarget(
-            sourceName,
-            CxxSourceRuleFactory.PicType.PDC);
+        cxxSourceRuleFactory.createCompileBuildTarget(sourceName);
 
     // Run the build and verify that the C++ source was (preprocessed and) compiled.
     workspace.runBuckBuild(target.toString()).assertSuccess();
@@ -280,10 +273,7 @@ public class CxxPreprocessAndCompileIntegrationTest {
         cxxPlatform);
     String unusedHeaderName = "unused_header.h";
     String sourceName = "source.cpp";
-    BuildTarget compileTarget =
-        cxxSourceRuleFactory.createCompileBuildTarget(
-            sourceName,
-            CxxSourceRuleFactory.PicType.PDC);
+    BuildTarget compileTarget = cxxSourceRuleFactory.createCompileBuildTarget(sourceName);
 
     // Run the build and verify that the C++ source was compiled.
     workspace.runBuckBuild(target.toString());
@@ -362,6 +352,50 @@ public class CxxPreprocessAndCompileIntegrationTest {
     BuildTarget target = BuildTargetFactory.newInstance("//:binary_with_used_relative_header");
     String usedHeaderName = "source_relative_header.h";
     String sourceName = "source_relative_header.cpp";
+    BuildTarget preprocessTarget =
+        getPreprocessTarget(
+            cxxPlatform,
+            target,
+            sourceName,
+            AbstractCxxSource.Type.CXX);
+
+    // Run the build and verify that the C++ source was preprocessed.
+    workspace.runBuckBuild("--config", "build.depfiles=enabled", target.toString()).assertSuccess();
+    BuckBuildLog.BuildLogEntry firstRunEntry =
+        workspace.getBuildLog().getLogEntry(preprocessTarget);
+    assertThat(
+        firstRunEntry.getSuccessType(),
+        equalTo(Optional.of(BuildRuleSuccessType.BUILT_LOCALLY)));
+
+    // Modify the used header.
+    workspace.writeContentsToPath(
+        "static inline int newFunction() { return 20; }",
+        usedHeaderName);
+
+    // Run the build again and verify that we recompiled as the header caused the depfile rule key
+    // to change.
+    workspace.runBuckBuild("--config", "build.depfiles=enabled", target.toString()).assertSuccess();
+    BuckBuildLog.BuildLogEntry secondRunEntry =
+        workspace.getBuildLog().getLogEntry(preprocessTarget);
+    assertThat(
+        secondRunEntry.getSuccessType(),
+        equalTo(Optional.of(BuildRuleSuccessType.BUILT_LOCALLY)));
+
+    // Also, make sure all three rule keys are actually different.
+    assertThat(
+        secondRunEntry.getRuleKey(),
+        Matchers.not(equalTo(firstRunEntry.getRuleKey())));
+  }
+
+  @Test
+  public void depfileBasedRuleKeyRebuildsAfterChangeToUsedParentHeaderUsingFileRelativeInclusion()
+      throws Exception {
+    CxxPlatform cxxPlatform = DefaultCxxPlatforms.build(
+        new CxxBuckConfig(FakeBuckConfig.builder().build()));
+    BuildTarget target =
+        BuildTargetFactory.newInstance("//:binary_with_used_relative_parent_header");
+    String usedHeaderName = "source_relative_parent_header.h";
+    String sourceName = "source_relative_parent_header/source.cpp";
     BuildTarget preprocessTarget =
         getPreprocessTarget(
             cxxPlatform,
@@ -593,6 +627,57 @@ public class CxxPreprocessAndCompileIntegrationTest {
     workspace.runBuckBuild("//parent_dir_ref:simple#default,static").assertSuccess();
   }
 
+  @Test
+  public void langCompilerFlags() throws IOException {
+    workspace.runBuckBuild("//:lang_compiler_flags#default,static").assertSuccess();
+  }
+
+  @Test
+  public void binaryBuildRuleTools() throws IOException {
+    workspace.runBuckBuild(
+        "-c", "cxx.cc=//:cc",
+        "-c", "cxx.cc_type=default",
+        "-c", "cxx.cpp=//:cc",
+        "-c", "cxx.cpp_type=default",
+        "-c", "cxx.cxx=//:cxx",
+        "-c", "cxx.cxx_type=default",
+        "-c", "cxx.cxxpp=//:cxx",
+        "-c", "cxx.cxxpp_type=default",
+        "//:simple#default,static")
+        .assertSuccess();
+  }
+
+  @Test
+  public void ignoreVerifyHeaders() throws IOException {
+    workspace.runBuckBuild("-c", "cxx.untracked_headers=ignore", "//:untracked_header")
+        .assertSuccess();
+  }
+
+  @Test
+  public void errorVerifyHeaders() throws IOException {
+    ProjectWorkspace.ProcessResult result =
+        workspace.runBuckBuild(
+            "-c", "cxx.untracked_headers=error",
+            "-c", "cxx.untracked_headers_whitelist=/usr/include/stdc-predef\\.h",
+            "//:untracked_header");
+    result.assertFailure();
+    assertThat(
+        result.getStderr(),
+        Matchers.containsString(
+            "untracked_header.cpp: included an untracked header \"untracked_header.h\""));
+  }
+
+  @Test
+  public void whitelistVerifyHeaders() throws IOException {
+    ProjectWorkspace.ProcessResult result =
+        workspace.runBuckBuild(
+            "-c", "cxx.untracked_headers=error",
+            "-c", "cxx.untracked_headers_whitelist=" +
+                "/usr/include/stdc-predef\\.h, /usr/local/.*, untracked_.*.h",
+            "//:untracked_header");
+    result.assertSuccess();
+  }
+
   private BuildTarget getPreprocessTarget(
       CxxPlatform cxxPlatform,
       BuildTarget target,
@@ -604,14 +689,9 @@ public class CxxPreprocessAndCompileIntegrationTest {
             target,
             cxxPlatform);
     if (mode == CxxPreprocessMode.SEPARATE) {
-      return cxxSourceRuleFactory.createPreprocessBuildTarget(
-          source,
-          type,
-          CxxSourceRuleFactory.PicType.PDC);
+      return cxxSourceRuleFactory.createPreprocessBuildTarget(source, type);
     } else {
-      return cxxSourceRuleFactory.createCompileBuildTarget(
-          source,
-          CxxSourceRuleFactory.PicType.PDC);
+      return cxxSourceRuleFactory.createCompileBuildTarget(source);
     }
   }
 

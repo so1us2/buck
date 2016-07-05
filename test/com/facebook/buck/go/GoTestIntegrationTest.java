@@ -22,6 +22,8 @@ import static org.junit.Assert.assertThat;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TestDataHelper;
+import com.facebook.buck.util.HumanReadableException;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -60,6 +62,37 @@ public class GoTestIntegrationTest {
         "`buck test` should fail because TestAdd2() failed.",
         result2.getStderr(),
         containsString("TestAdd2"));
+  }
+
+  @Test
+  public void testGoTestAfterChange() throws IOException {
+    // This test should pass.
+    workspace.runBuckCommand("test", "//:test-success").assertSuccess();
+
+    workspace.replaceFileContents("base.go", "n1 + n2", "n1 + n2 + 1");
+    workspace.runBuckCommand("test", "//:test-success").assertTestFailure();
+
+    workspace.replaceFileContents("base.go", "n1 + n2 + 1", "n1 + n2 * 1");
+    workspace.runBuckCommand("test", "//:test-success").assertSuccess();
+  }
+
+  @Test
+  public void testGoInternalTest() throws IOException {
+    ProjectWorkspace.ProcessResult result1 = workspace.runBuckCommand(
+        "test", "//:test-success-internal");
+    result1.assertSuccess();
+  }
+
+  @Test
+  public void testWithResources() throws IOException {
+    ProjectWorkspace.ProcessResult result1 = workspace.runBuckCommand(
+        "test", "//:test-with-resources");
+    result1.assertSuccess();
+  }
+
+  @Test(expected = HumanReadableException.class)
+  public void testGoInternalTestInTestList() throws IOException {
+    workspace.runBuckCommand("test", "//:test-success-bad");
   }
 
   @Test

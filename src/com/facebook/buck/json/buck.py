@@ -7,15 +7,22 @@
 
 import __builtin__
 import __future__
+
 from collections import namedtuple
+from pathlib import Path, PureWindowsPath, PurePath
+from pywatchman import bser
+import StringIO
+import cProfile
 import functools
+import hashlib
 import imp
 import inspect
-from pathlib import Path, PureWindowsPath, PurePath
+import json
 import optparse
 import os
 import os.path
-from pywatchman import bser
+import pstats
+import re
 import subprocess
 import sys
 import traceback
@@ -34,6 +41,7 @@ import traceback
 
 BUILD_FUNCTIONS = []
 
+VERIFY_AUTODEPS_SIGNATURE = False
 
 class SyncCookieState(object):
     """
@@ -62,13 +70,15 @@ class BuildFileContext(object):
 
     type = BuildContextType.BUILD_FILE
 
-    def __init__(self, base_path, dirname, allow_empty_globs, watchman_client,
+    def __init__(self, base_path, dirname, autodeps, allow_empty_globs, watchman_client,
                  watchman_watch_root, watchman_project_prefix, sync_cookie_state,
                  watchman_error):
         self.globals = {}
         self.includes = set()
+        self.used_configs = {}
         self.base_path = base_path
         self.dirname = dirname
+        self.autodeps = autodeps
         self.allow_empty_globs = allow_empty_globs
         self.watchman_client = watchman_client
         self.watchman_watch_root = watchman_watch_root
@@ -89,6 +99,7 @@ class IncludeContext(object):
     def __init__(self):
         self.globals = {}
         self.includes = set()
+        self.used_configs = {}
         self.diagnostics = set()
 
 
@@ -128,16 +139,56 @@ def add_rule(rule, build_env):
         "Cannot use `{}()` at the top-level of an included file."
         .format(rule['buck.type']))
 
-    # Include the base path of the BUILD file so the reader consuming this
-    # output will know which BUILD file the rule came from.
+    # Include the base path of the BUCK file so the reader consuming this
+    # output will know which BUCK file the rule came from.
     if 'name' not in rule:
         raise ValueError(
             'rules must contain the field \'name\'.  Found %s.' % rule)
     rule_name = rule['name']
+    if not isinstance(rule_name, basestring):
+        raise ValueError(
+            'rules \'name\' field must be a string.  Found %s.' % rule_name)
+
     if rule_name in build_env.rules:
         raise ValueError('Duplicate rule definition found.  Found %s and %s' %
                          (rule, build_env.rules[rule_name]))
     rule['buck.base_path'] = build_env.base_path
+
+    # It is possible that the user changed the rule from autodeps=True to autodeps=False
+    # without re-running `buck autodeps` (this is common when resolving merge conflicts).
+    # When this happens, the deps in BUCK.autodeps should be ignored because autodeps is
+    # set to False.
+    if rule_name in build_env.autodeps:
+        if rule.get('autodeps', False):
+            # TODO(bolinfest): One major edge case that exists right now when using a set to de-dupe
+            # elements is that the same target may be referenced in two different ways:
+            # 1. As a fully-qualified target: //src/com/facebook/buck/android:packageable
+            # 2. As a local target:           :packageable
+            # Because of this, we may end up with two entries for the same target even though we
+            # are trying to use a set to remove duplicates.
+
+            # Combine all of the deps into a set to eliminate duplicates. Although we would prefer
+            # it if each dep were exclusively in BUCK or BUCK.autodeps, that is not always
+            # possible. For example, if a user-defined macro creates a library that hardcodes a dep
+            # and the tooling to produce BUCK.autodeps also infers the need for that dep and adds
+            # it to BUCK.autodeps, then it will appear in both places.
+            explicit_deps = rule.get('deps', [])
+            auto_deps = build_env.autodeps[rule_name]['deps']
+            deps = set(explicit_deps)
+            deps.update(auto_deps)
+            rule['deps'] = list(deps)
+
+            explicit_exported_deps = rule.get('exportedDeps', [])
+            auto_exported_deps = build_env.autodeps[rule_name]['exported_deps']
+            exported_deps = set(explicit_exported_deps)
+            exported_deps.update(auto_exported_deps)
+            rule['exportedDeps'] = list(exported_deps)
+        else:
+            # If there is an entry in the .autodeps file for the rule, but the rule has autodeps
+            # set to False, then the .autodeps file is likely out of date. Ideally, we would warn
+            # the user to re-run `buck autodeps` in this scenario. Unfortunately, we do not have
+            # a mechanism to relay warnings from buck.py at the time of this writing.
+            pass
     build_env.rules[rule_name] = rule
 
 
@@ -193,7 +244,7 @@ def glob(includes, excludes=[], include_dotfiles=False, build_env=None, search_b
                 build_env.sync_cookie_state,
                 build_env.watchman_client,
                 build_env.diagnostics)
-        except build_env.watchman_error, e:
+        except build_env.watchman_error as e:
             build_env.diagnostics.add(
                 DiagnosticMessageAndLevel(
                     message='Watchman error, falling back to slow glob: {0}'.format(e),
@@ -387,28 +438,41 @@ def get_base_path(build_env=None):
     return build_env.base_path
 
 
+def flatten_list_of_dicts(list_of_dicts):
+    """Flatten the given list of dictionaries by merging l[1:] onto
+    l[0], one at a time. Key/Value pairs which appear in later list entries
+    will override those that appear in earlier entries
+
+    :param list_of_dicts: the list of dict objects to flatten.
+    :return: a single dict containing the flattened list
+    """
+    return_value = {}
+    for d in list_of_dicts:
+        for k, v in d.iteritems():
+            return_value[k] = v
+    return return_value
+
+
 @provide_for_build
-def add_deps(name, deps=[], build_env=None):
-    assert build_env.type == BuildContextType.BUILD_FILE, (
-        "Cannot use `add_deps()` at the top-level of an included file.")
+def flatten_dicts(*args, **_):
+    """Flatten the given list of dictionaries by merging args[1:] onto
+    args[0], one at a time.
 
-    if name not in build_env.rules:
-        raise ValueError(
-            'Invoked \'add_deps\' on non-existent rule %s.' % name)
+    :param *args: the list of dict objects to flatten.
+    :param **_: ignore the build_env kwarg
+    :return: a single dict containing the flattened list
+    """
+    return flatten_list_of_dicts(args)
 
-    rule = build_env.rules[name]
-    if 'deps' not in rule:
-        raise ValueError(
-            'Invoked \'add_deps\' on rule %s that has no \'deps\' field'
-            % name)
-    rule['deps'] = rule['deps'] + deps
+
+GENDEPS_SIGNATURE = re.compile(r'^#@# GENERATED FILE: DO NOT MODIFY ([a-f0-9]{40}) #@#\n$')
 
 
 class BuildFileProcessor(object):
 
     def __init__(self, project_root, watchman_watch_root, watchman_project_prefix, build_file_name,
-                 allow_empty_globs, watchman_client, watchman_error, implicit_includes=[],
-                 extra_funcs=[]):
+                 allow_empty_globs, ignore_buck_autodeps_files, watchman_client, watchman_error,
+                 implicit_includes=[], extra_funcs=[], configs={}):
         self._cache = {}
         self._build_env_stack = []
         self._sync_cookie_state = SyncCookieState()
@@ -419,8 +483,10 @@ class BuildFileProcessor(object):
         self._build_file_name = build_file_name
         self._implicit_includes = implicit_includes
         self._allow_empty_globs = allow_empty_globs
+        self._ignore_buck_autodeps_files = ignore_buck_autodeps_files
         self._watchman_client = watchman_client
         self._watchman_error = watchman_error
+        self._configs = configs
 
         lazy_functions = {}
         for func in BUILD_FUNCTIONS + extra_funcs:
@@ -474,6 +540,27 @@ class BuildFileProcessor(object):
         relative_path = name[2:]
         return os.path.join(self._project_root, relative_path)
 
+    def _read_config(self, section, field, default=None):
+        """
+        Lookup a setting from `.buckconfig`.
+
+        This method is meant to be installed into the globals of any files or
+        includes that we process.
+        """
+
+        # Grab the current build context from the top of the stack.
+        build_env = self._build_env_stack[-1]
+
+        # Lookup the value and record it in this build file's context.
+        value = self._configs.get((section, field))
+        build_env.used_configs[(section, field)] = value
+
+        # If no config setting was found, return the default.
+        if value is None:
+            return default
+
+        return value
+
     def _include_defs(self, name, implicit_includes=[]):
         """
         Pull the named include into the current caller's context.
@@ -506,6 +593,9 @@ class BuildFileProcessor(object):
 
         # Pull in any diagnostics issued by the include.
         build_env.diagnostics.update(inner_env.diagnostics)
+
+        # Pull in any config settings used by the include.
+        build_env.used_configs.update(inner_env.used_configs)
 
     def _push_build_env(self, build_env):
         """
@@ -545,6 +635,9 @@ class BuildFileProcessor(object):
             self._include_defs,
             implicit_includes=implicit_includes)
 
+        # Install the 'read_config' function into our global object.
+        default_globals['read_config'] = self._read_config
+
         # If any implicit includes were specified, process them first.
         for include in implicit_includes:
             include_path = self._get_include_path(include)
@@ -560,7 +653,9 @@ class BuildFileProcessor(object):
         module.__file__ = path
         module.__dict__.update(default_globals)
 
-        with open(path) as f:
+        # We don't open this file as binary, as we assume it's a textual source
+        # file.
+        with open(path, 'r') as f:
             contents = f.read()
 
         # Enable absolute imports.  This prevents the compiler from trying to
@@ -599,9 +694,22 @@ class BuildFileProcessor(object):
         len_suffix = -len('/' + self._build_file_name)
         base_path = relative_path_to_build_file[:len_suffix]
         dirname = os.path.dirname(path)
+
+        # If there is a signature failure, then record the error, but do not blow up.
+        autodeps = None
+        autodeps_file = None
+        invalid_signature_error_message = None
+        try:
+            results = self._try_parse_autodeps(dirname)
+            if results:
+                (autodeps, autodeps_file) = results
+        except InvalidSignatureError as e:
+            invalid_signature_error_message = e.message
+
         build_env = BuildFileContext(
             base_path,
             dirname,
+            autodeps or {},
             self._allow_empty_globs,
             self._watchman_client,
             self._watchman_watch_root,
@@ -609,22 +717,102 @@ class BuildFileProcessor(object):
             self._sync_cookie_state,
             self._watchman_error)
 
+        # If the .autodeps file has been successfully parsed, then treat it as if it were
+        # a file loaded via include_defs() in that a change to the .autodeps file should
+        # force all of the build rules in the build file to be invalidated.
+        if autodeps_file:
+            build_env.includes.add(autodeps_file)
+
+        if invalid_signature_error_message:
+            build_env.diagnostics.add(
+                DiagnosticMessageAndLevel(message=invalid_signature_error_message, level='fatal'))
+
         return self._process(
             build_env,
             path,
             implicit_includes=implicit_includes)
 
+    def _try_parse_autodeps(self, dirname):
+        """
+        Returns a tuple of (autodeps dict, autodeps_file string), or None.
+        """
+        # When we are running as part of `buck autodeps`, we ignore existing BUCK.autodeps files.
+        if self._ignore_buck_autodeps_files:
+            return None
+
+        autodeps_file = dirname + '/' + self._build_file_name + '.autodeps'
+        if not os.path.isfile(autodeps_file):
+            return None
+
+        autodeps = self._parse_autodeps(autodeps_file)
+        return (autodeps, autodeps_file)
+
+    def _parse_autodeps(self, autodeps_file):
+        """
+        A BUCK file may have a BUCK.autodeps file that lives alongside it. (If a custom build file
+        name is used, then <file-name>.autodeps must be the name of the .autodeps file.)
+
+        The .autodeps file is a JSON file with a special header that is used to sign the file,
+        containing a SHA-1 of the contents following the header. If the header does not match the
+        contents, an error will be thrown.
+
+        The JSON contains a mapping of build targets (by short name) to lists of build targets that
+        represent dependencies. For each mapping, the list of dependencies will be merged with that
+        of the original rule declared in the build file. This affords end users the ability to
+        partially generate build files.
+
+        :param autodeps_file: Absolute path to the expected .autodeps file.
+        :raises InvalidSignatureError:
+        """
+        with open(autodeps_file, 'r') as stream:
+            signature_line = stream.readline()
+            contents = stream.read()
+
+        match = GENDEPS_SIGNATURE.match(signature_line)
+        if not match:
+            raise InvalidSignatureError(
+                'Could not extract signature from {0}'.format(autodeps_file))
+
+        signature = match.group(1)
+        hash = hashlib.new('sha1')
+        hash.update(contents)
+        sha1 = hash.hexdigest()
+
+        if (not VERIFY_AUTODEPS_SIGNATURE) or sha1 == signature:
+            return json.loads(contents)
+        else:
+            raise InvalidSignatureError(
+                'Signature did not match contents in {0}'.format(autodeps_file))
+
+
     def process(self, path, diagnostics):
         """
-        Process a build file returning a dict of it's rules and includes.
+        Process a build file returning a dict of its rules and includes.
         """
         build_env, mod = self._process_build_file(
             os.path.join(self._project_root, path),
             implicit_includes=self._implicit_includes)
+
+        # Initialize the output object to a map of the parsed rules.
         values = build_env.rules.values()
+
+        # Add in tracked included files as a special meta rule.
         values.append({"__includes": [path] + sorted(build_env.includes)})
+
+        # Add in tracked used config settings as a special meta rule.
+        configs = {}
+        for (section, field), value in build_env.used_configs.iteritems():
+            configs.setdefault(section, {})
+            configs[section][field] = value
+        values.append({"__configs": configs})
+
         diagnostics.update(build_env.diagnostics)
+
         return values
+
+
+class InvalidSignatureError(Exception):
+    pass
 
 
 def cygwin_adjusted_path(path):
@@ -634,7 +822,7 @@ def cygwin_adjusted_path(path):
         return path
 
 
-def encode_result(values, diagnostics):
+def encode_result(values, diagnostics, profile):
     result = {'values': values}
     if diagnostics:
         encoded_diagnostics = []
@@ -644,6 +832,8 @@ def encode_result(values, diagnostics):
                 'level': d.level,
             })
         result['diagnostics'] = encoded_diagnostics
+    if profile is not None:
+        result['profile'] = profile
     return bser.dumps(result)
 
 
@@ -663,10 +853,16 @@ def format_traceback_and_exception():
     return formatted_traceback + formatted_exception
 
 
-def process_with_diagnostics(build_file, build_file_processor, to_parent):
+def process_with_diagnostics(build_file, build_file_processor, to_parent,
+                             should_profile=False):
     build_file = cygwin_adjusted_path(build_file)
     diagnostics = set()
     values = []
+    if should_profile:
+        profile = cProfile.Profile()
+        profile.enable()
+    else:
+        profile = None
     try:
         values = build_file_processor.process(build_file.rstrip(), diagnostics=diagnostics)
     except Exception as e:
@@ -678,7 +874,15 @@ def process_with_diagnostics(build_file, build_file_processor, to_parent):
                     level='fatal'))
         raise e
     finally:
-        to_parent.write(encode_result(values, diagnostics))
+        if profile is not None:
+            profile.disable()
+            s = StringIO.StringIO()
+            pstats.Stats(profile, stream=s).sort_stats('cumulative').print_stats()
+            profile_result = s.getvalue()
+        else:
+            profile_result = None
+
+        to_parent.write(encode_result(values, diagnostics, profile_result))
         to_parent.flush()
 
 
@@ -690,16 +894,16 @@ def silent_excepthook(exctype, value, tb):
 # Inexplicably, this script appears to run faster when the arguments passed
 # into it are absolute paths. However, we want the "buck.base_path" property
 # of each rule to be printed out to be the base path of the build target that
-# identifies the rule. That means that when parsing a BUILD file, we must know
+# identifies the rule. That means that when parsing a BUCK file, we must know
 # its path relative to the root of the project to produce the base path.
 #
 # To that end, the first argument to this script must be an absolute path to
 # the project root.  It must be followed by one or more absolute paths to
-# BUILD files under the project root.  If no paths to BUILD files are
-# specified, then it will traverse the project root for BUILD files, excluding
+# BUCK files under the project root.  If no paths to BUCK files are
+# specified, then it will traverse the project root for BUCK files, excluding
 # directories of generated files produced by Buck.
 #
-# All of the build rules that are parsed from the BUILD files will be printed
+# All of the build rules that are parsed from the BUCK files will be printed
 # to stdout encoded in BSER. That means that printing out other information
 # for debugging purposes will break the BSER encoding, so be careful!
 
@@ -711,7 +915,7 @@ def main():
     # doesn't happen.  Actually dup2 the file handle so that writing
     # to file descriptor 1, os.system, and so on work as expected too.
 
-    to_parent = os.fdopen(os.dup(sys.stdout.fileno()), 'a')
+    to_parent = os.fdopen(os.dup(sys.stdout.fileno()), 'ab')
     os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
 
     parser = optparse.OptionParser()
@@ -764,10 +968,21 @@ def main():
         action='append',
         dest='include')
     parser.add_option(
+        '--config',
+        help='BuckConfig settings available at parse time.')
+    parser.add_option(
         '--quiet',
         action='store_true',
         dest='quiet',
         help='Stifles exception backtraces printed to stderr during parsing.')
+    parser.add_option(
+        '--ignore_buck_autodeps_files',
+        action='store_true',
+        help='Profile every buck file execution')
+    parser.add_option(
+        '--profile',
+        action='store_true',
+        help='Profile every buck file execution')
     (options, args) = parser.parse_args()
 
     # Even though project_root is absolute path, it may not be concise. For
@@ -795,15 +1010,24 @@ def main():
         watchman_client = pywatchman.client(**client_args)
         watchman_error = pywatchman.WatchmanError
 
+    configs = {}
+    if options.config is not None:
+        with open(options.config, 'rb') as f:
+            for section, contents in bser.loads(f.read()).iteritems():
+                for field, value in contents.iteritems():
+                    configs[(section, field)] = value
+
     buildFileProcessor = BuildFileProcessor(
         project_root,
         options.watchman_watch_root,
         options.watchman_project_prefix,
         options.build_file_name,
         options.allow_empty_globs,
+        options.ignore_buck_autodeps_files,
         watchman_client,
         watchman_error,
-        implicit_includes=options.include or [])
+        implicit_includes=options.include or [],
+        configs=configs)
 
     buildFileProcessor.install_builtins(__builtin__.__dict__)
 
@@ -817,11 +1041,13 @@ def main():
         sys.excepthook = silent_excepthook
 
     for build_file in args:
-        process_with_diagnostics(build_file, buildFileProcessor, to_parent)
+        process_with_diagnostics(build_file, buildFileProcessor, to_parent,
+                                 should_profile=options.profile)
 
     # "for ... in sys.stdin" in Python 2.x hangs until stdin is closed.
     for build_file in iter(sys.stdin.readline, ''):
-        process_with_diagnostics(build_file, buildFileProcessor, to_parent)
+        process_with_diagnostics(build_file, buildFileProcessor, to_parent,
+                                 should_profile=options.profile)
 
     if options.quiet:
         sys.excepthook = orig_excepthook

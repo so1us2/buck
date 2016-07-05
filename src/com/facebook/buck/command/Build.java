@@ -22,6 +22,7 @@ import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.event.ConsoleEvent;
 import com.facebook.buck.event.ThrowableConsoleEvent;
 import com.facebook.buck.jvm.core.JavaPackageFinder;
+import com.facebook.buck.model.BuildId;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasBuildTarget;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
@@ -60,6 +61,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.immutables.value.Value;
 
@@ -92,6 +94,7 @@ public class Build implements Closeable {
   private final DefaultStepRunner stepRunner;
   private final JavaPackageFinder javaPackageFinder;
   private final Clock clock;
+  private final ObjectMapper objectMapper;
 
   /** Not set until {@link #executeBuild(Iterable, boolean)} is invoked. */
   @Nullable
@@ -117,7 +120,8 @@ public class Build implements Closeable {
       Clock clock,
       ConcurrencyLimit concurrencyLimit,
       Optional<AdbOptions> adbOptions,
-      Optional<TargetDeviceOptions> targetDeviceOptions) {
+      Optional<TargetDeviceOptions> targetDeviceOptions,
+      Map<ExecutionContext.ExecutorPool, ListeningExecutorService> executors) {
     this.actionGraph = actionGraph;
     this.ruleResolver = ruleResolver;
     this.executionContext = ExecutionContext.builder()
@@ -136,12 +140,14 @@ public class Build implements Closeable {
         .setConcurrencyLimit(concurrencyLimit)
         .setAdbOptions(adbOptions)
         .setTargetDeviceOptions(targetDeviceOptions)
+        .setExecutors(executors)
         .build();
     this.artifactCache = artifactCache;
     this.buildEngine = buildEngine;
     this.stepRunner = new DefaultStepRunner(executionContext);
     this.javaPackageFinder = javaPackageFinder;
     this.clock = clock;
+    this.objectMapper = objectMapper;
   }
 
   public ActionGraph getActionGraph() {
@@ -175,6 +181,7 @@ public class Build implements Closeable {
       Iterable<? extends HasBuildTarget> targetish,
       boolean isKeepGoing)
       throws IOException, StepFailedException, ExecutionException, InterruptedException {
+    BuildId buildId = executionContext.getBuildId();
     buildContext = ImmutableBuildContext.builder()
         .setActionGraph(actionGraph)
         .setStepRunner(stepRunner)
@@ -185,7 +192,8 @@ public class Build implements Closeable {
         .setAndroidBootclasspathSupplier(
             BuildContext.createBootclasspathSupplier(
                 executionContext.getAndroidPlatformTargetSupplier()))
-        .setBuildId(executionContext.getBuildId())
+        .setBuildId(buildId)
+        .setObjectMapper(objectMapper)
         .putAllEnvironment(executionContext.getEnvironment())
         .setKeepGoing(isKeepGoing)
         .setShouldReportAbsolutePaths(executionContext.shouldReportAbsolutePaths())

@@ -33,7 +33,9 @@ import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -66,7 +68,8 @@ public class IntraCellIntegrationTest {
     // We don't need to do a build. It's enough to just parse these things.
     Cell cell = workspace.asCell();
 
-    TypeCoercerFactory coercerFactory = new DefaultTypeCoercerFactory();
+    TypeCoercerFactory coercerFactory = new DefaultTypeCoercerFactory(
+        ObjectMappers.newDefaultInstance());
     Parser parser = new Parser(
         new ParserConfig(cell.getBuckConfig()),
         coercerFactory,
@@ -77,7 +80,7 @@ public class IntraCellIntegrationTest {
         BuckEventBusFactory.newInstance(),
         cell,
         false,
-        Executors.newSingleThreadExecutor(),
+        MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor()),
         ImmutableSet.of(BuildTargetFactory.newInstance(
             cell.getFilesystem(),
             "//just-a-directory:rule")));
@@ -92,7 +95,7 @@ public class IntraCellIntegrationTest {
           BuckEventBusFactory.newInstance(),
           childCell,
           false,
-          Executors.newSingleThreadExecutor(),
+          MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor()),
           ImmutableSet.of(BuildTargetFactory.newInstance(
               childCell.getFilesystem(),
               "//:child-target")));

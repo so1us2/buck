@@ -16,14 +16,18 @@
 
 package com.facebook.buck.slb;
 
+import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.timing.Clock;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteStreams;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -38,20 +42,23 @@ public class ClientSideSlb implements HttpLoadBalancer {
   private final Clock clock;
   private final ScheduledExecutorService schedulerService;
   private final ScheduledFuture<?> backgroundHealthChecker;
+  private final BuckEventBus eventBus;
 
   // Use the Builder.
   public ClientSideSlb(ClientSideSlbConfig config) {
     this.clock = config.getClock();
     this.pingEndpoint = Preconditions.checkNotNull(config.getPingEndpoint());
     this.serverPool = Preconditions.checkNotNull(config.getServerPool());
+    this.eventBus = Preconditions.checkNotNull(config.getEventBus());
     Preconditions.checkArgument(serverPool.size() > 0, "No server URLs passed.");
 
     this.healthManager = new ServerHealthManager(
         this.serverPool,
         config.getErrorCheckTimeRangeMillis(),
-        config.getMaxErrorsPerSecond(),
+        config.getMaxErrorPercentage(),
         config.getLatencyCheckTimeRangeMillis(),
-        config.getMaxAcceptableLatencyMillis());
+        config.getMaxAcceptableLatencyMillis(),
+        config.getEventBus());
     this.pingClient = config.getPingHttpClient();
     this.pingClient.setConnectTimeout(config.getConnectionTimeoutMillis(), TimeUnit.MILLISECONDS);
     this.pingClient.setReadTimeout(config.getConnectionTimeoutMillis(), TimeUnit.MILLISECONDS);
@@ -71,13 +78,18 @@ public class ClientSideSlb implements HttpLoadBalancer {
   }
 
   @Override
-  public URI getBestServer() throws IOException {
+  public URI getBestServer() throws NoHealthyServersException {
     return healthManager.getBestServer(clock.currentTimeMillis());
   }
 
   @Override
-  public void reportException(URI server) {
-    healthManager.reportError(server, clock.currentTimeMillis());
+  public void reportRequestSuccess(URI server) {
+    healthManager.reportRequestSuccess(server, clock.currentTimeMillis());
+  }
+
+  @Override
+  public void reportRequestException(URI server) {
+    healthManager.reportRequestError(server, clock.currentTimeMillis());
   }
 
   @Override
@@ -89,20 +101,42 @@ public class ClientSideSlb implements HttpLoadBalancer {
   // TODO(ruibm): Log into timeseries information about each run.
   // TODO(ruibm): Add cache health information to the SuperConsole.
   private void backgroundThreadCallForHealthCheck() {
-    for (URI uri : serverPool) {
+    LoadBalancerPingEventData.Builder data = LoadBalancerPingEventData.builder();
+    for (URI serverUri : serverPool) {
+      PerServerPingData.Builder perServerData = PerServerPingData.builder().setServer(serverUri);
       Request request =
           new Request.Builder()
-              .url(uri.resolve(pingEndpoint).toString())
+              .url(serverUri.resolve(pingEndpoint).toString())
               .get()
               .build();
       long nowMillis = clock.currentTimeMillis();
       Stopwatch stopwatch = Stopwatch.createStarted();
       try {
-        pingClient.newCall(request).execute();
-        healthManager.reportLatency(uri, nowMillis, stopwatch.elapsed(TimeUnit.MILLISECONDS));
+        Response response = pingClient.newCall(request).execute();
+        try {
+          // Make sure we explicitly read the whole response and that's taken into account in
+          // the latency calculation.
+          try (InputStream inputStream = response.body().byteStream()) {
+            ByteStreams.copy(inputStream, ByteStreams.nullOutputStream());
+          }
+          long requestLatencyMillis = stopwatch.elapsed(TimeUnit.MILLISECONDS);
+          perServerData.setPingRequestLatencyMillis(requestLatencyMillis);
+          healthManager.reportPingLatency(serverUri, nowMillis, requestLatencyMillis);
+          healthManager.reportRequestSuccess(serverUri, nowMillis);
+        } finally {
+          // This guarantees response resources are released. In OkHttp if the Response's stream
+          // is not explicitly closed the connection is leaked from the connection pool and
+          // it will go into CLOSE_WAIT state waiting for a TCP timeout to be hit.
+          response.body().close();
+        }
       } catch (IOException e) {
-        healthManager.reportError(uri, nowMillis);
+        healthManager.reportRequestError(serverUri, nowMillis);
+        perServerData.setException(e);
+      } finally {
+        data.addPerServerData(perServerData.build());
       }
     }
+
+    eventBus.post(new LoadBalancerPingEvent(data.build()));
   }
 }

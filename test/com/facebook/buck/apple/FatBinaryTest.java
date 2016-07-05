@@ -16,6 +16,7 @@
 
 package com.facebook.buck.apple;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -24,7 +25,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cxx.CxxCompilationDatabase;
 import com.facebook.buck.cxx.CxxInferEnhancer;
 import com.facebook.buck.io.ProjectFilesystem;
@@ -64,7 +65,7 @@ public class FatBinaryTest {
   public void appleBinaryDescriptionWithMultiplePlatformArgsShouldGenerateFatBinary()
       throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRule fatBinaryRule = AppleBinaryBuilder
         .createBuilder(
@@ -90,15 +91,15 @@ public class FatBinaryTest {
             endsWith("lipo"),
             equalTo("-create"),
             equalTo("-output"),
-            endsWith("foo/xctest#iphoneos-i386,iphoneos-x86_64"),
-            endsWith("/xctest#iphoneos-i386"),
-            endsWith("/xctest#iphoneos-x86_64")));
+            containsString("foo/xctest#"),
+            containsString("/xctest#"),
+            containsString("/xctest#")));
   }
 
   @Test
   public void appleBinaryDescriptionWithMultipleDifferentSdksShouldFail() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     HumanReadableException exception = null;
     try {
       AppleBinaryBuilder
@@ -118,12 +119,13 @@ public class FatBinaryTest {
   @Test
   public void fatBinaryWithSpecialBuildActionShouldFail() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     HumanReadableException exception = null;
-    Iterable<Flavor> forbiddenFlavors = ImmutableList.of(
-        CxxInferEnhancer.INFER,
-        CxxInferEnhancer.INFER_ANALYZE,
-        CxxCompilationDatabase.COMPILATION_DATABASE);
+    Iterable<Flavor> forbiddenFlavors = ImmutableList.<Flavor>builder()
+        .addAll(CxxInferEnhancer.InferFlavors.getAll())
+        .add(CxxCompilationDatabase.COMPILATION_DATABASE)
+        .build();
+
     for (Flavor flavor : forbiddenFlavors) {
       try {
         AppleBinaryBuilder

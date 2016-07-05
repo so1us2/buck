@@ -16,14 +16,18 @@
 
 package com.facebook.buck.apple;
 
+import static com.facebook.buck.cxx.CxxFlavorSanitizer.sanitize;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import com.facebook.buck.cxx.CxxCompilationDatabaseEntry;
 import com.facebook.buck.cxx.CxxCompilationDatabaseUtils;
 import com.facebook.buck.cxx.CxxDescriptionEnhancer;
+import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
+import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
@@ -74,12 +78,9 @@ public class CompilationDatabaseIntegrationTest {
   @Test
   public void testCreateCompilationDatabaseForAppleLibraryWithNoDeps() throws IOException {
     // buck build the #compilation-database.
-    Path compilationDatabase = workspace.buildAndReturnOutput(
+    BuildTarget target = BuildTargetFactory.newInstance(
         "//Libraries/EXExample:EXExample#compilation-database,iphonesimulator-x86_64");
-    assertEquals(
-        Paths.get("buck-out/gen/Libraries/EXExample/" +
-            "__EXExample#compilation-database,iphonesimulator-x86_64.json"),
-        tmp.getRoot().relativize(compilationDatabase));
+    Path compilationDatabase = workspace.buildAndReturnOutput(target.getFullyQualifiedName());
 
     // Parse the compilation_database.json file.
     Map<String, CxxCompilationDatabaseEntry> fileToEntry =
@@ -88,13 +89,21 @@ public class CompilationDatabaseIntegrationTest {
     ImmutableSet<String> frameworks = ImmutableSet.of(
         Paths.get("/System/Library/Frameworks/Foundation.framework").getParent().toString());
     String pathToPrivateHeaders =
-        String.format(
-            "buck-out/gen/Libraries/EXExample/EXExample#iphonesimulator-x86_64,%s.hmap",
-            CxxDescriptionEnhancer.HEADER_SYMLINK_TREE_FLAVOR);
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    CxxDescriptionEnhancer.HEADER_SYMLINK_TREE_FLAVOR),
+                "%s.hmap")
+            .toString();
     String pathToPublicHeaders =
-        String.format(
-            "buck-out/gen/Libraries/EXExample/EXExample#%s,iphonesimulator-x86_64.hmap",
-            CxxDescriptionEnhancer.EXPORTED_HEADER_SYMLINK_TREE_FLAVOR);
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    CxxDescriptionEnhancer.EXPORTED_HEADER_SYMLINK_TREE_FLAVOR),
+                "%s.hmap")
+            .toString();
     Iterable<String> includes = ImmutableList.of(
         pathToPrivateHeaders,
         pathToPublicHeaders,
@@ -103,25 +112,44 @@ public class CompilationDatabaseIntegrationTest {
     // Verify the entries in the compilation database.
     assertFlags(
         "Libraries/EXExample/EXExample/EXExampleModel.m",
-        "buck-out/gen/Libraries/EXExample/EXExample#compile-pic-EXExample_" +
-            "EXExampleModel.m.o,iphonesimulator-x86_64/EXExample/EXExampleModel.m.o",
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    ImmutableFlavor.of("compile-pic-" + sanitize("EXExample/EXExampleModel.m.o"))),
+                "%s")
+            .resolve("EXExample/EXExampleModel.m.o")
+            .toString(),
         /* isLibrary */ true,
         fileToEntry,
         frameworks,
         includes);
     assertFlags(
         "Libraries/EXExample/EXExample/EXUser.mm",
-        "buck-out/gen/Libraries/EXExample/EXExample#compile-pic-EXExample_" +
-            "EXUser.mm.o,iphonesimulator-x86_64/EXExample/EXUser.mm.o",
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    ImmutableFlavor.of("compile-pic-" + sanitize("EXExample/EXUser.mm.o"))),
+                "%s")
+            .resolve("EXExample/EXUser.mm.o")
+            .toString(),
         /* isLibrary */ true,
         fileToEntry,
         frameworks,
         includes);
     assertFlags(
         "Libraries/EXExample/EXExample/Categories/NSString+Palindrome.m",
-        "buck-out/gen/Libraries/EXExample/EXExample#compile-pic-EXExample_" +
-            "Categories_NSString_Palindrome.m.o,iphonesimulator-x86_64/" +
-            "EXExample/Categories/NSString+Palindrome.m.o",
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    ImmutableFlavor.of(
+                        "compile-pic-" +
+                            sanitize("EXExample/Categories/NSString+Palindrome.m.o"))),
+                "%s")
+            .resolve("EXExample/Categories/NSString+Palindrome.m.o")
+            .toString(),
         /* isLibrary */ true,
         fileToEntry,
         frameworks,
@@ -131,12 +159,9 @@ public class CompilationDatabaseIntegrationTest {
   @Test
   public void testCreateCompilationDatabaseForAppleBinaryWithDeps() throws IOException {
     // buck build the #compilation-database.
-    Path compilationDatabase = workspace.buildAndReturnOutput(
+    BuildTarget target = BuildTargetFactory.newInstance(
         "//Apps/Weather:Weather#iphonesimulator-x86_64,compilation-database");
-    assertEquals(
-        Paths.get("buck-out/gen/Apps/Weather/" +
-            "__Weather#compilation-database,iphonesimulator-x86_64.json"),
-        tmp.getRoot().relativize(compilationDatabase));
+    Path compilationDatabase = workspace.buildAndReturnOutput(target.getFullyQualifiedName());
 
     // Parse the compilation_database.json file.
     Map<String, CxxCompilationDatabaseEntry> fileToEntry =
@@ -146,13 +171,21 @@ public class CompilationDatabaseIntegrationTest {
         Paths.get("/System/Library/Frameworks/Foundation.framework").getParent().toString(),
         Paths.get("/System/Library/Frameworks/UIKit.framework").getParent().toString());
     String pathToPrivateHeaders =
-        String.format(
-            "buck-out/gen/Apps/Weather/Weather#iphonesimulator-x86_64,%s.hmap",
-            CxxDescriptionEnhancer.HEADER_SYMLINK_TREE_FLAVOR);
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    CxxDescriptionEnhancer.HEADER_SYMLINK_TREE_FLAVOR),
+                "%s.hmap")
+            .toString();
     String pathToPublicHeaders =
-        String.format(
-            "buck-out/gen/Libraries/EXExample/EXExample#%s,iphonesimulator-x86_64.hmap",
-            CxxDescriptionEnhancer.EXPORTED_HEADER_SYMLINK_TREE_FLAVOR);
+        BuildTargets
+            .getGenPath(
+                BuildTargetFactory.newInstance(
+                    "//Libraries/EXExample:EXExample#iphonesimulator-x86_64," +
+                        CxxDescriptionEnhancer.EXPORTED_HEADER_SYMLINK_TREE_FLAVOR),
+                "%s.hmap")
+            .toString();
     Iterable<String> includes = ImmutableList.of(
         pathToPrivateHeaders,
         pathToPublicHeaders,
@@ -160,16 +193,30 @@ public class CompilationDatabaseIntegrationTest {
 
     assertFlags(
         "Apps/Weather/Weather/EXViewController.m",
-        "buck-out/gen/Apps/Weather/Weather#compile-Weather_" +
-            "EXViewController.m.o,iphonesimulator-x86_64/Weather/EXViewController.m.o",
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    ImmutableFlavor.of(
+                        "compile-" + sanitize("Weather/EXViewController.m.o"))),
+                "%s")
+            .resolve("Weather/EXViewController.m.o")
+            .toString(),
         /* isLibrary */ false,
         fileToEntry,
         frameworks,
         includes);
     assertFlags(
         "Apps/Weather/Weather/main.m",
-        "buck-out/gen/Apps/Weather/Weather#compile-Weather_" +
-            "main.m.o,iphonesimulator-x86_64/Weather/main.m.o",
+        BuildTargets
+            .getGenPath(
+                target.withFlavors(
+                    ImmutableFlavor.of("iphonesimulator-x86_64"),
+                    ImmutableFlavor.of(
+                        "compile-" + sanitize("Weather/main.m.o"))),
+                "%s")
+            .resolve("Weather/main.m.o")
+            .toString(),
         /* isLibrary */ false,
         fileToEntry,
         frameworks,
@@ -203,37 +250,32 @@ public class CompilationDatabaseIntegrationTest {
       languageStandard = "-std=c++11";
       clang += "++";
     }
+    ImmutableList<String> commandArgs1 = ImmutableList.of(
+        "'" + languageStandard + "'",
+        "-Wno-deprecated",
+        "-Wno-conversion");
+
+    ImmutableList<String> commandArgs2 = ImmutableList.of(
+        "-isysroot",
+        sdkRoot,
+        "-arch",
+        "x86_64",
+        "'-mios-simulator-version-min=8.0'");
+
     List<String> commandArgs = Lists.newArrayList();
     commandArgs.add(clang);
-    commandArgs.add("'" + languageStandard + "'");
-    commandArgs.add("-Wno-deprecated");
-    commandArgs.add("-Wno-conversion");
-
     if (isLibrary) {
       commandArgs.add("-fPIC");
+      commandArgs.add("-fPIC");
     }
-
-    commandArgs.add("-isysroot");
-    commandArgs.add(sdkRoot);
-    commandArgs.add("-arch");
-    commandArgs.add("x86_64");
-    commandArgs.add("'-mios-simulator-version-min=8.0'");
 
     // TODO(Coneko, k21): It seems like a bug that this set of flags gets inserted twice.
     // Perhaps this has something to do with how the [cxx] section in .buckconfig is processed.
     // (Err, it's probably adding both the preprocessor and regular rule command suffixes. Should
     // be harmless.)
-    commandArgs.add("'" + languageStandard + "'");
-    commandArgs.add("-Wno-deprecated");
-    commandArgs.add("-Wno-conversion");
-
-    commandArgs.add("-isysroot");
-    commandArgs.add(sdkRoot);
-
-    commandArgs.add("-arch");
-    commandArgs.add("x86_64");
-
-    commandArgs.add("'-mios-simulator-version-min=8.0'");
+    commandArgs.addAll(commandArgs2);
+    commandArgs.addAll(commandArgs1);
+    commandArgs.addAll(commandArgs2);
 
     for (String include : includes) {
       commandArgs.add("-I");
@@ -254,7 +296,7 @@ public class CompilationDatabaseIntegrationTest {
     commandArgs.add("-c");
     commandArgs.add("-MD");
     commandArgs.add("-MF");
-    commandArgs.add(output + ".dep.tmp");
+    commandArgs.add(tmpRoot.resolve("dep.tmp").toString());
     commandArgs.add(source);
     commandArgs.add("-o");
     commandArgs.add(output);

@@ -23,6 +23,7 @@ import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.timing.FakeClock;
 import com.facebook.buck.util.BuckConstant;
+import com.facebook.buck.util.ObjectMappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
@@ -33,6 +34,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -43,6 +45,8 @@ public class ProgressEstimatorTest {
   @Rule
   public final DebuggableTemporaryFolder tmp = new DebuggableTemporaryFolder();
 
+  private static final ObjectMapper MAPPER = ObjectMappers.newDefaultInstance();
+
   public BuckEventBus getBuckEventBus() {
     return new BuckEventBus(new FakeClock(0), new BuildId(""));
   }
@@ -50,7 +54,7 @@ public class ProgressEstimatorTest {
   @Test
   public void testByDefaultProvidesNoProcessingBuckFilesProgress() {
     Path p = new FakeProjectFilesystem().getRootPath();
-    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus());
+    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus(), MAPPER);
     assertThat(e.getEstimatedProgressOfProcessingBuckFiles().isPresent(), Matchers.equalTo(false));
   }
 
@@ -59,9 +63,9 @@ public class ProgressEstimatorTest {
       throws IOException {
     Path storagePath = getStorageForTest();
 
-    ProgressEstimator estimator = new ProgressEstimator(storagePath, getBuckEventBus());
+    ProgressEstimator estimator = new ProgressEstimator(storagePath, getBuckEventBus(), MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
     estimator.didParseBuckRules(10);
     assertThat(estimator.getEstimatedProgressOfProcessingBuckFiles().isPresent(),
         Matchers.equalTo(false));
@@ -80,18 +84,20 @@ public class ProgressEstimatorTest {
                 .put(ProgressEstimator.EXPECTED_NUMBER_OF_PARSED_BUCK_FILES, 10)
                 .build())
         .build();
-    String contents = new ObjectMapper().writeValueAsString(storageContents);
+    String contents = MAPPER.writeValueAsString(storageContents);
     Files.createDirectories(storagePath.getParent());
-    Files.write(storagePath, contents.getBytes());
+    Files.write(storagePath, contents.getBytes(StandardCharsets.UTF_8));
 
     // path is 2 levels up folder
     ProgressEstimator estimator = new ProgressEstimator(
         storagePath.getParent().getParent(),
-        getBuckEventBus());
+        getBuckEventBus(),
+        MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
     estimator.didParseBuckRules(10);
-    assertThat(estimator.getEstimatedProgressOfProcessingBuckFiles().get().doubleValue(),
+    assertThat(
+        estimator.getEstimatedProgressOfProcessingBuckFiles().get(),
         Matchers.closeTo(0.1, 0.01));
   }
 
@@ -108,22 +114,23 @@ public class ProgressEstimatorTest {
                 .put(ProgressEstimator.EXPECTED_NUMBER_OF_PARSED_BUCK_FILES, 10)
                 .build())
         .build();
-    String contents = new ObjectMapper().writeValueAsString(storageContents);
+    String contents = MAPPER.writeValueAsString(storageContents);
     Files.createDirectories(storagePath.getParent());
-    Files.write(storagePath, contents.getBytes());
+    Files.write(storagePath, contents.getBytes(StandardCharsets.UTF_8));
 
     // path is 2 levels up folder
     ProgressEstimator estimator = new ProgressEstimator(
         storagePath.getParent().getParent(),
-        getBuckEventBus());
+        getBuckEventBus(),
+        MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
     estimator.didParseBuckRules(10);
     estimator.didParseBuckRules(30);
     estimator.didParseBuckRules(10);
     estimator.didFinishParsing();
 
-    Map<String, Map<String, Number>> jsonObject = new ObjectMapper().readValue(
+    Map<String, Map<String, Number>> jsonObject = MAPPER.readValue(
         Files.readAllBytes(storagePath),
         new TypeReference<HashMap<String, Map<String, Number>>>(){});
 
@@ -148,19 +155,21 @@ public class ProgressEstimatorTest {
                 .put(ProgressEstimator.EXPECTED_NUMBER_OF_GENERATED_PROJECT_FILES, 10)
                 .build())
         .build();
-    String contents = new ObjectMapper().writeValueAsString(storageContents);
+    String contents = MAPPER.writeValueAsString(storageContents);
     Files.createDirectories(storagePath.getParent());
-    Files.write(storagePath, contents.getBytes());
+    Files.write(storagePath, contents.getBytes(StandardCharsets.UTF_8));
 
     // path is 2 levels up folder
     ProgressEstimator estimator = new ProgressEstimator(
         storagePath.getParent().getParent(),
-        getBuckEventBus());
+        getBuckEventBus(),
+        MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
     estimator.didGenerateProjectForTarget();
     estimator.didGenerateProjectForTarget();
-    assertThat(estimator.getEstimatedProgressOfGeneratingProjectFiles().get().doubleValue(),
+    assertThat(
+        estimator.getEstimatedProgressOfGeneratingProjectFiles().get(),
         Matchers.closeTo(0.2, 0.01));
   }
 
@@ -176,22 +185,23 @@ public class ProgressEstimatorTest {
                 .put(ProgressEstimator.EXPECTED_NUMBER_OF_GENERATED_PROJECT_FILES, 10)
                 .build())
         .build();
-    String contents = new ObjectMapper().writeValueAsString(storageContents);
+    String contents = MAPPER.writeValueAsString(storageContents);
     Files.createDirectories(storagePath.getParent());
-    Files.write(storagePath, contents.getBytes());
+    Files.write(storagePath, contents.getBytes(StandardCharsets.UTF_8));
 
     // path is 2 levels up folder
     ProgressEstimator estimator = new ProgressEstimator(
         storagePath.getParent().getParent(),
-        getBuckEventBus());
+        getBuckEventBus(),
+        MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
     estimator.didGenerateProjectForTarget();
     estimator.didGenerateProjectForTarget();
     estimator.didGenerateProjectForTarget();
     estimator.didFinishProjectGeneration();
 
-    Map<String, Map<String, Number>> jsonObject = new ObjectMapper().readValue(
+    Map<String, Map<String, Number>> jsonObject = MAPPER.readValue(
         Files.readAllBytes(storagePath),
         new TypeReference<HashMap<String, Map<String, Number>>>() {});
 
@@ -209,9 +219,10 @@ public class ProgressEstimatorTest {
     // path is 2 levels up folder
     ProgressEstimator estimator = new ProgressEstimator(
         storagePath.getParent().getParent(),
-        getBuckEventBus());
+        getBuckEventBus(),
+        MAPPER);
 
-    estimator.setCurrentCommand("project", ImmutableList.<String>of("arg1", "arg2"));
+    estimator.setCurrentCommand("project", ImmutableList.of("arg1", "arg2"));
 
     estimator.didParseBuckRules(10);
     estimator.didParseBuckRules(20);
@@ -223,7 +234,7 @@ public class ProgressEstimatorTest {
     estimator.didGenerateProjectForTarget();
     estimator.didFinishProjectGeneration();
 
-    Map<String, Map<String, Number>> jsonObject = new ObjectMapper().readValue(
+    Map<String, Map<String, Number>> jsonObject = MAPPER.readValue(
         Files.readAllBytes(storagePath),
         new TypeReference<HashMap<String, Map<String, Number>>>() {
         });
@@ -250,27 +261,27 @@ public class ProgressEstimatorTest {
   @Test
   public void testByDefaultProvidesNoBuildProgress() {
     Path p = new FakeProjectFilesystem().getRootPath();
-    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus());
+    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus(), MAPPER);
     assertThat(e.getApproximateBuildProgress().isPresent(), Matchers.equalTo(false));
   }
 
   @Test
   public void testByProvidesCompleteBuildProgressAfterGettingBuildEvents() {
     Path p = new FakeProjectFilesystem().getRootPath();
-    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus());
+    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus(), MAPPER);
 
     e.didStartBuild();
     e.setNumberOfRules(10);
     e.didFinishBuild();
 
     assertThat(e.getApproximateBuildProgress().isPresent(), Matchers.equalTo(true));
-    assertThat(e.getApproximateBuildProgress().get().doubleValue(), Matchers.closeTo(1.0, 0.01));
+    assertThat(e.getApproximateBuildProgress().get(), Matchers.closeTo(1.0, 0.01));
   }
 
   @Test
   public void testByProvidesPartialBuildProgressAfterGettingBuildEvents() {
     Path p = new FakeProjectFilesystem().getRootPath();
-    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus());
+    ProgressEstimator e = new ProgressEstimator(p, getBuckEventBus(), MAPPER);
 
     e.didStartBuild();
     e.setNumberOfRules(10);
@@ -295,9 +306,7 @@ public class ProgressEstimatorTest {
     e.didFinishRule();
 
     assertThat(e.getApproximateBuildProgress().isPresent(), Matchers.equalTo(true));
-    assertThat(e.getApproximateBuildProgress().get().doubleValue(),
-        Matchers.greaterThan(0.0));
-    assertThat(e.getApproximateBuildProgress().get().doubleValue(),
-        Matchers.lessThan(1.0));
+    assertThat(e.getApproximateBuildProgress().get(), Matchers.greaterThan(0.0));
+    assertThat(e.getApproximateBuildProgress().get(), Matchers.lessThan(1.0));
   }
 }

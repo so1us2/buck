@@ -18,8 +18,8 @@ package com.facebook.buck.util.cache;
 
 import static org.junit.Assert.assertTrue;
 
-import com.facebook.buck.cli.Config;
-import com.facebook.buck.cli.ConfigBuilder;
+import com.facebook.buck.config.Config;
+import com.facebook.buck.config.ConfigBuilder;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
@@ -88,7 +88,7 @@ public class StackedFileHashCacheTest {
     DefaultFileHashCache innerCache = new DefaultFileHashCache(filesystem);
     StackedFileHashCache cache = new StackedFileHashCache(ImmutableList.of(innerCache));
     expectedException.expect(NoSuchFileException.class);
-    cache.get(fullPath);
+    cache.get(filesystem.resolve(fullPath));
   }
 
   @Test
@@ -103,7 +103,7 @@ public class StackedFileHashCacheTest {
     DefaultFileHashCache innerCache = new DefaultFileHashCache(filesystem);
     StackedFileHashCache cache = new StackedFileHashCache(ImmutableList.of(innerCache));
     expectedException.expect(NoSuchFileException.class);
-    cache.get(fullPath);
+    cache.get(filesystem.resolve(fullPath));
   }
 
 }

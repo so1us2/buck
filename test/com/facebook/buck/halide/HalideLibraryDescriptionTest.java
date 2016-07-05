@@ -16,115 +16,95 @@
 
 package com.facebook.buck.halide;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
-import com.facebook.buck.cxx.CxxBinary;
-import com.facebook.buck.cxx.CxxDescriptionEnhancer;
-import com.facebook.buck.cxx.CxxHeaders;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.cxx.Archive;
 import com.facebook.buck.cxx.CxxLibraryBuilder;
 import com.facebook.buck.cxx.CxxPlatform;
-import com.facebook.buck.cxx.CxxPreprocessorInput;
+import com.facebook.buck.cxx.CxxPreprocessables;
+import com.facebook.buck.cxx.CxxSymlinkTreeHeaders;
 import com.facebook.buck.cxx.HeaderVisibility;
 import com.facebook.buck.cxx.Linker;
 import com.facebook.buck.cxx.NativeLinkableInput;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
-import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.FakeSourcePath;
+import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.Arg;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.TargetGraphFactory;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedSet;
 
+import org.hamcrest.Matchers;
 import org.junit.Test;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class HalideLibraryDescriptionTest {
-  @Test
-  public void testIsHalideCompilerTarget() {
-    BuildTarget target = BuildTargetFactory.newInstance("//:foo");
-    assertFalse(HalideLibraryDescription.isHalideCompilerTarget(target));
-    target = BuildTargetFactory.newInstance("//:foo#halide-compiler");
-    assertTrue(HalideLibraryDescription.isHalideCompilerTarget(target));
-  }
 
   @Test
   public void testCreateBuildRule() throws Exception {
     // Set up a #halide-compiler rule, then set up a halide_library rule, and
     // check that the library rule depends on the compiler rule.
     BuildTarget compilerTarget = BuildTargetFactory
-      .newInstance("//:rule")
-      .withFlavors(HalideLibraryDescription.HALIDE_COMPILER_FLAVOR);
+        .newInstance("//:rule")
+        .withFlavors(HalideLibraryDescription.HALIDE_COMPILER_FLAVOR);
     BuildTarget libTarget = BuildTargetFactory.newInstance("//:rule");
 
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     HalideLibraryBuilder compilerBuilder =
-      new HalideLibraryBuilder(compilerTarget);
+        new HalideLibraryBuilder(compilerTarget);
     compilerBuilder.setSrcs(
-      ImmutableSortedSet.of(
-        SourceWithFlags.of(
-          new FakeSourcePath("main.cpp"))));
+        ImmutableSortedSet.of(
+            SourceWithFlags.of(
+                new FakeSourcePath("main.cpp"))));
     HalideLibraryBuilder libBuilder = new HalideLibraryBuilder(libTarget);
     TargetGraph targetGraph = TargetGraphFactory.newInstance(
-      compilerBuilder.build(),
-      libBuilder.build());
+        compilerBuilder.build(),
+        libBuilder.build());
     BuildRuleResolver resolver =
-        new BuildRuleResolver(targetGraph, new BuildTargetNodeToBuildRuleTransformer());
-    CxxBinary compiler = (CxxBinary) compilerBuilder.build(
-      resolver,
-      filesystem,
-      targetGraph);
+        new BuildRuleResolver(targetGraph, new DefaultTargetNodeToBuildRuleTransformer());
     HalideLibrary lib = (HalideLibrary) libBuilder.build(
-      resolver,
-      filesystem,
-      targetGraph);
-    // Check that we picked up the implicit dependency on the #halide-compiler
-    // version of the rule.
-    assertEquals(lib.getDeps(), ImmutableSortedSet.<BuildRule>of(compiler));
+        resolver,
+        filesystem,
+        targetGraph);
 
     // Check that the library rule has the correct preprocessor input.
     CxxPlatform cxxPlatform = CxxLibraryBuilder.createDefaultPlatform();
     String headerName = "rule.h";
-    Path headerPath = BuildTargets.getGenPath(libTarget, "%s/" + headerName);
-    Path headerRoot =
-      CxxDescriptionEnhancer.getHeaderSymlinkTreePath(
-        libTarget,
-        cxxPlatform.getFlavor(),
-        HeaderVisibility.PUBLIC);
-    assertEquals(
-      CxxPreprocessorInput.builder()
-        .addRules(
-          CxxDescriptionEnhancer.createHeaderSymlinkTreeTarget(
-            libTarget,
-            cxxPlatform.getFlavor(),
-            HeaderVisibility.PUBLIC))
-        .setIncludes(
-          CxxHeaders.builder()
-            .putNameToPathMap(
-              Paths.get(headerName),
-              new BuildTargetSourcePath(libTarget, headerPath))
-            .putFullNameToPathMap(
-              headerRoot.resolve(headerName),
-              new BuildTargetSourcePath(libTarget, headerPath))
-            .build())
-        .addSystemIncludeRoots(headerRoot)
-        .build(),
-      lib.getCxxPreprocessorInput(
-        cxxPlatform,
-        HeaderVisibility.PUBLIC));
+    BuildTarget flavoredLibTarget = libTarget.withFlavors(
+        HalideLibraryDescription.HALIDE_COMPILE_FLAVOR,
+        cxxPlatform.getFlavor());
+    Path headerPath = HalideCompile.headerOutputPath(flavoredLibTarget);
+    CxxSymlinkTreeHeaders publicHeaders =
+        (CxxSymlinkTreeHeaders) lib.getCxxPreprocessorInput(
+            cxxPlatform,
+            HeaderVisibility.PUBLIC).getIncludes()
+            .get(0);
+    assertThat(
+        publicHeaders.getIncludeType(),
+        Matchers.equalTo(CxxPreprocessables.IncludeType.SYSTEM));
+    assertThat(
+        publicHeaders.getNameToPathMap(),
+        Matchers.equalTo(
+            ImmutableMap.<Path, SourcePath>of(
+                Paths.get(headerName),
+                new BuildTargetSourcePath(
+                    flavoredLibTarget,
+                    headerPath))));
 
     // Check that the library rule has the correct native linkable input.
     NativeLinkableInput input = lib.getNativeLinkableInput(
@@ -134,6 +114,6 @@ public class HalideLibraryDescriptionTest {
         FluentIterable.from(input.getArgs())
             .transformAndConcat(Arg.getDepsFunction(new SourcePathResolver(resolver)))
             .get(0);
-    assertTrue(buildRule instanceof HalideLibrary);
+    assertThat(buildRule, is(instanceOf(Archive.class)));
   }
 }

@@ -17,8 +17,10 @@
 package com.facebook.buck.cxx;
 
 import com.facebook.buck.model.Flavor;
+import com.facebook.buck.model.FlavorConvertible;
 import com.facebook.buck.rules.Tool;
 import com.facebook.buck.util.immutables.BuckStyleImmutable;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 
@@ -31,29 +33,36 @@ import java.util.List;
  */
 @Value.Immutable
 @BuckStyleImmutable
-interface AbstractCxxPlatform {
+interface AbstractCxxPlatform extends FlavorConvertible {
 
+  @Override
   Flavor getFlavor();
 
-  Tool getAs();
+  CompilerProvider getAs();
   List<String> getAsflags();
 
-  Preprocessor getAspp();
+  PreprocessorProvider getAspp();
   List<String> getAsppflags();
 
-  Compiler getCc();
+  CompilerProvider getCc();
   List<String> getCflags();
 
-  Compiler getCxx();
+  CompilerProvider getCxx();
   List<String> getCxxflags();
 
-  Preprocessor getCpp();
+  PreprocessorProvider getCpp();
   List<String> getCppflags();
 
-  Preprocessor getCxxpp();
+  PreprocessorProvider getCxxpp();
   List<String> getCxxppflags();
 
-  Linker getLd();
+  Optional<PreprocessorProvider> getCudapp();
+  List<String> getCudappflags();
+
+  Optional<CompilerProvider> getCuda();
+  List<String> getCudaflags();
+
+  LinkerProvider getLd();
   List<String> getLdflags();
   Multimap<Linker.LinkableDepType, String> getRuntimeLdflags();
 

@@ -16,8 +16,10 @@
 
 package com.facebook.buck.android;
 
+import com.facebook.buck.jvm.java.JavaOptions;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasSourceUnderTest;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRules;
 import com.facebook.buck.rules.BuildRuleParams;
@@ -39,9 +41,13 @@ public class AndroidInstrumentationTestDescription
 
   public static final BuildRuleType TYPE = BuildRuleType.of("android_instrumentation_test");
 
+  private final JavaOptions javaOptions;
   private final Optional<Long> defaultTestRuleTimeoutMs;
 
-  public AndroidInstrumentationTestDescription(Optional<Long> defaultTestRuleTimeoutMs) {
+  public AndroidInstrumentationTestDescription(
+      JavaOptions javaOptions,
+      Optional<Long> defaultTestRuleTimeoutMs) {
+    this.javaOptions = javaOptions;
     this.defaultTestRuleTimeoutMs = defaultTestRuleTimeoutMs;
   }
 
@@ -79,6 +85,7 @@ public class AndroidInstrumentationTestDescription
         (InstallableApk) apk,
         args.labels.get(),
         args.contacts.get(),
+        javaOptions.getJavaRuntimeLauncher(),
         resolver.getAllRules(args.sourceUnderTest.get()),
         args.testRuleTimeoutMs.or(defaultTestRuleTimeoutMs));
   }
@@ -96,7 +103,7 @@ public class AndroidInstrumentationTestDescription
 
 
   @SuppressFieldNotInitialized
-  public static class Arg implements HasSourceUnderTest {
+  public static class Arg extends AbstractDescriptionArg implements HasSourceUnderTest {
     public BuildTarget apk;
     public Optional<ImmutableSortedSet<Label>> labels;
     public Optional<ImmutableSortedSet<String>> contacts;

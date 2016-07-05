@@ -41,7 +41,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -100,6 +99,11 @@ public class GnuLinker implements Linker {
   }
 
   @Override
+  public Iterable<Arg> linkerMap(Path output) {
+    return ImmutableList.<Arg>of();
+  }
+
+  @Override
   public Iterable<String> soname(String arg) {
     return Linkers.iXlinker("-soname", arg);
   }
@@ -117,6 +121,11 @@ public class GnuLinker implements Linker {
   @Override
   public String searchPathEnvVar() {
     return "LD_LIBRARY_PATH";
+  }
+
+  @Override
+  public String preloadEnvVar() {
+    return "LD_PRELOAD";
   }
 
   /**
@@ -145,6 +154,16 @@ public class GnuLinker implements Linker {
             symbolFiles));
     return ImmutableList.<Arg>of(
         new SourcePathArg(pathResolver, new BuildTargetSourcePath(target)));
+  }
+
+  @Override
+  public Iterable<String> getNoAsNeededSharedLibsFlags() {
+    return Linkers.iXlinker("--no-as-needed");
+  }
+
+  @Override
+  public Iterable<String> getIgnoreUndefinedSymbolsFlags() {
+    return Linkers.iXlinker("--allow-shlib-undefined");
   }
 
   @Override
@@ -194,7 +213,7 @@ public class GnuLinker implements Linker {
                               getResolver().getAbsolutePath(path),
                               Charsets.UTF_8));
                     } catch (IOException e) {
-                      throw Throwables.propagate(e);
+                      throw new RuntimeException(e);
                     }
                   }
                   List<String> lines = new ArrayList<>();

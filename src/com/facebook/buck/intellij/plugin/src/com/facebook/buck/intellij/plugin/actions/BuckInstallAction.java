@@ -19,13 +19,15 @@ package com.facebook.buck.intellij.plugin.actions;
 import com.facebook.buck.intellij.plugin.build.BuckBuildCommandHandler;
 import com.facebook.buck.intellij.plugin.build.BuckBuildManager;
 import com.facebook.buck.intellij.plugin.build.BuckCommand;
+import com.facebook.buck.intellij.plugin.config.BuckModule;
 import com.facebook.buck.intellij.plugin.config.BuckSettingsProvider;
+import com.facebook.buck.intellij.plugin.ui.BuckEventsConsumer;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.project.Project;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.swing.Icon;
 
 /**
  * Run buck install command.
@@ -34,17 +36,14 @@ public class BuckInstallAction extends BuckBaseAction {
 
   public static final String ACTION_TITLE = "Run buck install";
   public static final String ACTION_DESCRIPTION = "Run buck install command";
+  public static final Icon ICON = AllIcons.Actions.Execute;
 
   public BuckInstallAction() {
-    super(ACTION_TITLE, ACTION_DESCRIPTION, AllIcons.Actions.Execute);
+    this(ACTION_TITLE, ACTION_DESCRIPTION, ICON);
   }
 
-  @Override
-  public void update(AnActionEvent e) {
-    if (preUpdateCheck(e)) {
-      Project project = e.getProject();
-      e.getPresentation().setEnabled(!BuckBuildManager.getInstance(project).isBuilding());
-    }
+  public BuckInstallAction(String actionTitle, String actionDescription, Icon icon) {
+    super(actionTitle, actionDescription, icon);
   }
 
   @Override
@@ -61,10 +60,16 @@ public class BuckInstallAction extends BuckBaseAction {
       return;
     }
 
+    // Initiate a buck install
+    BuckEventsConsumer buckEventsConsumer = new BuckEventsConsumer(e.getProject());
+    BuckModule buckModule = e.getProject().getComponent(BuckModule.class);
+    buckModule.attach(buckEventsConsumer, target);
+
     BuckBuildCommandHandler handler = new BuckBuildCommandHandler(
         e.getProject(),
         e.getProject().getBaseDir(),
-        BuckCommand.INSTALL);
+        BuckCommand.INSTALL,
+        buckEventsConsumer);
     if (state.customizedInstallSetting) {
       // Split the whole command line into different parameters.
       String commands = state.customizedInstallSettingCommand;
@@ -84,6 +89,6 @@ public class BuckInstallAction extends BuckBaseAction {
       }
     }
     handler.command().addParameter(target);
-    buildManager.runBuckCommand(handler, ACTION_TITLE);
+    buildManager.runBuckCommandWhileConnectedToBuck(handler, ACTION_TITLE, buckModule);
   }
 }

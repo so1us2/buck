@@ -22,7 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.artifact_cache.ArtifactCache;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.event.BuckEventBusFactory;
 import com.facebook.buck.io.MorePathsForTests;
 import com.facebook.buck.io.ProjectFilesystem;
@@ -33,6 +33,7 @@ import com.facebook.buck.jvm.java.KeystoreBuilder;
 import com.facebook.buck.model.BuildId;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.parser.BuildTargetParser;
 import com.facebook.buck.parser.BuildTargetPatternParser;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
@@ -64,6 +65,7 @@ import com.facebook.buck.step.fs.RmStep;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.MoreAsserts;
 import com.facebook.buck.timing.Clock;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -112,7 +114,7 @@ public class ApkGenruleTest {
   public void testCreateAndRunApkGenrule() throws IOException, NoSuchBuildTargetException {
     ProjectFilesystem projectFilesystem = FakeProjectFilesystem.createJavaOnlyFilesystem();
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     createSampleAndroidBinaryRule(ruleResolver, projectFilesystem);
 
     // From the Python object, create a ApkGenruleBuildRuleFactory to create a ApkGenrule.Builder
@@ -138,6 +140,7 @@ public class ApkGenruleTest {
     arg.srcs = Optional.of(ImmutableList.<SourcePath>of(
         new PathSourcePath(projectFilesystem, Paths.get("src/com/facebook/signer.py")),
         new PathSourcePath(projectFilesystem, Paths.get("src/com/facebook/key.properties"))));
+    arg.tests = Optional.of(ImmutableSortedSet.<BuildTarget>of());
     BuildRuleParams params = new FakeBuildRuleParamsBuilder(buildTarget)
         .setProjectFilesystem(projectFilesystem).build();
     ApkGenrule apkGenrule =
@@ -164,6 +167,7 @@ public class ApkGenruleTest {
         .setStepRunner(EasyMock.createNiceMock(StepRunner.class))
         .setClock(EasyMock.createMock(Clock.class))
         .setBuildId(EasyMock.createMock(BuildId.class))
+        .setObjectMapper(ObjectMappers.newDefaultInstance())
         .setArtifactCache(EasyMock.createMock(ArtifactCache.class))
         .setJavaPackageFinder(EasyMock.createNiceMock(JavaPackageFinder.class))
         .setEventBus(BuckEventBusFactory.newInstance())
@@ -234,7 +238,7 @@ public class ApkGenruleTest {
     ImmutableMap<String, String> environmentVariables = genruleCommand.getEnvironmentVariables(
         executionContext);
     assertEquals(new ImmutableMap.Builder<String, String>()
-        .put("APK", "/opt/src/buck/" + GEN_PATH.resolve("fb4a.apk").toString())
+        .put("APK", "/opt/src/buck/" + BuildTargets.getGenPath(apkTarget, "%s.apk").toString())
         .put("OUT", expectedApkOutput).build(),
         environmentVariables);
     assertEquals(

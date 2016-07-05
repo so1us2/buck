@@ -23,6 +23,7 @@ import com.facebook.buck.shell.ShellStep;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.util.ProcessExecutor;
 import com.facebook.buck.util.ProcessExecutorParams;
+import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -39,6 +40,7 @@ public class JUnitStep extends ShellStep {
   private static final Logger LOG = Logger.get(JUnitStep.class);
 
   private final ProjectFilesystem filesystem;
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
   private final ImmutableMap<String, String> nativeLibsEnvironment;
   private final Optional<Long> testRuleTimeoutMs;
   private final JUnitJvmArgs junitJvmArgs;
@@ -50,9 +52,11 @@ public class JUnitStep extends ShellStep {
       ProjectFilesystem filesystem,
       Map<String, String> nativeLibsEnvironment,
       Optional<Long> testRuleTimeoutMs,
+      JavaRuntimeLauncher javaRuntimeLauncher,
       JUnitJvmArgs junitJvmArgs) {
     super(filesystem.getRootPath());
     this.filesystem = filesystem;
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.nativeLibsEnvironment = ImmutableMap.copyOf(nativeLibsEnvironment);
     this.testRuleTimeoutMs = testRuleTimeoutMs;
     this.junitJvmArgs = junitJvmArgs;
@@ -66,7 +70,7 @@ public class JUnitStep extends ShellStep {
   @Override
   protected ImmutableList<String> getShellCommandInternal(ExecutionContext context) {
     ImmutableList.Builder<String> args = ImmutableList.builder();
-    args.add("java");
+    args.add(javaRuntimeLauncher.getCommand());
 
     junitJvmArgs.formatCommandLineArgsToList(
         args,
@@ -108,8 +112,9 @@ public class JUnitStep extends ShellStep {
           @Override
           public Void apply(Process process) {
             Optional<Long> pid = Optional.absent();
+            Platform platform = context.getPlatform();
             try {
-              switch(context.getPlatform()) {
+              switch(platform) {
                 case LINUX:
                 case MACOS: {
                   Field field = process.getClass().getDeclaredField("pid");

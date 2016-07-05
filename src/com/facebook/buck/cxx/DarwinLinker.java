@@ -29,7 +29,6 @@ import com.facebook.buck.rules.args.Arg;
 import com.facebook.buck.rules.args.StringArg;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -37,6 +36,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -89,6 +89,16 @@ public class DarwinLinker implements Linker {
   }
 
   @Override
+  public Iterable<Arg> linkerMap(Path output) {
+    // Build up the arguments to pass to the linker.
+    ImmutableList.Builder<Arg> argsBuilder = ImmutableList.builder();
+
+    Path linkMapPath = Paths.get(output + "-LinkMap.txt");
+    argsBuilder.addAll(StringArg.from("-Xlinker", "-map", "-Xlinker", linkMapPath.toString()));
+    return argsBuilder.build();
+  }
+
+  @Override
   public Iterable<String> soname(String arg) {
     return Linkers.iXlinker("-install_name", "@rpath/" + arg);
   }
@@ -109,6 +119,11 @@ public class DarwinLinker implements Linker {
   }
 
   @Override
+  public String preloadEnvVar() {
+    return "DYLD_INSERT_LIBRARIES";
+  }
+
+  @Override
   public ImmutableList<Arg> createUndefinedSymbolsLinkerArgs(
       BuildRuleParams baseParams,
       BuildRuleResolver ruleResolver,
@@ -116,6 +131,16 @@ public class DarwinLinker implements Linker {
       BuildTarget target,
       Iterable<? extends SourcePath> symbolFiles) {
     return ImmutableList.<Arg>of(new UndefinedSymbolsArg(pathResolver, symbolFiles));
+  }
+
+  @Override
+  public Iterable<String> getNoAsNeededSharedLibsFlags() {
+    return ImmutableList.of();
+  }
+
+  @Override
+  public Iterable<String> getIgnoreUndefinedSymbolsFlags() {
+    return Linkers.iXlinker("-flat_namespace", "-undefined", "suppress");
   }
 
   @Override
@@ -150,6 +175,11 @@ public class DarwinLinker implements Linker {
       return pathResolver.filterBuildRuleInputs(symbolFiles);
     }
 
+    @Override
+    public ImmutableCollection<SourcePath> getInputs() {
+      return ImmutableList.copyOf(symbolFiles);
+    }
+
     // Open all the symbol files and read in all undefined symbols, passing them to linker using the
     // `-u` command line option.
     @Override
@@ -160,7 +190,7 @@ public class DarwinLinker implements Linker {
           symbols.addAll(Files.readAllLines(pathResolver.getAbsolutePath(path), Charsets.UTF_8));
         }
       } catch (IOException e) {
-        throw Throwables.propagate(e);
+        throw new RuntimeException(e);
       }
       for (String symbol : symbols) {
         builder.addAll(Linkers.iXlinker("-u", symbol));

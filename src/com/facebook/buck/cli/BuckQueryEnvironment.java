@@ -34,6 +34,7 @@ import com.facebook.buck.query.QueryTarget;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.rules.TargetNodes;
+import com.facebook.buck.util.concurrent.MoreExecutors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -42,6 +43,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -51,7 +53,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executor;
 
 /**
  * The environment of a Buck query that can evaluate queries to produce a result.
@@ -95,7 +96,7 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
    * @return the resulting set of targets.
    * @throws QueryException if the evaluation failed.
    */
-  public Set<QueryTarget> evaluateQuery(QueryExpression expr, Executor executor)
+  public Set<QueryTarget> evaluateQuery(QueryExpression expr, ListeningExecutorService executor)
       throws QueryException, InterruptedException {
     Set<String> targetLiterals = new HashSet<>();
     expr.collectTargetPatterns(targetLiterals);
@@ -109,14 +110,15 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
     return expr.eval(this, executor);
   }
 
-  public Set<QueryTarget> evaluateQuery(String query, Executor executor)
+  public Set<QueryTarget> evaluateQuery(String query, ListeningExecutorService executor)
       throws QueryException, InterruptedException {
     return evaluateQuery(QueryExpression.parse(query, this), executor);
   }
 
   @Override
-  public ImmutableSet<QueryTarget> getTargetsMatchingPattern(String pattern, Executor executor)
-      throws QueryException, InterruptedException {
+  public ImmutableSet<QueryTarget> getTargetsMatchingPattern(
+      String pattern,
+      ListeningExecutorService executor) throws QueryException, InterruptedException {
     try {
       return targetPatternEvaluator.resolveTargetPattern(pattern, executor);
     } catch (BuildTargetException | BuildFileParseException | IOException e) {
@@ -124,16 +126,25 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
     }
   }
 
-  TargetNode<?> getNode(QueryTarget target) throws QueryException, InterruptedException {
+  TargetNode<?> getNode(QueryTarget target)
+      throws QueryException, InterruptedException {
     Preconditions.checkState(target instanceof QueryBuildTarget);
+    ListeningExecutorService executor = null;
     try {
+      executor = com.google.common.util.concurrent.MoreExecutors.listeningDecorator(
+          MoreExecutors.newSingleThreadExecutor("buck query.getNode"));
       return params.getParser().getTargetNode(
           params.getBuckEventBus(),
           params.getCell(),
           enableProfiling,
+          executor,
           ((QueryBuildTarget) target).getBuildTarget());
-    } catch (BuildTargetException | BuildFileParseException | IOException e) {
+    } catch (BuildTargetException | BuildFileParseException e) {
       throw new QueryException("Error getting target node for %s\n%s", target, e.getMessage());
+    } finally {
+      if (executor != null) {
+        executor.shutdown();
+      }
     }
   }
 
@@ -209,7 +220,7 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
 
   private void buildGraphForBuildTargets(
       Set<BuildTarget> targets,
-      Executor executor) throws QueryException, InterruptedException {
+      ListeningExecutorService executor) throws QueryException, InterruptedException {
     try {
       graph = params.getParser().buildTargetGraph(
           params.getBuckEventBus(),
@@ -217,14 +228,16 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
           enableProfiling,
           executor,
           targets);
-    } catch (BuildFileParseException | IOException e) {
-      throw new QueryException("Error in building depencency graph");
+    } catch (BuildFileParseException | BuildTargetException | IOException e) {
+      throw new QueryException("Error in building dependency graph");
     }
   }
 
   @Override
-  public void buildTransitiveClosure(Set<QueryTarget> targets, int maxDepth, Executor executor)
-      throws QueryException, InterruptedException {
+  public void buildTransitiveClosure(
+      Set<QueryTarget> targets,
+      int maxDepth,
+      ListeningExecutorService executor) throws QueryException, InterruptedException {
     // Filter QueryTargets that are build targets and not yet present in the build target graph.
     Set<BuildTarget> graphTargets = getTargetsFromNodes(graph.getNodes());
     Set<BuildTarget> newBuildTargets = new HashSet<>();
@@ -282,7 +295,7 @@ public class BuckQueryEnvironment implements QueryEnvironment<QueryTarget> {
   public ImmutableSet<QueryTarget> getFileOwners(ImmutableList<String> files)
       throws InterruptedException, QueryException {
     try {
-      AuditOwnerCommand.OwnersReport report = AuditOwnerCommand.buildOwnersReport(
+      AuditOwnerCommand.OwnersReport report = new AuditOwnerCommand().buildOwnersReport(
           params,
           buildFileTree,
           files,

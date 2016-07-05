@@ -16,6 +16,7 @@
 
 package com.facebook.buck.file;
 
+import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.rules.AbstractBuildRule;
 import com.facebook.buck.rules.AddToRuleKey;
 import com.facebook.buck.rules.BuildContext;
@@ -29,6 +30,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 public class WriteFile extends AbstractBuildRule {
@@ -46,7 +48,12 @@ public class WriteFile extends AbstractBuildRule {
       String fileContents,
       Path output,
       boolean executable) {
-    this(buildRuleParams, resolver, fileContents.getBytes(), output, executable);
+    this(
+        buildRuleParams,
+        resolver,
+        fileContents.getBytes(StandardCharsets.UTF_8),
+        output,
+        executable);
   }
 
   public WriteFile(
@@ -68,10 +75,11 @@ public class WriteFile extends AbstractBuildRule {
   public ImmutableList<Step> getBuildSteps(
       BuildContext context, BuildableContext buildableContext) {
     buildableContext.recordArtifact(output);
+    ProjectFilesystem projectFilesystem = getProjectFilesystem();
     return ImmutableList.of(
-        new MkdirStep(getProjectFilesystem(), output.getParent()),
+        new MkdirStep(projectFilesystem, output.getParent()),
         new WriteFileStep(
-            getProjectFilesystem(),
+            projectFilesystem,
             ByteSource.wrap(fileContents),
             output,
             executable));
@@ -82,5 +90,7 @@ public class WriteFile extends AbstractBuildRule {
     return output;
   }
 
-  public byte[] getFileContents() { return fileContents.clone(); }
+  public byte[] getFileContents() {
+    return fileContents.clone();
+  }
 }

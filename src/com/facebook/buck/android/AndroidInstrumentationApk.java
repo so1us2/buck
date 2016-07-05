@@ -49,6 +49,7 @@ public class AndroidInstrumentationApk extends AndroidBinary {
       SourcePathResolver resolver,
       Optional<SourcePath> proGuardJarOverride,
       String proGuardMaxHeapSize,
+      Optional<String> proguardAgentPath,
       AndroidBinary apkUnderTest,
       ImmutableSortedSet<JavaLibrary> rulesToExcludeFromDex,
       AndroidGraphEnhancementResult enhancementResult,
@@ -58,6 +59,7 @@ public class AndroidInstrumentationApk extends AndroidBinary {
         resolver,
         proGuardJarOverride,
         proGuardMaxHeapSize,
+        proguardAgentPath,
         apkUnderTest.getKeystore(),
         PackageType.INSTRUMENTED,
         // Do not split the test apk even if the tested apk is split
@@ -82,7 +84,9 @@ public class AndroidInstrumentationApk extends AndroidBinary {
         Optional.<Integer>absent(),
         dxExecutorService,
         Optional.<Boolean>absent(),
-        Optional.<Boolean>absent());
+        Optional.<Boolean>absent(),
+        apkUnderTest.getManifestEntries(),
+        apkUnderTest.getJavaRuntimeLauncher());
     this.apkUnderTest = apkUnderTest;
   }
 

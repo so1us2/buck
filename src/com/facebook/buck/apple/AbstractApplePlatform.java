@@ -32,14 +32,20 @@ abstract class AbstractApplePlatform implements Comparable<AbstractApplePlatform
   public static final ApplePlatform IPHONEOS =
       ApplePlatform.builder()
           .setName("iphoneos")
+          .setSwiftName("ios")
           .setArchitectures(ImmutableList.of("armv7", "arm64"))
           .setMinVersionFlagPrefix("-mios-version-min=")
+          // only used for legacy watch apps
+          .setStubBinaryPath(Optional.of(Paths.get("Library/Application Support/WatchKit/WK")))
           .build();
   public static final ApplePlatform IPHONESIMULATOR =
       ApplePlatform.builder()
           .setName("iphonesimulator")
+          .setSwiftName("ios")
           .setArchitectures(ImmutableList.of("i386", "x86_64"))
           .setMinVersionFlagPrefix("-mios-simulator-version-min=")
+          // only used for legacy watch apps
+          .setStubBinaryPath(Optional.of(Paths.get("Library/Application Support/WatchKit/WK")))
           .build();
   public static final ApplePlatform WATCHOS =
       ApplePlatform.builder()
@@ -55,6 +61,18 @@ abstract class AbstractApplePlatform implements Comparable<AbstractApplePlatform
           .setMinVersionFlagPrefix("-mwatchos-simulator-version-min=")
           .setStubBinaryPath(Optional.of(Paths.get("Library/Application Support/WatchKit/WK")))
           .build();
+  public static final ApplePlatform APPLETVOS =
+      ApplePlatform.builder()
+          .setName("appletvos")
+          .setArchitectures(ImmutableList.of("arm64"))
+          .setMinVersionFlagPrefix("-mtvos-version-min=")
+          .build();
+  public static final ApplePlatform APPLETVSIMULATOR =
+      ApplePlatform.builder()
+          .setName("appletvsimulator")
+          .setArchitectures(ImmutableList.of("x86_64"))
+          .setMinVersionFlagPrefix("-mtvos-simulator-version-min=")
+          .build();
   public static final ApplePlatform MACOSX =
       ApplePlatform.builder()
           .setName("macosx")
@@ -66,6 +84,12 @@ abstract class AbstractApplePlatform implements Comparable<AbstractApplePlatform
    * The full name of the platform. For example: {@code macosx}.
    */
   public abstract String getName();
+
+  /**
+   * The Swift name for the platform. For example: {@code ios}. If absent,
+   * use {@link #getName()} instead.
+   */
+  public abstract Optional<String> getSwiftName();
 
   @SuppressWarnings("immutables")
   @Value.Default
@@ -90,7 +114,9 @@ abstract class AbstractApplePlatform implements Comparable<AbstractApplePlatform
   }
 
   public static boolean needsCodeSign(String name) {
-    return name.startsWith(IPHONEOS.getName()) || name.startsWith(WATCHOS.getName());
+    return name.startsWith(IPHONEOS.getName()) ||
+      name.startsWith(WATCHOS.getName()) ||
+      name.startsWith(APPLETVOS.getName());
   }
 
   public static boolean needsInstallHelper(String name) {
@@ -98,12 +124,21 @@ abstract class AbstractApplePlatform implements Comparable<AbstractApplePlatform
   }
 
   public static boolean isSimulator(String name) {
-    return name.startsWith(IPHONESIMULATOR.getName()) || name.startsWith(WATCHSIMULATOR.getName());
+    return name.startsWith(IPHONESIMULATOR.getName()) ||
+      name.startsWith(WATCHSIMULATOR.getName()) ||
+      name.startsWith(APPLETVSIMULATOR.getName());
   }
 
   public static ApplePlatform of(String name) {
-    for (ApplePlatform platform :
-        ImmutableList.of(IPHONEOS, IPHONESIMULATOR, WATCHOS, WATCHSIMULATOR, MACOSX)) {
+    for (ApplePlatform platform : ImmutableList.of(
+      IPHONEOS,
+      IPHONESIMULATOR,
+      WATCHOS,
+      WATCHSIMULATOR,
+      APPLETVOS,
+      APPLETVSIMULATOR,
+      MACOSX
+    )) {
       if (name.equals(platform.getName())) {
         return platform;
       }

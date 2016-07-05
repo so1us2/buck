@@ -26,13 +26,6 @@ public class BuckEventsConsumerFactory {
         mBus = project.getMessageBus();
     }
 
-    public BuildRuleStartConsumer getBuildRuleStartConsumer() {
-        return mBus.syncPublisher(BuildRuleStartConsumer.BUCK_BUILD_RULE_START);
-    }
-    public BuildRuleEndConsumer getBuildRuleEndConsumer() {
-        return mBus.syncPublisher(BuildRuleEndConsumer.BUCK_BUILD_RULE_END);
-    }
-
     public RulesParsingStartConsumer getRulesParsingStartConsumer() {
         return mBus.syncPublisher(RulesParsingStartConsumer.BUCK_PARSE_RULE_START);
     }
@@ -41,12 +34,20 @@ public class BuckEventsConsumerFactory {
         return mBus.syncPublisher(RulesParsingEndConsumer.BUCK_PARSE_RULE_END);
     }
 
-    public BuildRuleSuspendedConsumer getBuildRuleSuspendedConsumer() {
-        return mBus.syncPublisher(BuildRuleSuspendedConsumer.BUCK_BUILD_RULE_SUSPENDED);
+    public RulesParsingProgressUpdateConsumer getRulesParsingProgressUpdateConsumer() {
+        return mBus.syncPublisher(RulesParsingProgressUpdateConsumer.BUCK_PARSE_PROGRESS_UPDATE);
     }
 
-    public CompilerErrorConsumer getCompilerErrorConsumer() {
-        return mBus.syncPublisher(CompilerErrorConsumer.COMPILER_ERROR_CONSUMER);
+    public TestRunStartedConsumer getTestRunStartedConsumer() {
+        return mBus.syncPublisher(TestRunStartedConsumer.BUCK_TEST_RUN_STARTED);
+    }
+
+    public TestRunCompleteConsumer getTestRunCompleteConsumer() {
+        return mBus.syncPublisher(TestRunCompleteConsumer.BUCK_TEST_RUN_COMPLETE);
+    }
+
+    public TestResultsAvailableConsumer getTestResultsAvailableConsumer() {
+        return mBus.syncPublisher(TestResultsAvailableConsumer.BUCK_TEST_RESULTS_AVAILABLE);
     }
 
     public BuckBuildStartConsumer getBuildStartConsumer() {
@@ -57,10 +58,35 @@ public class BuckEventsConsumerFactory {
         return mBus.syncPublisher(BuckBuildEndConsumer.BUCK_BUILD_END);
     }
 
-    public BuckInternalBatchStartConsumer getBatchStartConsumer() {
-        return mBus.syncPublisher(BuckInternalBatchStartConsumer.BUCK_INTERNAL_BATCH_START);
+    public BuckBuildProgressUpdateConsumer getBuckBuildProgressUpdateConsumer() {
+        return mBus.syncPublisher(BuckBuildProgressUpdateConsumer.BUCK_BUILD_PROGRESS_UPDATE);
     }
-    public BuckInternalBatchCommitConsumer getBatchCommitConsumer() {
-        return mBus.syncPublisher(BuckInternalBatchCommitConsumer.BUCK_INTERNAL_BATCH_COMMIT);
+
+    public CompilerErrorConsumer getCompilerErrorConsumer() {
+        return mBus.syncPublisher(CompilerErrorConsumer.COMPILER_ERROR_CONSUMER);
     }
+
+    public BuckConsoleEventConsumer getConsoleEventConsumer() {
+        return mBus.syncPublisher(BuckConsoleEventConsumer.BUCK_CONSOLE_EVENT);
+    }
+    public BuckProjectGenerationFinishedConsumer getBuckProjectGenerationFinishedConsumer() {
+        return mBus.syncPublisher(
+            BuckProjectGenerationFinishedConsumer.PROJECT_GENERATION_FINISHED_CONSUMER);
+    }
+
+    public BuckProjectGenerationProgressConsumer getBuckProjectGenerationProgressConsumer() {
+        return mBus.syncPublisher(
+            BuckProjectGenerationProgressConsumer.PROJECT_GENERATION_PROGRESS_CONSUMER);
+    }
+
+    public BuckProjectGenerationStartedConsumer getBuckProjectGenerationStartedConsumer() {
+        return mBus.syncPublisher(
+            BuckProjectGenerationStartedConsumer.PROJECT_GENERATION_STARTED_CONSUMER);
+    }
+
+    public BuckInstallFinishedConsumer getInstallFinishedConsumer() {
+        return mBus.syncPublisher(
+            BuckInstallFinishedConsumer.INSTALL_FINISHED_CONSUMER);
+    }
+
 }

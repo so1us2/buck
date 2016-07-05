@@ -36,7 +36,6 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -63,7 +62,6 @@ import javax.annotation.processing.Processor;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
-import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 
@@ -92,16 +90,11 @@ public abstract class Jsr199Javac implements Javac {
   public String getDescription(
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList) {
+      Path pathToSrcsList) {
     StringBuilder builder = new StringBuilder("javac ");
     Joiner.on(" ").appendTo(builder, options);
     builder.append(" ");
-
-    if (pathToSrcsList.isPresent()) {
-      builder.append("@").append(pathToSrcsList.get());
-    } else {
-      Joiner.on(" ").appendTo(builder, javaSourceFilePaths);
-    }
+    builder.append("@").append(pathToSrcsList);
 
     return builder.toString();
   }
@@ -133,52 +126,90 @@ public abstract class Jsr199Javac implements Javac {
       BuildTarget invokingRule,
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList,
+      Path pathToSrcsList,
       Optional<Path> workingDirectory,
+      Optional<Path> usedClassesFile,
       Optional<StandardJavaFileManagerFactory> fileManagerFactory) {
     JavaCompiler compiler = createCompiler(context, resolver);
 
     StandardJavaFileManager fileManager =
         fileManagerFactory.or(DEFAULT_FILE_MANAGER_FACTORY).create(compiler);
-
-    Iterable<? extends JavaFileObject> compilationUnits = ImmutableSet.of();
     try {
-      compilationUnits = createCompilationUnits(
-          fileManager,
-          filesystem.getAbsolutifier(),
-          javaSourceFilePaths);
+      Iterable<? extends JavaFileObject> compilationUnits;
+      try {
+        compilationUnits = createCompilationUnits(
+            fileManager,
+            filesystem.getAbsolutifier(),
+            javaSourceFilePaths);
+      } catch (IOException e) {
+        LOG.warn(e, "Error building compilation units");
+        return 1;
+      }
+
+      try {
+        return buildWithClasspath(
+            context,
+            filesystem,
+            invokingRule,
+            options,
+            javaSourceFilePaths,
+            pathToSrcsList,
+            compiler,
+            usedClassesFile,
+            fileManager,
+            compilationUnits);
+      } finally {
+        close(compilationUnits);
+      }
+    } finally {
+      try {
+        fileManager.close();
+      } catch (IOException e) {
+        LOG.warn(e, "Unable to close java filemanager. We may be leaking memory.");
+      }
+    }
+  }
+
+  private int buildWithClasspath(
+      ExecutionContext context,
+      ProjectFilesystem filesystem,
+      BuildTarget invokingRule,
+      ImmutableList<String> options,
+      ImmutableSortedSet<Path> javaSourceFilePaths,
+      Path pathToSrcsList,
+      JavaCompiler compiler,
+      Optional<Path> usedClassesFile,
+      StandardJavaFileManager fileManager,
+      Iterable<? extends JavaFileObject> compilationUnits) {
+    // write javaSourceFilePaths to classes file
+    // for buck user to have a list of all .java files to be compiled
+    // since we do not print them out to console in case of error
+    try {
+      filesystem.writeLinesToPath(
+          FluentIterable.from(javaSourceFilePaths)
+              .transform(Functions.toStringFunction())
+              .transform(ARGFILES_ESCAPER),
+          pathToSrcsList);
     } catch (IOException e) {
-      close(fileManager, compilationUnits);
-      e.printStackTrace(context.getStdErr());
+      context.logError(
+          e,
+          "Cannot write list of .java files to compile to %s file! Terminating compilation.",
+          pathToSrcsList);
       return 1;
     }
 
-    if (pathToSrcsList.isPresent()) {
-      // write javaSourceFilePaths to classes file
-      // for buck user to have a list of all .java files to be compiled
-      // since we do not print them out to console in case of error
-      try {
-        filesystem.writeLinesToPath(
-            FluentIterable.from(javaSourceFilePaths)
-                .transform(Functions.toStringFunction())
-                .transform(ARGFILES_ESCAPER),
-            pathToSrcsList.get());
-      } catch (IOException e) {
-        close(fileManager, compilationUnits);
-        context.logError(
-            e,
-            "Cannot write list of .java files to compile to %s file! Terminating compilation.",
-            pathToSrcsList.get());
-        return 1;
-      }
-    }
 
     DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
     List<String> classNamesForAnnotationProcessing = ImmutableList.of();
     Writer compilerOutputWriter = new PrintWriter(context.getStdErr());
+    ClassUsageTracker classTracker = new ClassUsageTracker();
+    final StandardJavaFileManager maybeWrappedFileManager =
+        usedClassesFile.isPresent() ?
+        classTracker.wrapFileManager(fileManager) :
+        fileManager;
     JavaCompiler.CompilationTask compilationTask = compiler.getTask(
         compilerOutputWriter,
-        fileManager,
+        maybeWrappedFileManager,
         diagnostics,
         options,
         classNamesForAnnotationProcessing,
@@ -212,8 +243,6 @@ public abstract class Jsr199Javac implements Javac {
         isSuccess = compilationTask.call();
       } catch (IOException e) {
         LOG.warn(e, "Unable to close annotation processor class loader. We may be leaking memory.");
-      } finally {
-        close(fileManager, compilationUnits);
       }
     } finally {
       // Clear the tracing interface so we have no chance of leaking it to code that shouldn't
@@ -226,6 +255,13 @@ public abstract class Jsr199Javac implements Javac {
     }
 
     if (isSuccess) {
+      if (usedClassesFile.isPresent()) {
+        ClassUsageFile.writeFromTrackerData(
+            filesystem,
+            filesystem.resolve(usedClassesFile.get()),
+            classTracker,
+            context.getObjectMapper());
+      }
       return 0;
     } else {
       if (context.getVerbosity().shouldPrintStandardInformation()) {
@@ -252,23 +288,14 @@ public abstract class Jsr199Javac implements Javac {
     }
   }
 
-  private void close(
-      JavaFileManager fileManager,
-      Iterable<? extends JavaFileObject> compilationUnits) {
-    try {
-      fileManager.close();
-    } catch (IOException e) {
-      LOG.warn(e, "Unable to close java filemanager. We may be leaking memory.");
-    }
-
+  private void close(Iterable<? extends JavaFileObject> compilationUnits) {
     for (JavaFileObject unit : compilationUnits) {
-      if (!(unit instanceof ZipEntryJavaFileObject)) {
-        continue;
-      }
-      try {
-        ((ZipEntryJavaFileObject) unit).close();
-      } catch (IOException e) {
-        LOG.warn(e, "Unable to close zipfile. We may be leaking memory.");
+      if (unit instanceof Closeable) {
+        try {
+          ((Closeable) unit).close();
+        } catch (IOException e) {
+          LOG.warn(e, "Unable to close zipfile. We may be leaking memory.");
+        }
       }
     }
   }

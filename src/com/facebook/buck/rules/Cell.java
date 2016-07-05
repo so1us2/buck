@@ -18,7 +18,9 @@ package com.facebook.buck.rules;
 
 import com.facebook.buck.android.AndroidDirectoryResolver;
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Config;
+import com.facebook.buck.config.Configs;
+import com.facebook.buck.config.RawConfig;
 import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.io.ExecutableFinder;
 import com.facebook.buck.io.ProjectFilesystem;
@@ -134,10 +136,7 @@ public class Cell {
         }
 
         // TODO(shs96c): Get the overrides from the parent config
-        ImmutableMap<String, ImmutableMap<String, String>> sections = ImmutableMap.of();
-        Config config = Config.createDefaultConfig(
-            cellPath,
-            sections);
+        Config config = Configs.createDefaultConfig(cellPath, RawConfig.of());
 
         ProjectFilesystem cellFilesystem = new ProjectFilesystem(cellPath, config);
 
@@ -225,10 +224,7 @@ public class Cell {
         }
       });
     } catch (ExecutionException | UncheckedExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof HumanReadableException) {
-        throw (HumanReadableException) cause;
-      }
+      Throwables.propagateIfInstanceOf(e.getCause(), HumanReadableException.class);
       throw Throwables.propagate(e);
     }
   }
@@ -268,6 +264,10 @@ public class Cell {
     return buildFile;
   }
 
+  public Watchman getWatchman() {
+    return watchman;
+  }
+
   /**
    * Callers are responsible for managing the life-cycle of the created {@link
    * ProjectBuildFileParser}.
@@ -275,13 +275,19 @@ public class Cell {
   public ProjectBuildFileParser createBuildFileParser(
       ConstructorArgMarshaller marshaller,
       Console console,
-      BuckEventBus eventBus) {
+      BuckEventBus eventBus,
+      boolean ignoreBuckAutodepsFiles) {
     ParserConfig parserConfig = new ParserConfig(getBuckConfig());
     boolean useWatchmanGlob =
         parserConfig.getGlobHandler() == ParserConfig.GlobHandler.WATCHMAN &&
         watchman.hasWildmatchGlob();
     ProjectBuildFileParserFactory factory = createBuildFileParserFactory(useWatchmanGlob);
-    return factory.createParser(marshaller, console, config.getEnvironment(), eventBus);
+    return factory.createParser(
+        marshaller,
+        console,
+        config.getEnvironment(),
+        eventBus,
+        ignoreBuckAutodepsFiles);
   }
 
   @VisibleForTesting
@@ -299,6 +305,7 @@ public class Cell {
             .setUseWatchmanGlob(useWatchmanGlob)
             .setWatchman(watchman)
             .setWatchmanQueryTimeoutMs(parserConfig.getWatchmanQueryTimeoutMs())
+            .setRawConfig(getBuckConfig().getRawConfigForParser())
             .build());
   }
 
@@ -309,7 +316,7 @@ public class Cell {
     }
     Cell that = (Cell) o;
     return Objects.equals(filesystem, that.filesystem) &&
-        Objects.equals(config, that.config) &&
+        config.equalsForDaemonRestart(that.config) &&
         Objects.equals(directoryResolver, that.directoryResolver);
   }
 

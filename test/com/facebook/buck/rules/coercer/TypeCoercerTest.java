@@ -26,13 +26,17 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.Either;
 import com.facebook.buck.model.Pair;
+import com.facebook.buck.python.NeededCoverageSpec;
 import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.Label;
 import com.facebook.buck.rules.SourcePath;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -58,7 +62,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class TypeCoercerTest {
-  private final TypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory();
+  private final TypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory(
+      ObjectMappers.newDefaultInstance());
   private final FakeProjectFilesystem filesystem = new FakeProjectFilesystem();
   private Function<Optional<String>, Path> cellRoots;
 
@@ -451,6 +456,33 @@ public class TypeCoercerTest {
   }
 
   @Test
+  public void coerceToNeededCoverageSpec()
+      throws NoSuchFieldException, CoerceFailedException {
+    Type type = TestFields.class.getField("listOfNeededCoverageSpecs").getGenericType();
+    TypeCoercer<?> coercer = typeCoercerFactory.typeCoercerForType(type);
+
+    ImmutableList<?> input = ImmutableList.of(
+        ImmutableList.of(0.0, "//some:build-target"),
+        ImmutableList.of(0.9, "//other/build:target"),
+        ImmutableList.of(1.0, "//:target", "some/path.py"));
+    Object result = coercer.coerce(cellRoots, filesystem, Paths.get(""), input);
+    ImmutableList<NeededCoverageSpec> expectedResult = ImmutableList.of(
+        NeededCoverageSpec.of(
+            0.0f,
+            BuildTargetFactory.newInstance("//some:build-target"),
+            Optional.<String>absent()),
+        NeededCoverageSpec.of(
+            0.9f,
+            BuildTargetFactory.newInstance("//other/build:target"),
+            Optional.<String>absent()),
+        NeededCoverageSpec.of(
+            1.0f,
+            BuildTargetFactory.newInstance("//:target"),
+            Optional.of("some/path.py")));
+    assertEquals(expectedResult, result);
+  }
+
+  @Test
   public void coerceToEnumShouldWorkInList()
     throws NoSuchFieldException, CoerceFailedException {
     Type type = TestFields.class.getField("listOfTestEnums").getGenericType();
@@ -673,6 +705,7 @@ public class TypeCoercerTest {
     public Either<Path, ImmutableList<String>> eitherPathOrListOfStrings;
     public Either<ImmutableList<String>, Path> eitherListOfStringsOrPath;
     public ImmutableSet<TestEnum> setOfTestEnums;
+    public ImmutableList<NeededCoverageSpec> listOfNeededCoverageSpecs;
   }
 
   private static enum TestEnum { RED, PURPLE, yellow, grey, PINK, white, VIOLET }

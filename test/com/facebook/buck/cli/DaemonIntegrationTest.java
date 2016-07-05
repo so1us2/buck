@@ -44,8 +44,8 @@ import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.timing.FakeClock;
 import com.facebook.buck.util.CapturingPrintStream;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
@@ -61,6 +61,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -237,7 +238,10 @@ public class DaemonIntegrationTest {
       @Override
       public void run() {
         try {
-          Main main = new Main(new CapturingPrintStream(), new CapturingPrintStream());
+          Main main = new Main(
+              new CapturingPrintStream(),
+              new CapturingPrintStream(),
+              new ByteArrayInputStream("".getBytes("UTF-8")));
           int exitCode = main.tryRunMainWithExitCode(
               new BuildId(),
               tmp.getRootPath(),
@@ -487,7 +491,8 @@ public class DaemonIntegrationTest {
                 ImmutableMap.of("somesection", ImmutableMap.of("somename", "somevalue"))).build())
             .setFilesystem(filesystem)
             .build(),
-        new ObjectMapper());
+        ObjectMappers.newDefaultInstance());
+
     assertEquals(
         "Daemon should not be replaced when config equal.", daemon,
         Main.getDaemon(
@@ -498,7 +503,7 @@ public class DaemonIntegrationTest {
                     .build())
                 .setFilesystem(filesystem)
                 .build(),
-            new ObjectMapper()));
+            ObjectMappers.newDefaultInstance()));
 
     assertNotEquals(
         "Daemon should be replaced when config not equal.", daemon,
@@ -510,7 +515,7 @@ public class DaemonIntegrationTest {
                         ImmutableMap.of("somename", "someothervalue"))).build())
                 .setFilesystem(filesystem)
                 .build(),
-            new ObjectMapper()));
+            ObjectMappers.newDefaultInstance()));
   }
 
   @Test
@@ -547,10 +552,11 @@ public class DaemonIntegrationTest {
                 new FakeAndroidDirectoryResolver(
                     Optional.<Path>absent(),
                     Optional.<Path>absent(),
+                    Optional.<Path>absent(),
                     Optional.of("something")))
             .setFilesystem(filesystem)
             .build(),
-        new ObjectMapper());
+        ObjectMappers.newDefaultInstance());
 
     assertNotEquals(
         "Daemon should be replaced when not equal.", daemon,
@@ -560,9 +566,10 @@ public class DaemonIntegrationTest {
                     new FakeAndroidDirectoryResolver(
                         Optional.<Path>absent(),
                         Optional.<Path>absent(),
+                        Optional.<Path>absent(),
                         Optional.of("different")))
                 .setFilesystem(filesystem)
                 .build(),
-            new ObjectMapper()));
+            ObjectMappers.newDefaultInstance()));
   }
 }

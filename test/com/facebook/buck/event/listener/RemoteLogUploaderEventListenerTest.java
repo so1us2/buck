@@ -19,7 +19,7 @@ package com.facebook.buck.event.listener;
 import static com.facebook.buck.event.TestEventConfigerator.configureTestEventAtTime;
 import static org.hamcrest.junit.MatcherAssert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.CommandEvent;
 import com.facebook.buck.event.AbstractBuckEvent;
 import com.facebook.buck.event.BuckEventBusFactory;
@@ -32,6 +32,7 @@ import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.FakeBuildRule;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.TriState;
 import com.facebook.buck.util.environment.BuildEnvironmentDescription;
 import com.facebook.buck.util.network.RemoteLogger;
@@ -75,7 +76,7 @@ public class RemoteLogUploaderEventListenerTest {
     }
   }
 
-  private ObjectMapper objectMapper = new ObjectMapper();
+  private ObjectMapper objectMapper = ObjectMappers.newDefaultInstance();
 
   private static final BuildEnvironmentDescription BUILD_ENVIRONMENT_DESCRIPTION =
       BuildEnvironmentDescription.builder()
@@ -83,7 +84,7 @@ public class RemoteLogUploaderEventListenerTest {
           .setHostname("hostname")
           .setOs("os")
           .setAvailableCores(1)
-          .setSystemMemoryMb(1024)
+          .setSystemMemory(1024 * 1024)
           .setBuckDirty(TriState.UNSPECIFIED)
           .setBuckCommit("unknown")
           .setJavaVersion("1.7")
@@ -260,9 +261,9 @@ public class RemoteLogUploaderEventListenerTest {
             hasJsonField("daemon", true)
         ));
 
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver resolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+     );
     FakeBuildRule buildRule = createFakeBuildRule("//build:rule1", resolver);
     FakeBuildRule buildRule2 = createFakeBuildRule(
         "//build:rule2",

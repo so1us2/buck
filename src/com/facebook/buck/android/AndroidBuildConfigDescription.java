@@ -21,6 +21,7 @@ import com.facebook.buck.jvm.java.JavacOptions;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.ImmutableFlavor;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -113,18 +114,12 @@ public class AndroidBuildConfigDescription
     if (!params.getBuildTarget().isFlavored()) {
       // android_build_config() case.
       Preconditions.checkArgument(!useConstantExpressions);
-      buildConfigBuildTarget =
-          BuildTarget.builder(params.getBuildTarget().getUnflavoredBuildTarget())
-          .addFlavors(GEN_JAVA_FLAVOR)
-          .build();
+      buildConfigBuildTarget = params.getBuildTarget().withFlavors(GEN_JAVA_FLAVOR);
     } else {
       // android_binary() graph enhancement case.
       Preconditions.checkArgument(useConstantExpressions);
-      buildConfigBuildTarget =
-          BuildTarget.builder(params.getBuildTarget().getUnflavoredBuildTarget())
-          .addFlavors(
-              ImmutableFlavor.of(GEN_JAVA_FLAVOR.getName() + '_' + javaPackage.replace('.', '_')))
-          .build();
+      buildConfigBuildTarget = params.getBuildTarget().withFlavors(
+          ImmutableFlavor.of(GEN_JAVA_FLAVOR.getName() + '_' + javaPackage.replace('.', '_')));
     }
 
     // Create one build rule to generate BuildConfig.java.
@@ -145,10 +140,7 @@ public class AndroidBuildConfigDescription
         useConstantExpressions);
     ruleResolver.addToIndex(androidBuildConfig);
 
-    BuildTarget abiJarTarget =
-      BuildTarget.builder(params.getBuildTarget())
-          .addFlavors(CalculateAbi.FLAVOR)
-          .build();
+    BuildTarget abiJarTarget = params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR);
 
     // Create a second build rule to compile BuildConfig.java and expose it as a JavaLibrary.
     BuildRuleParams javaLibraryParams = params.copyWithChanges(
@@ -176,7 +168,7 @@ public class AndroidBuildConfigDescription
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     @Hint(name = "package")
     public String javaPackage;
 

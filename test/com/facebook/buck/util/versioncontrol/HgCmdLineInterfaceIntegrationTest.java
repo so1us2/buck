@@ -26,6 +26,7 @@ import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.util.TestProcessExecutorFactory;
 import com.facebook.buck.zip.Unzip;
+import com.google.common.collect.ImmutableMap;
 
 import org.junit.Assume;
 import org.junit.Before;
@@ -63,7 +64,7 @@ public class HgCmdLineInterfaceIntegrationTest {
    * Test data:
    *
    * The following repo is used in the tests:
-   *
+   * <pre>
    * @  e1b8ef  branch_from_master3
    * |  diverge from master_3 further
    * |
@@ -81,7 +82,7 @@ public class HgCmdLineInterfaceIntegrationTest {
    * |
    * o  f5091a  master1
    * commit1
-   *
+   * </pre>
    * There are two different variants (both stored inside HG_REPOS_ZIP):
    *
    * hg_repo_two: above, current tip @branch_from_master2, and no local changes.
@@ -90,7 +91,7 @@ public class HgCmdLineInterfaceIntegrationTest {
    * Additionally hg_repo_with_subdir is a new hg_repo with a directory called subdir
    *
    */
-
+  @SuppressWarnings("javadoc")
   @ClassRule
   public static TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -188,7 +189,8 @@ public class HgCmdLineInterfaceIntegrationTest {
         new DefaultVersionControlCmdLineInterfaceFactory(
             tempFolder.getRoot().toPath(),
             new TestProcessExecutorFactory(),
-            new VersionControlBuckConfig(FakeBuckConfig.builder().build()));
+            new VersionControlBuckConfig(FakeBuckConfig.builder().build()),
+            ImmutableMap.<String, String>of());
     VersionControlCmdLineInterface cmdLineInterface = vcFactory.createCmdLineInterface();
     assertEquals(NoOpCmdLineInterface.class, cmdLineInterface.getClass());
   }
@@ -222,7 +224,8 @@ public class HgCmdLineInterfaceIntegrationTest {
         new DefaultVersionControlCmdLineInterfaceFactory(
             repoRootDir,
             new TestProcessExecutorFactory(),
-            new VersionControlBuckConfig(FakeBuckConfig.builder().build()));
+            new VersionControlBuckConfig(FakeBuckConfig.builder().build()),
+            ImmutableMap.<String, String>of());
     return vcFactory.createCmdLineInterface();
   }
 }

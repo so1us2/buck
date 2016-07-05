@@ -20,10 +20,13 @@ import com.facebook.buck.android.AndroidBinaryDescription;
 import com.facebook.buck.android.AndroidLibraryGraphEnhancer;
 import com.facebook.buck.android.AndroidResourceDescription;
 import com.facebook.buck.android.DummyRDotJava;
+import com.facebook.buck.cli.BuckConfig;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.core.JavaPackageFinder;
+import com.facebook.buck.jvm.java.AnnotationProcessingParams;
 import com.facebook.buck.jvm.java.JavaFileParser;
 import com.facebook.buck.jvm.java.JavaLibrary;
+import com.facebook.buck.jvm.java.JvmLibraryArg;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasBuildTarget;
 import com.facebook.buck.rules.BuildRule;
@@ -51,6 +54,7 @@ public class IjProject {
   private final SourcePathResolver sourcePathResolver;
   private final ProjectFilesystem projectFilesystem;
   private final IjModuleGraph.AggregationMode aggregationMode;
+  private final BuckConfig buckConfig;
 
   public IjProject(
       TargetGraphAndTargets targetGraphAndTargets,
@@ -59,7 +63,8 @@ public class IjProject {
       BuildRuleResolver buildRuleResolver,
       SourcePathResolver sourcePathResolver,
       ProjectFilesystem projectFilesystem,
-      IjModuleGraph.AggregationMode aggregationMode) {
+      IjModuleGraph.AggregationMode aggregationMode,
+      BuckConfig buckConfig) {
     this.targetGraphAndTargets = targetGraphAndTargets;
     this.javaPackageFinder = javaPackageFinder;
     this.javaFileParser = javaFileParser;
@@ -67,16 +72,18 @@ public class IjProject {
     this.sourcePathResolver = sourcePathResolver;
     this.projectFilesystem = projectFilesystem;
     this.aggregationMode = aggregationMode;
+    this.buckConfig = buckConfig;
   }
 
   /**
    * Write the project to disk.
    *
+   * @param runPostGenerationCleaner Whether or not the post-generation cleaner should be run.
    * @return set of {@link BuildTarget}s which should be built in order for the project to index
    *   correctly.
    * @throws IOException
    */
-  public ImmutableSet<BuildTarget> write() throws IOException {
+  public ImmutableSet<BuildTarget> write(boolean runPostGenerationCleaner) throws IOException {
     final ImmutableSet.Builder<BuildTarget> requiredBuildTargets = ImmutableSet.builder();
     IjLibraryFactory libraryFactory = new DefaultIjLibraryFactory(
         new DefaultIjLibraryFactory.IjLibraryFactoryResolver() {
@@ -156,6 +163,26 @@ public class IjProject {
                 .transform(getAbsolutePathAndRecordRuleFunction);
           }
 
+          @Override
+          public Optional<Path> getAnnotationOutputPath(
+              TargetNode<? extends JvmLibraryArg> targetNode) {
+            AnnotationProcessingParams annotationProcessingParams =
+                targetNode
+                .getConstructorArg()
+                .buildAnnotationProcessingParams(
+                    targetNode.getBuildTarget(),
+                    projectFilesystem,
+                    buildRuleResolver
+                );
+            if (annotationProcessingParams == null || annotationProcessingParams.isEmpty()) {
+              return Optional.<Path>absent();
+            }
+
+            return Optional
+                  .fromNullable(annotationProcessingParams.getGeneratedSourceFolderName())
+                  .or(Optional.<Path>absent());
+          }
+
           private Path getRelativePathAndRecordRule(SourcePath sourcePath) {
             requiredBuildTargets.addAll(
                 sourcePathResolver.getRule(sourcePath)
@@ -177,8 +204,7 @@ public class IjProject {
     IjProjectWriter writer = new IjProjectWriter(
         new IjProjectTemplateDataPreparer(parsingJavaPackageFinder, moduleGraph, projectFilesystem),
         projectFilesystem);
-    writer.write();
+    writer.write(buckConfig, runPostGenerationCleaner);
     return requiredBuildTargets.build();
   }
-
 }

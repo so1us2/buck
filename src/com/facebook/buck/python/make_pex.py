@@ -16,23 +16,17 @@ import zipfile
 # setuptools at runtime.  Also, locate the `pkg_resources` modules
 # via our local setuptools import.
 if not zipfile.is_zipfile(sys.argv[0]):
-    # Remove twitter.common.python from the import path - it may be eagerly
-    # loaded as part of site-packages.
-    sys.modules.pop('twitter', None)
-    sys.modules.pop('twitter.common', None)
-    sys.modules.pop('twitter.common.python', None)
-
     buck_root = os.sep.join(__file__.split(os.sep)[:-6])
     sys.path.insert(0, os.path.join(
         buck_root,
-        'third-party/py/twitter-commons/src/python'))
+        'third-party/py/pex'))
     sys.path.insert(0, os.path.join(
         buck_root, 'third-party/py/setuptools'))
 
 import pkg_resources
 
-from twitter.common.python.pex_builder import PEXBuilder
-from twitter.common.python.interpreter import PythonInterpreter
+from pex.pex_builder import PEXBuilder
+from pex.interpreter import PythonInterpreter
 
 
 def dereference_symlinks(src):
@@ -92,6 +86,7 @@ def main():
     parser.add_option('--entry-point', default='__main__')
     parser.add_option('--no-zip-safe', action='store_false', dest='zip_safe', default=True)
     parser.add_option('--python', default=sys.executable)
+    parser.add_option('--preload', action='append', default=[])
     options, args = parser.parse_args()
     if len(args) == 1:
         output = args[0]

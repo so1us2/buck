@@ -35,6 +35,7 @@ import com.facebook.buck.io.MorePosixFilePermissions;
 import com.facebook.buck.testutil.Zip;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CharStreams;
@@ -42,6 +43,7 @@ import com.google.common.io.Resources;
 
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -57,6 +59,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.TimeZone;
+import java.util.jar.JarOutputStream;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -96,8 +100,7 @@ public class ZipOutputStreamTest {
   @Test(expected = ZipException.class)
   public void mustThrowAnExceptionIfNoZipEntryIsOpenWhenWritingData() throws IOException {
     try (
-        CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output)
-    ) {
+        CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output)) {
       // Note: we have not opened a zip entry.
       out.write("cheese".getBytes());
     }
@@ -121,8 +124,7 @@ public class ZipOutputStreamTest {
 
     try (
         CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output);
-        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))
-    ) {
+        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))) {
       ZipEntry entry = new ZipEntry("example.txt");
       entry.setTime(System.currentTimeMillis());
       out.putNextEntry(entry);
@@ -161,8 +163,7 @@ public class ZipOutputStreamTest {
 
     try (
         CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output);
-        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))
-    ) {
+        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))) {
       ZipEntry entry = new ZipEntry("example.txt");
       entry.setTime(System.currentTimeMillis());
       out.putNextEntry(entry);
@@ -186,8 +187,7 @@ public class ZipOutputStreamTest {
 
     try (
         CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output);
-        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))
-    ) {
+        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))) {
       byte[] bytes = "cheese".getBytes();
       ZipEntry entry = new ZipEntry("example.txt");
       entry.setTime(System.currentTimeMillis());
@@ -205,9 +205,7 @@ public class ZipOutputStreamTest {
 
   @Test(expected = ZipException.class)
   public void writingTheSameFileMoreThanOnceIsNormallyAnError() throws IOException {
-    try (
-        CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output)
-    ) {
+    try (CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output)) {
       ZipEntry entry = new ZipEntry("example.txt");
       out.putNextEntry(entry);
       out.putNextEntry(entry);
@@ -220,8 +218,7 @@ public class ZipOutputStreamTest {
 
     try (
         CustomZipOutputStream out = ZipOutputStreams.newOutputStream(output);
-        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))
-    ) {
+        ZipOutputStream ref = new ZipOutputStream(new FileOutputStream(reference))) {
       byte[] bytes = "cheese".getBytes();
       ZipEntry entry = new ZipEntry("example.txt");
       entry.setMethod(ZipEntry.STORED);
@@ -485,6 +482,40 @@ public class ZipOutputStreamTest {
         assertEquals(mode, entry.getExternalAttributes() >> 16);
         assertFalse(entries.hasMoreElements());
       }
+    }
+  }
+
+  private HashCode writeSimpleJarAndGetHash() throws Exception {
+    try (FileOutputStream fileOutputStream = new FileOutputStream(output.toFile());
+         ZipOutputStream out = new JarOutputStream(fileOutputStream)) {
+      ZipEntry entry = new CustomZipEntry("test");
+      out.putNextEntry(entry);
+      out.write(new byte[0]);
+      entry = new ZipEntry("test1");
+      entry.setTime(ZipConstants.getFakeTime());
+      out.putNextEntry(entry);
+      out.write(new byte[0]);
+    }
+
+    return Hashing.sha1().hashBytes(Files.readAllBytes(output));
+  }
+
+  @Test
+  public void producedZipFilesAreTimezoneAgnostic() throws Exception {
+    HashCode referenceHash = writeSimpleJarAndGetHash();
+    TimeZone previousDefault = TimeZone.getDefault();
+    try {
+      String[] availableIDs = TimeZone.getAvailableIDs();
+      assertThat(availableIDs.length, Matchers.greaterThan(1));
+
+      for (String timezoneID : availableIDs) {
+        TimeZone timeZone = TimeZone.getTimeZone(timezoneID);
+        TimeZone.setDefault(timeZone);
+
+        assertThat(writeSimpleJarAndGetHash(), Matchers.equalTo(referenceHash));
+      }
+    } finally {
+      TimeZone.setDefault(previousDefault);
     }
   }
 

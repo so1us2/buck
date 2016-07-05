@@ -1,0 +1,10 @@
+#@# GENERATED FILE: DO NOT MODIFY 3ed0d84696285fc2111d4f150a8e2bf43984528d #@#
+{
+  "i18n" : {
+    "deps" : [ ],
+    "exported_deps" : [
+      "//third-party/java/guava:guava",
+      "//third-party/java/jsr:jsr305"
+    ]
+  }
+}

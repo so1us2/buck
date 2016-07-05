@@ -16,8 +16,6 @@
 
 package com.facebook.buck.artifact_cache;
 
-import static com.facebook.buck.util.BuckConstant.DEFAULT_CACHE_DIR;
-
 import com.facebook.buck.cli.BuckConfig;
 import com.facebook.buck.cli.SlbBuckConfig;
 import com.facebook.buck.util.HumanReadableException;
@@ -36,13 +34,11 @@ import com.google.common.collect.ImmutableSet;
 
 import org.immutables.value.Value;
 
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Represents configuration specific to the {@link ArtifactCache}s.
@@ -59,13 +55,21 @@ public class ArtifactCacheBuckConfig {
   private static final String HTTP_TIMEOUT_SECONDS_FIELD_NAME = "http_timeout_seconds";
   private static final String HTTP_READ_HEADERS_FIELD_NAME = "http_read_headers";
   private static final String HTTP_WRITE_HEADERS_FIELD_NAME = "http_write_headers";
+  private static final String HTTP_CACHE_ERROR_MESSAGE_NAME = "http_error_message_format";
+  private static final String HTTP_MAX_STORE_SIZE = "http_max_store_size";
+  private static final String HTTP_THREAD_POOL_SIZE = "http_thread_pool_size";
+  private static final String HTTP_THREAD_POOL_KEEP_ALIVE_DURATION_MILLIS =
+      "http_thread_pool_keep_alive_duration_millis";
   private static final ImmutableSet<String> HTTP_CACHE_DESCRIPTION_FIELDS = ImmutableSet.of(
       HTTP_URL_FIELD_NAME,
       HTTP_BLACKLISTED_WIFI_SSIDS_FIELD_NAME,
       HTTP_MODE_FIELD_NAME,
       HTTP_TIMEOUT_SECONDS_FIELD_NAME,
       HTTP_READ_HEADERS_FIELD_NAME,
-      HTTP_WRITE_HEADERS_FIELD_NAME);
+      HTTP_WRITE_HEADERS_FIELD_NAME,
+      HTTP_CACHE_ERROR_MESSAGE_NAME,
+      HTTP_MAX_STORE_SIZE);
+  private static final String HTTP_MAX_FETCH_RETRIES = "http_max_fetch_retries";
 
   // List of names of cache-* sections that contain the fields above. This is used to emulate
   // dicts, essentially.
@@ -76,6 +80,9 @@ public class ArtifactCacheBuckConfig {
   private static final long DEFAULT_HTTP_CACHE_TIMEOUT_SECONDS = 3L;
   private static final String DEFAULT_HTTP_MAX_CONCURRENT_WRITES = "1";
   private static final String DEFAULT_HTTP_WRITE_SHUTDOWN_TIMEOUT_SECONDS = "1800"; // 30 minutes
+  private static final String DEFAULT_HTTP_CACHE_ERROR_MESSAGE =
+      "{cache_name} cache encountered an error: {error_message}";
+  private static final int DEFAULT_HTTP_MAX_FETCH_RETRIES = 2;
 
   private static final String SERVED_CACHE_ENABLED_FIELD_NAME = "serve_local_cache";
   private static final String DEFAULT_SERVED_CACHE_MODE = CacheReadMode.readonly.name();
@@ -83,6 +90,18 @@ public class ArtifactCacheBuckConfig {
   private static final String LOAD_BALANCING_TYPE = "load_balancing_type";
   private static final LoadBalancingType DEFAULT_LOAD_BALANCING_TYPE =
       LoadBalancingType.SINGLE_SERVER;
+  private static final long DEFAULT_HTTP_THREAD_POOL_SIZE = 200;
+  private static final long DEFAULT_HTTP_THREAD_POOL_KEEP_ALIVE_DURATION_MILLIS =
+      TimeUnit.MINUTES.toMillis(1);
+
+  private static final String TWO_LEVEL_CACHING_ENABLED_FIELD_NAME = "two_level_cache_enabled";
+  // Old name for "two_level_cache_minimum_size", remove eventually.
+  private static final String TWO_LEVEL_CACHING_THRESHOLD_FIELD_NAME = "two_level_cache_threshold";
+  private static final String TWO_LEVEL_CACHING_MIN_SIZE_FIELD_NAME =
+      "two_level_cache_minimum_size";
+  private static final String TWO_LEVEL_CACHING_MAX_SIZE_FIELD_NAME =
+      "two_level_cache_maximum_size";
+  private static final long TWO_LEVEL_CACHING_MIN_SIZE_DEFAULT = 20 * 1024L;
 
   public enum LoadBalancingType {
     SINGLE_SERVER,
@@ -118,6 +137,11 @@ public class ArtifactCacheBuckConfig {
             .or(DEFAULT_HTTP_WRITE_SHUTDOWN_TIMEOUT_SECONDS));
   }
 
+  public int getMaxFetchRetries() {
+    return buckConfig.getInteger(CACHE_SECTION_NAME, HTTP_MAX_FETCH_RETRIES)
+          .or(DEFAULT_HTTP_MAX_FETCH_RETRIES);
+  }
+
   public boolean hasAtLeastOneWriteableCache() {
     return FluentIterable.from(getHttpCaches()).anyMatch(
         new Predicate<HttpCacheEntry>() {
@@ -133,7 +157,12 @@ public class ArtifactCacheBuckConfig {
   }
 
   public ImmutableList<String> getArtifactCacheModesRaw() {
-    return buckConfig.getListWithoutComments(CACHE_SECTION_NAME, "mode");
+    // If there is a user-set value, even if it is `mode =`, use it.
+    if (buckConfig.hasUserDefinedValue(CACHE_SECTION_NAME, "mode")) {
+      return buckConfig.getListWithoutComments(CACHE_SECTION_NAME, "mode");
+    }
+    // Otherwise, we default to using the directory cache.
+    return ImmutableList.of("dir");
   }
 
   public ImmutableSet<ArtifactCacheMode> getArtifactCacheModes() {
@@ -186,12 +215,59 @@ public class ArtifactCacheBuckConfig {
     return result.build();
   }
 
+  // It's important that this number is greater than the `-j` parallelism,
+  // as if it's too small, we'll overflow the reusable connection pool and
+  // start spamming new connections.  While this isn't the best location,
+  // the other current option is setting this wherever we construct a `Build`
+  // object and have access to the `-j` argument.  However, since that is
+  // created in several places leave it here for now.
+  public long getThreadPoolSize() {
+    return buckConfig.getLong(CACHE_SECTION_NAME, HTTP_THREAD_POOL_SIZE)
+        .or(DEFAULT_HTTP_THREAD_POOL_SIZE);
+  }
+
+  public long getThreadPoolKeepAliveDurationMillis() {
+    return buckConfig.getLong(CACHE_SECTION_NAME, HTTP_THREAD_POOL_KEEP_ALIVE_DURATION_MILLIS)
+        .or(DEFAULT_HTTP_THREAD_POOL_KEEP_ALIVE_DURATION_MILLIS);
+  }
+
+  public boolean getTwoLevelCachingEnabled() {
+    return buckConfig.getBooleanValue(
+        CACHE_SECTION_NAME,
+        TWO_LEVEL_CACHING_ENABLED_FIELD_NAME,
+        false);
+  }
+
+  public long getTwoLevelCachingMinimumSize() {
+    return buckConfig.getValue(CACHE_SECTION_NAME, TWO_LEVEL_CACHING_MIN_SIZE_FIELD_NAME)
+        .or(buckConfig.getValue(CACHE_SECTION_NAME, TWO_LEVEL_CACHING_THRESHOLD_FIELD_NAME))
+        .transform(
+            new Function<String, Long>() {
+              @Override
+              public Long apply(String input) {
+                return SizeUnit.parseBytes(input);
+              }
+            })
+        .or(TWO_LEVEL_CACHING_MIN_SIZE_DEFAULT);
+  }
+
+  public Optional<Long> getTwoLevelCachingMaximumSize() {
+    return buckConfig.getValue(CACHE_SECTION_NAME, TWO_LEVEL_CACHING_MAX_SIZE_FIELD_NAME)
+        .transform(
+            new Function<String, Long>() {
+              @Override
+              public Long apply(String input) {
+                return SizeUnit.parseBytes(input);
+              }
+            });
+  }
+
   private CacheReadMode getDirCacheReadMode() {
     return getCacheReadMode(CACHE_SECTION_NAME, "dir_mode", DEFAULT_DIR_CACHE_MODE);
   }
 
   private Path getCacheDir() {
-    String cacheDir = buckConfig.getValue(CACHE_SECTION_NAME, "dir").or(DEFAULT_CACHE_DIR);
+    String cacheDir = buckConfig.getLocalCacheDirectory();
     Path pathToCacheDir = buckConfig.resolvePathThatMayBeOutsideTheProjectFilesystem(
         Paths.get(
             cacheDir));
@@ -253,12 +329,16 @@ public class ArtifactCacheBuckConfig {
     return ImmutableSet.copyOf(httpCacheNames);
   }
 
+  private String getCacheErrorFormatMessage(String section, String fieldName, String defaultValue) {
+    return buckConfig.getValue(section, fieldName).or(defaultValue);
+  }
+
   private HttpCacheEntry obtainEntryForName(Optional<String> cacheName) {
     final String section = Joiner.on('#').skipNulls().join(CACHE_SECTION_NAME, cacheName.orNull());
 
     HttpCacheEntry.Builder builder = HttpCacheEntry.builder();
     builder.setName(cacheName);
-    builder.setUrl(getUri(section, HTTP_URL_FIELD_NAME).or(DEFAULT_HTTP_URL));
+    builder.setUrl(buckConfig.getUrl(section, HTTP_URL_FIELD_NAME).or(DEFAULT_HTTP_URL));
     builder.setTimeoutSeconds(
         buckConfig.getLong(section, HTTP_TIMEOUT_SECONDS_FIELD_NAME)
             .or(DEFAULT_HTTP_CACHE_TIMEOUT_SECONDS).intValue());
@@ -268,22 +348,13 @@ public class ArtifactCacheBuckConfig {
         buckConfig.getListWithoutComments(section, HTTP_BLACKLISTED_WIFI_SSIDS_FIELD_NAME));
     builder.setCacheReadMode(
         getCacheReadMode(section, HTTP_MODE_FIELD_NAME, DEFAULT_HTTP_CACHE_MODE));
+    builder.setErrorMessageFormat(
+        getCacheErrorFormatMessage(
+            section,
+            HTTP_CACHE_ERROR_MESSAGE_NAME,
+            DEFAULT_HTTP_CACHE_ERROR_MESSAGE));
+    builder.setMaxStoreSize(buckConfig.getLong(section, HTTP_MAX_STORE_SIZE));
     return builder.build();
-  }
-
-  private final Optional<URI> getUri(String section, String field) {
-    try {
-      // URL has stricter parsing rules than URI, so we want to use that constructor to surface
-      // the error message early. Passing around a URL is problematic as it hits DNS from the
-      // equals method, which is why the (new URL(...).toURI()) call instead of just URI.create.
-      Optional<String> value = buckConfig.getValue(section, field);
-      if (!value.isPresent()) {
-        return Optional.absent();
-      }
-      return Optional.of(new URL(value.get()).toURI());
-    } catch (URISyntaxException|MalformedURLException e) {
-      throw new HumanReadableException(e, "Malformed [cache]%s: %s", field, e.getMessage());
-    }
   }
 
   private boolean legacyCacheConfigurationFieldsPresent() {
@@ -334,6 +405,8 @@ public class ArtifactCacheBuckConfig {
     public abstract ImmutableMap<String, String> getWriteHeaders();
     public abstract CacheReadMode getCacheReadMode();
     protected abstract ImmutableSet<String> getBlacklistedWifiSsids();
+    public abstract String getErrorMessageFormat();
+    public abstract Optional<Long> getMaxStoreSize();
 
     public boolean isWifiUsableForDistributedCache(Optional<String> currentWifiSsid) {
       if (currentWifiSsid.isPresent() &&

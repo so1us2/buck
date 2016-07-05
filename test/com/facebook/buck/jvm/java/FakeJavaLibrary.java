@@ -65,11 +65,6 @@ public class FakeJavaLibrary extends FakeBuildRule implements JavaLibrary, Andro
   }
 
   @Override
-  public ImmutableSetMultimap<JavaLibrary, Path> getDeclaredClasspathEntries() {
-    return ImmutableSetMultimap.of();
-  }
-
-  @Override
   public ImmutableSetMultimap<JavaLibrary, Path> getOutputClasspathEntries() {
     return ImmutableSetMultimap.of();
   }
@@ -83,14 +78,17 @@ public class FakeJavaLibrary extends FakeBuildRule implements JavaLibrary, Andro
   public ImmutableSetMultimap<JavaLibrary, Path> getTransitiveClasspathEntries() {
     return JavaLibraryClasspathProvider.getTransitiveClasspathEntries(
         this,
-        Optional.fromNullable(getPathToOutput()));
+        getResolver(),
+        Optional.<SourcePath>of(new BuildTargetSourcePath(getBuildTarget(),
+            getPathToOutput())));
   }
 
   @Override
   public ImmutableSet<JavaLibrary> getTransitiveClasspathDeps() {
     return JavaLibraryClasspathProvider.getTransitiveClasspathDeps(
         this,
-        Optional.fromNullable(getPathToOutput()));
+        Optional.<SourcePath>of(new BuildTargetSourcePath(getBuildTarget(),
+            getPathToOutput())));
   }
 
   @Override

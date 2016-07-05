@@ -20,14 +20,12 @@ import static com.facebook.buck.zip.ZipOutputStreams.HandleDuplicates.OVERWRITE_
 
 import com.facebook.buck.event.ConsoleEvent;
 import com.facebook.buck.io.MorePaths;
-import com.facebook.buck.io.MorePosixFilePermissions;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.log.Logger;
 import com.facebook.buck.model.Pair;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.Step;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
@@ -42,8 +40,6 @@ import java.nio.file.FileVisitor;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -56,20 +52,11 @@ public class ZipStep implements Step {
 
   private static final Logger LOG = Logger.get(ZipStep.class);
 
-  public static final int MIN_COMPRESSION_LEVEL = 0;
-  public static final int DEFAULT_COMPRESSION_LEVEL = 6;
-  public static final int MAX_COMPRESSION_LEVEL = 9;
-
-  // Extended attribute bits for directories and symlinks; see:
-  // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute
-  public static final long S_IFDIR = 0040000;
-  public static final long S_IFLNK = 0120000;
-
   private final ProjectFilesystem filesystem;
   private final Path pathToZipFile;
   private final ImmutableSet<Path> paths;
   private final boolean junkPaths;
-  private final int compressionLevel;
+  private final ZipCompressionLevel compressionLevel;
   private final Path baseDir;
 
 
@@ -94,10 +81,8 @@ public class ZipStep implements Step {
       Path pathToZipFile,
       Set<Path> paths,
       boolean junkPaths,
-      int compressionLevel,
+      ZipCompressionLevel compressionLevel,
       Path baseDir) {
-    Preconditions.checkArgument(compressionLevel >= MIN_COMPRESSION_LEVEL &&
-        compressionLevel <= MAX_COMPRESSION_LEVEL, "compressionLevel out of bounds.");
     this.filesystem = filesystem;
     this.pathToZipFile = pathToZipFile;
     this.paths = ImmutableSet.copyOf(paths);
@@ -138,8 +123,12 @@ public class ZipStep implements Step {
         }
 
         CustomZipEntry entry = new CustomZipEntry(entryName);
-        entry.setTime(0);  // We want deterministic ZIP files, so avoid mtimes.
-        entry.setCompressionLevel(isDirectory ? MIN_COMPRESSION_LEVEL : compressionLevel);
+        // We want deterministic ZIPs, so avoid mtimes.
+        entry.setFakeTime();
+        entry.setCompressionLevel(
+            isDirectory ?
+                ZipCompressionLevel.MIN_COMPRESSION_LEVEL.getValue() :
+                compressionLevel.getValue());
         // If we're using STORED files, we must manually set the CRC, size, and compressed size.
         if (entry.getMethod() == ZipEntry.STORED && !isDirectory) {
           entry.setSize(attr.size());
@@ -153,31 +142,10 @@ public class ZipStep implements Step {
               }.hash(Hashing.crc32()).padToLong());
         }
 
-        long mode = 0;
-        // Support executable files.  If we detect this file is executable, store this
-        // information as 0100 in the field typically used in zip implementations for
-        // POSIX file permissions.  We'll use this information when unzipping.
-        if (filesystem.isExecutable(path)) {
-          mode |=
-              MorePosixFilePermissions.toMode(
-                  EnumSet.of(PosixFilePermission.OWNER_EXECUTE));
-        }
-
-        if (isDirectory) {
-          mode |= S_IFDIR;
-        }
-
-        if (filesystem.isSymLink(path)) {
-          mode |= S_IFLNK;
-        }
-
-        // Propagate any additional permissions
-        mode |= MorePosixFilePermissions.toMode(filesystem.getPosixFilePermissions(path));
-
-        long externalAttributes = mode << 16;
+        long externalAttributes = filesystem.getFileAttributesForZipEntry(path);
         LOG.verbose(
-            "Setting mode for entry %s path %s to 0x%08X (0x%08X)",
-            entryName, path, mode, externalAttributes);
+            "Setting mode for entry %s path %s to 0x%08X",
+            entryName, path, externalAttributes);
         entry.setExternalAttributes(externalAttributes);
         return entry;
       }

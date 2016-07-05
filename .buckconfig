@@ -9,6 +9,9 @@
     maven-importer = //src/com/facebook/buck/maven:resolver
 [buildfile]
     includes = //DEFS
+[cache]
+    ; Disable the default directory cache.
+    mode =
 [download]
     maven_repo = https://repo1.maven.org/maven2
 [project]
@@ -19,8 +22,7 @@
       .git, \
       .buckd, \
       build, \
-      bin, \
-      src/com/facebook/buck/intellij/plugin, \
+      bin
 
     ; Common temp file patterns:
     ; .*\.swp$ (vim)
@@ -30,6 +32,9 @@
       .*\.swp$, \
       ^#.*#$, .*~$, \
       .*___jb_bak___$, .*___jb_old___$,
+    ; Forbid symlinks for source files so Buck doesn't have to dump its
+    ; cache every time it encounters one.
+    allow_symlinks = forbid
 [test]
     ; Maximum timeout of 1 minute per test.
     timeout = 60000

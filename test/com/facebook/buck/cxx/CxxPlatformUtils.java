@@ -16,10 +16,12 @@
 
 package com.facebook.buck.cxx;
 
+import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.model.FlavorDomain;
 import com.facebook.buck.model.ImmutableFlavor;
+import com.facebook.buck.rules.ConstantToolProvider;
 import com.facebook.buck.rules.HashedFileTool;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Optional;
 
 import java.nio.file.Paths;
 
@@ -27,16 +29,48 @@ public class CxxPlatformUtils {
 
   private CxxPlatformUtils() {}
 
+  public static final CxxBuckConfig DEFAULT_CONFIG =
+      new CxxBuckConfig(new FakeBuckConfig.Builder().build());
+
   public static final CxxPlatform DEFAULT_PLATFORM =
       CxxPlatform.builder()
           .setFlavor(ImmutableFlavor.of("platform"))
-          .setAs(new HashedFileTool(Paths.get("tool")))
-          .setAspp(new DefaultPreprocessor(new HashedFileTool(Paths.get("tool"))))
-          .setCc(new DefaultCompiler(new HashedFileTool(Paths.get("tool"))))
-          .setCpp(new DefaultPreprocessor(new HashedFileTool(Paths.get("tool"))))
-          .setCxx(new DefaultCompiler(new HashedFileTool(Paths.get("tool"))))
-          .setCxxpp(new DefaultPreprocessor(new HashedFileTool(Paths.get("tool"))))
-          .setLd(new GnuLinker(new HashedFileTool(Paths.get("tool"))))
+          .setAs(
+              new CompilerProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setAspp(
+              new PreprocessorProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCc(
+              new CompilerProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCpp(
+              new PreprocessorProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCxx(
+              new CompilerProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCxxpp(
+              new PreprocessorProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCuda(
+              new CompilerProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setCudapp(
+              new PreprocessorProvider(
+                  Paths.get("tool"),
+                  Optional.of(CxxToolProvider.Type.DEFAULT)))
+          .setLd(
+              new DefaultLinkerProvider(
+                  LinkerProvider.Type.GNU,
+                  new ConstantToolProvider(new HashedFileTool(Paths.get("tool")))))
           .setStrip(new HashedFileTool(Paths.get("tool")))
           .setAr(new GnuArchiver(new HashedFileTool(Paths.get("tool"))))
           .setRanlib(new HashedFileTool(Paths.get("ranlib")))
@@ -47,9 +81,6 @@ public class CxxPlatformUtils {
           .build();
 
     public static final FlavorDomain<CxxPlatform> DEFAULT_PLATFORMS =
-        new FlavorDomain<>(
-            "C/C++ Platform",
-            ImmutableMap.of(
-                DEFAULT_PLATFORM.getFlavor(), DEFAULT_PLATFORM));
+        FlavorDomain.of("C/C++ Platform", DEFAULT_PLATFORM);
 
 }

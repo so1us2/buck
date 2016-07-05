@@ -17,18 +17,21 @@
 package com.facebook.buck.python;
 
 import com.facebook.buck.model.BuildTargets;
+import com.facebook.buck.model.Pair;
+import com.facebook.buck.rules.AbstractBuildRule;
 import com.facebook.buck.rules.AddToRuleKey;
+import com.facebook.buck.rules.BinaryBuildRule;
 import com.facebook.buck.rules.BuildContext;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
+import com.facebook.buck.rules.BuildableContext;
 import com.facebook.buck.rules.ExternalTestRunnerRule;
 import com.facebook.buck.rules.ExternalTestRunnerTestSpec;
 import com.facebook.buck.rules.HasRuntimeDeps;
 import com.facebook.buck.rules.Label;
-import com.facebook.buck.rules.NoopBuildRule;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TestRule;
-import com.facebook.buck.shell.ShellStep;
+import com.facebook.buck.rules.Tool;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
@@ -36,7 +39,6 @@ import com.facebook.buck.test.TestCaseSummary;
 import com.facebook.buck.test.TestResultSummary;
 import com.facebook.buck.test.TestResults;
 import com.facebook.buck.test.TestRunningOptions;
-import com.facebook.buck.util.HumanReadableException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
@@ -48,15 +50,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.base.Function;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class PythonTest
-    extends NoopBuildRule
-    implements TestRule, HasRuntimeDeps, ExternalTestRunnerRule {
+    extends AbstractBuildRule
+    implements TestRule, HasRuntimeDeps, ExternalTestRunnerRule, BinaryBuildRule {
 
   @AddToRuleKey
   private final Supplier<ImmutableMap<String, String>> env;
@@ -66,6 +67,7 @@ public class PythonTest
   private final Optional<Long> testRuleTimeoutMs;
   private final ImmutableSet<String> contacts;
   private final ImmutableSet<BuildRule> sourceUnderTest;
+  private final ImmutableList<Pair<Float, ImmutableSet<Path>>> neededCoverage;
 
   public PythonTest(
       BuildRuleParams params,
@@ -75,6 +77,7 @@ public class PythonTest
       ImmutableSortedSet<BuildRule> additionalDeps,
       ImmutableSet<BuildRule> sourceUnderTest,
       ImmutableSet<Label> labels,
+      ImmutableList<Pair<Float, ImmutableSet<Path>>> neededCoverage,
       Optional<Long> testRuleTimeoutMs,
       ImmutableSet<String> contacts) {
 
@@ -94,64 +97,21 @@ public class PythonTest
     this.additionalDeps = additionalDeps;
     this.sourceUnderTest = sourceUnderTest;
     this.labels = labels;
+    this.neededCoverage = neededCoverage;
     this.testRuleTimeoutMs = testRuleTimeoutMs;
     this.contacts = contacts;
   }
 
-  private Step getRunTestStep() {
-    // TODO(shs96c): I'm not convinced this is the right root path
-    return new ShellStep(getProjectFilesystem().getRootPath()) {
+  @Override
+  public ImmutableList<Step> getBuildSteps(
+      BuildContext context,
+      BuildableContext buildableContext) {
+    return ImmutableList.of();
+  }
 
-      boolean timedOut = false;
-
-      @Override
-      protected ImmutableList<String> getShellCommandInternal(ExecutionContext context) {
-        ImmutableList.Builder<String> builder = new ImmutableList.Builder<>();
-        builder.addAll(binary.getExecutableCommand().getCommandPrefix(getResolver()));
-        builder.add("-o", getProjectFilesystem().resolve(getPathToTestOutputResult()).toString());
-        return builder.build();
-      }
-
-      @Override
-      public ImmutableMap<String, String> getEnvironmentVariables(ExecutionContext context) {
-        return env.get();
-      }
-
-      @Override
-      public String getShortName() {
-        return "pyunit";
-      }
-
-      @Override
-      public int execute(ExecutionContext context) throws InterruptedException {
-        int exitCode = super.execute(context);
-        if (timedOut) {
-          throw new HumanReadableException(
-              "Following test case timed out: " +
-                  getBuildTarget().getFullyQualifiedName() +
-                  ", with exitCode: " + exitCode);
-        }
-        return exitCode;
-      }
-
-      @Override
-      protected Optional<Function<Process, Void>> getTimeoutHandler(
-          final ExecutionContext context) {
-        return Optional.<Function<Process, Void>>of(
-            new Function<Process, Void>() {
-              @Override
-              public Void apply(Process process) {
-                timedOut = true;
-                return null;
-              }
-            });
-      }
-
-      @Override
-      protected Optional<Long> getTimeout() {
-        return testRuleTimeoutMs;
-      }
-    };
+  @Override
+  public Path getPathToOutput() {
+    return binary.getPathToOutput();
   }
 
   @Override
@@ -162,7 +122,14 @@ public class PythonTest
       TestRule.TestReportingCallback testReportingCallback) {
     return ImmutableList.of(
         new MakeCleanDirectoryStep(getProjectFilesystem(), getPathToTestOutputDirectory()),
-        getRunTestStep());
+        new PythonRunTestsStep(
+            getProjectFilesystem().getRootPath(),
+            getBuildTarget().getFullyQualifiedName(),
+            binary.getExecutableCommand().getCommandPrefix(getResolver()),
+            env,
+            options.getTestSelectorList(),
+            testRuleTimeoutMs,
+            getProjectFilesystem().resolve(getPathToTestOutputResult())));
   }
 
   @Override
@@ -237,7 +204,7 @@ public class PythonTest
   @Override
   public ImmutableSortedSet<BuildRule> getRuntimeDeps() {
     return ImmutableSortedSet.<BuildRule>naturalOrder()
-        .add(binary)
+        .addAll(binary.getExecutableCommand().getDeps(getResolver()))
         .addAll(additionalDeps)
         .build();
   }
@@ -253,12 +220,18 @@ public class PythonTest
   }
 
   @Override
+  public Tool getExecutableCommand() {
+    return binary.getExecutableCommand();
+  }
+
+  @Override
   public ExternalTestRunnerTestSpec getExternalTestRunnerSpec(
       ExecutionContext executionContext,
       TestRunningOptions testRunningOptions) {
     return ExternalTestRunnerTestSpec.builder()
         .setTarget(getBuildTarget())
         .setType("pyunit")
+        .setNeededCoverage(neededCoverage)
         .addAllCommand(binary.getExecutableCommand().getCommandPrefix(getResolver()))
         .putAllEnv(env.get())
         .addAllLabels(getLabels())

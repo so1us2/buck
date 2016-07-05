@@ -106,6 +106,7 @@ public class MainIntegrationTest {
         "  buck command [command-options]",
         "available commands:",
         "  audit       lists the inputs for the specified target",
+        "  autodeps    auto-generates dependencies for build rules, where possible",
         "  build       builds the specified target",
         "  cache       makes calls to the artifact cache",
         "  clean       deletes any generated files",
@@ -115,6 +116,8 @@ public class MainIntegrationTest {
         "  publish     builds and publishes a library to a central repository",
         "  query       provides facilities to query information about the target nodes graph",
         "  quickstart  generates a default project directory",
+        "  rage        create a defect report",
+        "  repl        a shell for interactive experimentation with buck internals",
         "  root        prints the absolute path to the root of the current buck project",
         "  run         runs a target as a command",
         "  server      query and control the http server",
@@ -123,7 +126,7 @@ public class MainIntegrationTest {
         "  test        builds and runs the tests for the specified target",
         "  uninstall   uninstalls an APK",
         "options:",
-        " --help         : Shows this screen and exits.",
+        " --help (-h)    : Shows this screen and exits.",
         " --version (-V) : Show version number.",
         "");
   }

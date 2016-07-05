@@ -25,10 +25,10 @@ import com.facebook.buck.parser.NoSuchBuildTargetException;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.hash.HashCode;
@@ -116,7 +116,7 @@ public abstract class AbstractNodeBuilder<A> {
           hash,
           description,
           arg,
-          new DefaultTypeCoercerFactory(),
+          new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance()),
           factoryParams,
           getDepsFromArg(),
           ImmutableSet.<BuildTargetPattern>of(),
@@ -179,16 +179,17 @@ public abstract class AbstractNodeBuilder<A> {
     return Optional.of(toReturn.build());
   }
 
+  /**
+   * Populate optional fields of this constructor arg with their default values.
+   */
   private void populateWithDefaultValues(A arg) {
     try {
-      new ConstructorArgMarshaller(new DefaultTypeCoercerFactory()).populate(
+      new ConstructorArgMarshaller(
+          new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance())).populateDefaults(
           cellRoots,
           new FakeProjectFilesystem(),
           factoryParams,
-          arg,
-          ImmutableSet.<BuildTarget>builder(),
-          ImmutableMap.<String, Object>of(),
-          true);
+          arg);
     } catch (ConstructorArgMarshalException error) {
       throw Throwables.propagate(error);
     }

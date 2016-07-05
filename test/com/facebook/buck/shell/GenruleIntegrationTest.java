@@ -119,6 +119,7 @@ public class GenruleIntegrationTest {
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "genrule_directory_output", temporaryFolder);
     workspace.setUp();
+    workspace.enableDirCache();
 
     workspace.runBuckCommand("build", "//:mkdir").assertSuccess();
 
@@ -130,7 +131,6 @@ public class GenruleIntegrationTest {
     workspace.runBuckCommand("clean").assertSuccess();
 
     assertThat(Files.isDirectory(workspace.resolve("buck-out/gen")), equalTo(false));
-
     // Retrieving the genrule output from the local cache should recreate the directory contents.
     workspace.runBuckCommand("build", "//:mkdir").assertSuccess();
 
@@ -146,6 +146,7 @@ public class GenruleIntegrationTest {
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "genrule_directory_output_cleaned", temporaryFolder);
     workspace.setUp();
+    workspace.enableDirCache();
 
     workspace.copyFile("BUCK.1", "BUCK");
     workspace.runBuckCommand("build", "//:mkdir_another").assertSuccess();
@@ -239,4 +240,15 @@ public class GenruleIntegrationTest {
 
     assertEquals(originalOutput, originalOutput2);
   }
+
+  @Test
+  public void executableGenrule() throws IOException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this, "genrule_executable", temporaryFolder);
+    workspace.setUp();
+
+    ProcessResult buildResult = workspace.runBuckCommand("run", "//:binary");
+    buildResult.assertSuccess();
+  }
+
 }

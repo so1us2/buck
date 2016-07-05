@@ -16,16 +16,13 @@
 
 package com.facebook.buck.cxx;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.FakeBuildRuleParamsBuilder;
-import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 
 import java.nio.file.Path;
 
@@ -38,17 +35,36 @@ public class CxxSourceRuleFactoryHelper {
       BuildTarget target,
       CxxPlatform cxxPlatform) {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
-    return new CxxSourceRuleFactory(
-        new FakeBuildRuleParamsBuilder(target)
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    return CxxSourceRuleFactory.builder()
+        .setParams(new FakeBuildRuleParamsBuilder(target)
+                .setProjectFilesystem(new FakeProjectFilesystem(cellRoot.toFile()))
+                .build())
+        .setResolver(resolver)
+        .setPathResolver(new SourcePathResolver(resolver))
+        .setCxxBuckConfig(CxxPlatformUtils.DEFAULT_CONFIG)
+        .setCxxPlatform(cxxPlatform)
+        .setPicType(CxxSourceRuleFactory.PicType.PDC)
+        .build();
+  }
+
+  public static CxxSourceRuleFactory of(
+      Path cellRoot,
+      BuildTarget target,
+      CxxPlatform cxxPlatform,
+      CxxSourceRuleFactory.PicType picType) {
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    return CxxSourceRuleFactory.builder()
+        .setParams(new FakeBuildRuleParamsBuilder(target)
             .setProjectFilesystem(new FakeProjectFilesystem(cellRoot.toFile()))
-            .build(),
-        resolver,
-        new SourcePathResolver(resolver),
-        cxxPlatform,
-        ImmutableList.<CxxPreprocessorInput>of(),
-        ImmutableList.<String>of(),
-        Optional.<SourcePath>absent());
+            .build())
+        .setResolver(resolver)
+        .setPathResolver(new SourcePathResolver(resolver))
+        .setCxxBuckConfig(CxxPlatformUtils.DEFAULT_CONFIG)
+        .setCxxPlatform(cxxPlatform)
+        .setPicType(picType)
+        .build();
   }
 
 }

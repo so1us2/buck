@@ -96,6 +96,7 @@ public class AndroidLibraryDescription
             Suppliers.ofInstance(resolver.getAllRules(args.exportedDeps.get()))),
         javacOptions,
         DependencyMode.FIRST_ORDER,
+        /* forceFinalResourceIds */ false,
         args.resourceUnionPackage);
 
     boolean hasDummyRDotJavaFlavor =
@@ -119,10 +120,7 @@ public class AndroidLibraryDescription
             params.getExtraDeps());
       }
 
-      BuildTarget abiJarTarget =
-          BuildTarget.builder(params.getBuildTarget())
-              .addFlavors(CalculateAbi.FLAVOR)
-              .build();
+      BuildTarget abiJarTarget = params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR);
 
       ImmutableSortedSet<BuildRule> exportedDeps = resolver.getAllRules(args.exportedDeps.get());
       AndroidLibrary library =

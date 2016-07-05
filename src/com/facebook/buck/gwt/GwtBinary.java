@@ -16,6 +16,8 @@
 
 package com.facebook.buck.gwt;
 
+import com.facebook.buck.io.ProjectFilesystem;
+import com.facebook.buck.jvm.java.JavaRuntimeLauncher;
 import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
@@ -67,6 +69,8 @@ public class GwtBinary extends AbstractBuildRule {
   @AddToRuleKey
   private final ImmutableSortedSet<String> modules;
   @AddToRuleKey
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
+  @AddToRuleKey
   private final ImmutableList<String> vmArgs;
   @AddToRuleKey
   private final Style style;
@@ -90,6 +94,7 @@ public class GwtBinary extends AbstractBuildRule {
       BuildRuleParams buildRuleParams,
       SourcePathResolver resolver,
       ImmutableSortedSet<String> modules,
+      JavaRuntimeLauncher javaRuntimeLauncher,
       List<String> vmArgs,
       Style style,
       boolean draftCompile,
@@ -108,6 +113,7 @@ public class GwtBinary extends AbstractBuildRule {
         !modules.isEmpty(),
         "Must specify at least one module for %s.",
         buildTarget);
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.vmArgs = ImmutableList.copyOf(vmArgs);
     this.style = style;
     this.draftCompile = draftCompile;
@@ -135,13 +141,14 @@ public class GwtBinary extends AbstractBuildRule {
 
     // Create a clean directory where the .zip file will be written.
     Path workingDirectory = getPathToOutput().getParent();
-    steps.add(new MakeCleanDirectoryStep(getProjectFilesystem(), workingDirectory));
+    ProjectFilesystem projectFilesystem = getProjectFilesystem();
+    steps.add(new MakeCleanDirectoryStep(projectFilesystem, workingDirectory));
 
     // Write the deploy files into a separate directory so that the generated .zip is smaller.
     final Path deployDirectory = workingDirectory.resolve("deploy");
-    steps.add(new MkdirStep(getProjectFilesystem(), deployDirectory));
+    steps.add(new MkdirStep(projectFilesystem, deployDirectory));
 
-    Step javaStep = new ShellStep(getProjectFilesystem().getRootPath()) {
+    Step javaStep = new ShellStep(projectFilesystem.getRootPath()) {
       @Override
       public String getShortName() {
         return "gwt-compile";
@@ -150,7 +157,7 @@ public class GwtBinary extends AbstractBuildRule {
       @Override
       protected ImmutableList<String> getShellCommandInternal(ExecutionContext context) {
         ImmutableList.Builder<String> javaArgsBuilder = ImmutableList.builder();
-        javaArgsBuilder.add("java");
+        javaArgsBuilder.add(javaRuntimeLauncher.getCommand());
         javaArgsBuilder.add("-Dgwt.normalizeTimestamps=true");
         javaArgsBuilder.addAll(vmArgs);
         javaArgsBuilder.add(

@@ -21,8 +21,13 @@ import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetPattern;
 import com.facebook.buck.model.Either;
 import com.facebook.buck.model.Pair;
+import com.facebook.buck.python.NeededCoverageSpec;
 import com.facebook.buck.rules.Label;
 import com.facebook.buck.rules.SourcePath;
+import com.facebook.buck.rules.SourceWithFlags;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -49,8 +54,14 @@ public class DefaultTypeCoercerFactory implements TypeCoercerFactory {
   private final TypeCoercer<Pattern> patternTypeCoercer = new PatternTypeCoercer();
 
   private final TypeCoercer<?>[] nonParameterizedTypeCoercers;
+  private final ObjectMapper jacksonObjectMapper;
 
-  public DefaultTypeCoercerFactory() {
+  public DefaultTypeCoercerFactory(ObjectMapper mapper) {
+    // Cached instance for any type coercers that utilize Jackson
+    jacksonObjectMapper = mapper.copy()
+        .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES)
+        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
     TypeCoercer<String> stringTypeCoercer = new IdentityTypeCoercer<>(String.class);
     TypeCoercer<Path> pathTypeCoercer = new PathTypeCoercer();
     TypeCoercer<Label> labelTypeCoercer = new LabelTypeCoercer();
@@ -78,6 +89,12 @@ public class DefaultTypeCoercerFactory implements TypeCoercerFactory {
         new ListTypeCoercer<>(stringTypeCoercer));
     TypeCoercer<OCamlSource> ocamlSourceTypeCoercer = new OCamlSourceTypeCoercer(
         sourcePathTypeCoercer);
+    TypeCoercer<Float> floatTypeCoercer = new NumberTypeCoercer<>(Float.class);
+    TypeCoercer<NeededCoverageSpec> neededCoverageSpecTypeCoercer =
+        new NeededCoverageSpecTypeCoercer(
+            floatTypeCoercer,
+            buildTargetTypeCoercer,
+            stringTypeCoercer);
     nonParameterizedTypeCoercers = new TypeCoercer<?>[] {
         // special classes
         labelTypeCoercer,
@@ -93,7 +110,7 @@ public class DefaultTypeCoercerFactory implements TypeCoercerFactory {
         // numeric
         new NumberTypeCoercer<>(Integer.class),
         new NumberTypeCoercer<>(Double.class),
-        new NumberTypeCoercer<>(Float.class),
+        floatTypeCoercer,
         new NumberTypeCoercer<>(Long.class),
         new NumberTypeCoercer<>(Short.class),
         new NumberTypeCoercer<>(Byte.class),
@@ -107,7 +124,9 @@ public class DefaultTypeCoercerFactory implements TypeCoercerFactory {
         new SourceWithFlagsListTypeCoercer(stringTypeCoercer, sourceWithFlagsTypeCoercer),
         new SourceListTypeCoercer(stringTypeCoercer, sourcePathTypeCoercer),
         new LogLevelTypeCoercer(),
+        new ManifestEntriesTypeCoercer(jacksonObjectMapper),
         patternTypeCoercer,
+        neededCoverageSpecTypeCoercer,
     };
   }
 

@@ -27,6 +27,7 @@ import com.facebook.buck.json.ProjectBuildFileParserOptions;
 import com.facebook.buck.jvm.java.JavaSymbolFinder;
 import com.facebook.buck.jvm.java.JavacOptions;
 import com.facebook.buck.jvm.java.SrcRootsFinder;
+import com.facebook.buck.log.Logger;
 import com.facebook.buck.model.BuildId;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.parser.ParserConfig;
@@ -36,6 +37,7 @@ import com.facebook.buck.rules.ConstructorArgMarshaller;
 import com.facebook.buck.rules.Description;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.util.Console;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -44,10 +46,13 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Multimap;
 import com.google.common.eventbus.Subscribe;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Set;
 
 public class MissingSymbolsHandler {
+
+  private static final Logger LOG = Logger.get(MissingSymbolsHandler.class);
 
   private final Console console;
   private final JavaSymbolFinder javaSymbolFinder;
@@ -89,7 +94,8 @@ public class MissingSymbolsHandler {
         projectFilesystem,
         srcRootsFinder,
         javacOptions,
-        new ConstructorArgMarshaller(new DefaultTypeCoercerFactory()),
+        new ConstructorArgMarshaller(
+            new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance())),
         projectBuildFileParserFactory,
         config,
         buckEventBus,
@@ -156,7 +162,7 @@ public class MissingSymbolsHandler {
    * missing dependencies for each broken target.
    */
   public ImmutableSetMultimap<BuildTarget, BuildTarget> getNeededDependencies(
-      Collection<MissingSymbolEvent> missingSymbolEvents) throws InterruptedException {
+      Collection<MissingSymbolEvent> missingSymbolEvents) throws InterruptedException, IOException {
     ImmutableSetMultimap.Builder<BuildTarget, String> targetsMissingSymbolsBuilder =
         ImmutableSetMultimap.builder();
     for (MissingSymbolEvent event : missingSymbolEvents) {
@@ -190,8 +196,14 @@ public class MissingSymbolsHandler {
    */
   private void printNeededDependencies(Collection<MissingSymbolEvent> missingSymbolEvents)
       throws InterruptedException {
-    ImmutableSetMultimap<BuildTarget, BuildTarget> neededDependencies =
-        getNeededDependencies(missingSymbolEvents);
+    ImmutableSetMultimap<BuildTarget, BuildTarget> neededDependencies;
+    try {
+      neededDependencies = getNeededDependencies(missingSymbolEvents);
+    } catch (IOException e) {
+      LOG.warn(e, "Could not find missing deps");
+      print("Could not find missing deps because of an IOException: " + e.getMessage());
+      return;
+    }
     ImmutableSortedSet.Builder<String> samePackageDeps = ImmutableSortedSet.naturalOrder();
     ImmutableSortedSet.Builder<String> otherPackageDeps = ImmutableSortedSet.naturalOrder();
     for (BuildTarget target : neededDependencies.keySet()) {

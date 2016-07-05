@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import com.facebook.buck.artifact_cache.ArtifactCache;
 import com.facebook.buck.artifact_cache.NoopArtifactCache;
 import com.facebook.buck.event.BuckEventBus;
+import com.facebook.buck.io.BorrowablePath;
 import com.facebook.buck.io.MorePathsForTests;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildId;
@@ -39,6 +40,7 @@ import com.facebook.buck.timing.DefaultClock;
 import com.facebook.buck.timing.FakeClock;
 import com.facebook.buck.util.cache.DefaultFileHashCache;
 import com.facebook.buck.util.cache.FileHashCache;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -85,7 +87,8 @@ public class BuildInfoRecorderTest {
 
     buildInfoRecorder.writeMetadataToDisk(/* clearExistingMetadata */ true);
 
-    OnDiskBuildInfo onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem);
+    OnDiskBuildInfo onDiskBuildInfo =
+        new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem, new ObjectMapper());
     assertOnDiskBuildInfoHasMetadata(onDiskBuildInfo, "key1", "value1");
 
     buildInfoRecorder = createBuildInfoRecorder(filesystem);
@@ -93,7 +96,7 @@ public class BuildInfoRecorderTest {
 
     buildInfoRecorder.writeMetadataToDisk(/* clearExistingMetadata */ false);
 
-    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem);
+    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem, new ObjectMapper());
     assertOnDiskBuildInfoHasMetadata(onDiskBuildInfo, "key1", "value1");
     assertOnDiskBuildInfoHasMetadata(onDiskBuildInfo, "key2", "value2");
 
@@ -102,7 +105,7 @@ public class BuildInfoRecorderTest {
 
     buildInfoRecorder.writeMetadataToDisk(/* clearExistingMetadata */ true);
 
-    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem);
+    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem, new ObjectMapper());
     assertOnDiskBuildInfoHasMetadata(onDiskBuildInfo, "key3", "value3");
     assertOnDiskBuildInfoDoesNotHaveMetadata(onDiskBuildInfo, "key1");
     assertOnDiskBuildInfoDoesNotHaveMetadata(onDiskBuildInfo, "key2");
@@ -111,13 +114,13 @@ public class BuildInfoRecorderTest {
     buildInfoRecorder = createBuildInfoRecorder(filesystem);
     buildInfoRecorder.addBuildMetadata("build", "metadata");
     buildInfoRecorder.writeMetadataToDisk(/* clearExistingMetadata */ true);
-    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem);
+    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem, new ObjectMapper());
     assertOnDiskBuildInfoHasMetadata(onDiskBuildInfo, "build", "metadata");
 
     // Verify additional info build metadata always gets written.
     buildInfoRecorder = createBuildInfoRecorder(filesystem);
     buildInfoRecorder.writeMetadataToDisk(/* clearExistingMetadata */ true);
-    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem);
+    onDiskBuildInfo = new DefaultOnDiskBuildInfo(BUILD_TARGET, filesystem, new ObjectMapper());
     assertTrue(onDiskBuildInfo.getValue(BuildInfo.METADATA_KEY_FOR_ADDITIONAL_INFO).isPresent());
   }
 
@@ -175,7 +178,7 @@ public class BuildInfoRecorderTest {
           public ListenableFuture<Void> store(
               ImmutableSet<RuleKey> ruleKeys,
               ImmutableMap<String, String> metadata,
-              Path output) {
+              BorrowablePath output) {
             stored.set(true);
 
             // Verify the build metadata.
@@ -184,7 +187,7 @@ public class BuildInfoRecorderTest {
                 Matchers.equalTo("build-metadata"));
 
             // Verify zip contents
-            try (Zip zip = new Zip(output, /* forWriting */ false)) {
+            try (Zip zip = new Zip(output.getPath(), /* forWriting */ false)) {
               assertEquals(
                   ImmutableSet.of(
                       "",
@@ -316,6 +319,7 @@ public class BuildInfoRecorderTest {
         filesystem,
         new DefaultClock(),
         new BuildId(),
+        new ObjectMapper(),
         ImmutableMap.<String, String>of());
   }
 }

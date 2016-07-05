@@ -16,6 +16,7 @@
 
 package com.facebook.buck.python;
 
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.WindowsLinker;
 import com.facebook.buck.file.WriteFile;
@@ -26,6 +27,7 @@ import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.FlavorDomain;
 import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -38,11 +40,13 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.SymlinkTree;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.args.MacroArg;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.infer.annotation.SuppressFieldNotInitialized;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -64,16 +68,19 @@ public class PythonBinaryDescription implements
 
   private final PythonBuckConfig pythonBuckConfig;
   private final FlavorDomain<PythonPlatform> pythonPlatforms;
+  private final CxxBuckConfig cxxBuckConfig;
   private final CxxPlatform defaultCxxPlatform;
   private final FlavorDomain<CxxPlatform> cxxPlatforms;
 
   public PythonBinaryDescription(
       PythonBuckConfig pythonBuckConfig,
       FlavorDomain<PythonPlatform> pythonPlatforms,
+      CxxBuckConfig cxxBuckConfig,
       CxxPlatform defaultCxxPlatform,
       FlavorDomain<CxxPlatform> cxxPlatforms) {
     this.pythonBuckConfig = pythonBuckConfig;
     this.pythonPlatforms = pythonPlatforms;
+    this.cxxBuckConfig = cxxBuckConfig;
     this.defaultCxxPlatform = defaultCxxPlatform;
     this.cxxPlatforms = cxxPlatforms;
   }
@@ -121,10 +128,11 @@ public class PythonBinaryDescription implements
       PythonPlatform pythonPlatform,
       CxxPlatform cxxPlatform,
       String mainModule,
-      PythonPackageComponents components) {
+      PythonPackageComponents components,
+      ImmutableSet<String> preloadLibraries) {
 
     // We don't currently support targeting Windows.
-    if (cxxPlatform.getLd() instanceof WindowsLinker) {
+    if (cxxPlatform.getLd().resolve(resolver) instanceof WindowsLinker) {
       throw new HumanReadableException(
           "%s: cannot build in-place python binaries for Windows (%s)",
           params.getBuildTarget(),
@@ -133,9 +141,7 @@ public class PythonBinaryDescription implements
 
     // Generate an empty __init__.py module to fill in for any missing ones in the link tree.
     BuildTarget emptyInitTarget =
-        BuildTarget.builder(params.getBuildTarget())
-            .addFlavors(ImmutableFlavor.of("__init__"))
-            .build();
+        params.getBuildTarget().withAppendedFlavor(ImmutableFlavor.of("__init__"));
     Path emptyInitPath =
         BuildTargets.getGenPath(
             params.getBuildTarget(),
@@ -155,14 +161,10 @@ public class PythonBinaryDescription implements
     components = addMissingInitModules(components, new BuildTargetSourcePath(emptyInitTarget));
 
     BuildTarget linkTreeTarget =
-        BuildTarget.builder(params.getBuildTarget())
-            .addFlavors(ImmutableFlavor.of("link-tree"))
-            .build();
+        params.getBuildTarget().withAppendedFlavor(ImmutableFlavor.of("link-tree"));
     Path linkTreeRoot = params.getProjectFilesystem().resolve(
         BuildTargets.getGenPath(linkTreeTarget, "%s"));
-    SymlinkTree linkTree;
-    try {
-      linkTree =
+    SymlinkTree linkTree =
         resolver.addToIndex(
             new SymlinkTree(
                 params.copyWithChanges(
@@ -176,21 +178,19 @@ public class PythonBinaryDescription implements
                     .putAll(components.getResources())
                     .putAll(components.getNativeLibraries())
                     .build()));
-    } catch (SymlinkTree.InvalidSymlinkTreeException e) {
-      throw e.getHumanReadableExceptionForBuildTarget(
-          params.getBuildTarget().getUnflavoredBuildTarget());
-    }
 
     return new PythonInPlaceBinary(
         params,
         pathResolver,
+        resolver,
         pythonPlatform,
         cxxPlatform,
         linkTree,
         mainModule,
         components,
         pythonPlatform.getEnvironment(),
-        pythonBuckConfig.getPexExtension());
+        pythonBuckConfig.getPexExtension(),
+        preloadLibraries);
   }
 
   protected PythonBinary createPackageRule(
@@ -201,9 +201,11 @@ public class PythonBinaryDescription implements
       CxxPlatform cxxPlatform,
       String mainModule,
       PythonPackageComponents components,
-      ImmutableList<String> buildArgs) {
+      ImmutableList<String> buildArgs,
+      PythonBuckConfig.PackageStyle packageStyle,
+      ImmutableSet<String> preloadLibraries) {
 
-    switch (pythonBuckConfig.getPackageStyle()) {
+    switch (packageStyle) {
 
       case INPLACE:
         return createInPlaceBinaryRule(
@@ -213,7 +215,8 @@ public class PythonBinaryDescription implements
             pythonPlatform,
             cxxPlatform,
             mainModule,
-            components);
+            components,
+            preloadLibraries);
 
       case STANDALONE:
         ImmutableSortedSet<BuildRule> componentDeps =
@@ -231,11 +234,12 @@ public class PythonBinaryDescription implements
             pythonPlatform,
             pexTool,
             buildArgs,
-            pythonBuckConfig.getPathToPexExecuter(resolver).or(pythonPlatform.getEnvironment()),
+            pythonBuckConfig.getPexExecutor(resolver).or(pythonPlatform.getEnvironment()),
             pythonBuckConfig.getPexExtension(),
             pythonPlatform.getEnvironment(),
             mainModule,
             components,
+            preloadLibraries,
             // Attach any additional declared deps that don't qualify as build time deps,
             // as runtime deps, so that we make to include other things we depend on in
             // the build.
@@ -302,7 +306,16 @@ public class PythonBinaryDescription implements
             pathResolver,
             binaryPackageComponents,
             pythonPlatform,
+            cxxBuckConfig,
             cxxPlatform,
+            FluentIterable.from(args.linkerFlags.get())
+                .transform(
+                    MacroArg.toMacroArgFunction(
+                        PythonUtil.MACRO_HANDLER,
+                        params.getBuildTarget(),
+                        params.getCellRoots(),
+                        resolver))
+                .toList(),
             pythonBuckConfig.getNativeLinkStrategy());
     return createPackageRule(
         params,
@@ -312,7 +325,12 @@ public class PythonBinaryDescription implements
         cxxPlatform,
         mainModule,
         allPackageComponents,
-        args.buildArgs.or(ImmutableList.<String>of()));
+        args.buildArgs.or(ImmutableList.<String>of()),
+        args.packageStyle.or(pythonBuckConfig.getPackageStyle()),
+        PythonUtil.getPreloadNames(
+            resolver,
+            cxxPlatform,
+            args.preloadDeps.or(ImmutableSortedSet.<BuildTarget>of())));
   }
 
   @Override
@@ -322,15 +340,21 @@ public class PythonBinaryDescription implements
       Arg constructorArg) {
     ImmutableList.Builder<BuildTarget> targets = ImmutableList.builder();
 
+    // We need to use the C/C++ linker for native libs handling, so add in the C/C++ linker to
+    // parse time deps.
+    targets.addAll(
+        cxxPlatforms.getValue(buildTarget).or(defaultCxxPlatform).getLd().getParseTimeDeps());
+
     if (pythonBuckConfig.getPackageStyle() == PythonBuckConfig.PackageStyle.STANDALONE) {
       targets.addAll(pythonBuckConfig.getPexTarget().asSet());
+      targets.addAll(pythonBuckConfig.getPexExecutorTarget().asSet());
     }
 
     return targets.build();
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     public Optional<SourcePath> main;
     public Optional<String> mainModule;
     public Optional<ImmutableSortedSet<BuildTarget>> deps;
@@ -338,6 +362,9 @@ public class PythonBinaryDescription implements
     public Optional<Boolean> zipSafe;
     public Optional<ImmutableList<String>> buildArgs;
     public Optional<String> platform;
+    public Optional<PythonBuckConfig.PackageStyle> packageStyle;
+    public Optional<ImmutableSet<BuildTarget>> preloadDeps;
+    public Optional<ImmutableList<String>> linkerFlags;
   }
 
 }

@@ -18,14 +18,16 @@ package com.facebook.buck.android;
 
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.cxx.CxxPlatformUtils;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cxx.CxxLinkableEnhancer;
 import com.facebook.buck.cxx.CxxPreprocessAndCompile;
 import com.facebook.buck.cxx.CxxPreprocessMode;
-import com.facebook.buck.cxx.CxxPreprocessorInput;
 import com.facebook.buck.cxx.CxxSource;
 import com.facebook.buck.cxx.CxxSourceRuleFactory;
 import com.facebook.buck.cxx.Linker;
+import com.facebook.buck.cxx.NativeLinkable;
+import com.facebook.buck.cxx.NativeLinkableInput;
 import com.facebook.buck.io.AlwaysFoundExecutableFinder;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
@@ -41,7 +43,6 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.SourcePathArg;
-import com.facebook.buck.rules.coercer.FrameworkPath;
 import com.facebook.buck.rules.keys.DefaultRuleKeyBuilderFactory;
 import com.facebook.buck.testutil.FakeFileHashCache;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
@@ -80,7 +81,7 @@ public class NdkCxxPlatformTest {
       Operation operation,
       ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> cxxPlatforms) {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     String source = "source.cpp";
     RuleKeyBuilderFactory ruleKeyBuilderFactory =
@@ -94,50 +95,43 @@ public class NdkCxxPlatformTest {
     ImmutableMap.Builder<NdkCxxPlatforms.TargetCpuType, RuleKey> ruleKeys =
         ImmutableMap.builder();
     for (Map.Entry<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> entry : cxxPlatforms.entrySet()) {
-      CxxSourceRuleFactory cxxSourceRuleFactory =
-          new CxxSourceRuleFactory(
-              new FakeBuildRuleParamsBuilder(target).build(),
-              resolver,
-              pathResolver,
-              entry.getValue().getCxxPlatform(),
-              ImmutableList.<CxxPreprocessorInput>of(),
-              ImmutableList.<String>of(),
-              Optional.<SourcePath>absent());
+      CxxSourceRuleFactory cxxSourceRuleFactory = CxxSourceRuleFactory.builder()
+          .setParams(new FakeBuildRuleParamsBuilder(target).build())
+          .setResolver(resolver)
+          .setPathResolver(pathResolver)
+          .setCxxBuckConfig(CxxPlatformUtils.DEFAULT_CONFIG)
+          .setCxxPlatform(entry.getValue().getCxxPlatform())
+          .setPicType(CxxSourceRuleFactory.PicType.PIC)
+          .build();
       CxxPreprocessAndCompile rule;
       switch (operation) {
         case PREPROCESS_AND_COMPILE:
           rule =
               cxxSourceRuleFactory.createPreprocessAndCompileBuildRule(
-                  resolver,
                   source,
                   CxxSource.of(
                       CxxSource.Type.CXX,
                       new FakeSourcePath(source),
                       ImmutableList.<String>of()),
-                  CxxSourceRuleFactory.PicType.PIC,
                   CxxPreprocessMode.COMBINED);
           break;
         case PREPROCESS:
           rule =
               cxxSourceRuleFactory.createPreprocessBuildRule(
-                  resolver,
                   source,
                   CxxSource.of(
                       CxxSource.Type.CXX,
                       new FakeSourcePath(source),
-                      ImmutableList.<String>of()),
-                  CxxSourceRuleFactory.PicType.PIC);
+                      ImmutableList.<String>of()));
           break;
         case COMPILE:
           rule =
               cxxSourceRuleFactory.createCompileBuildRule(
-                  resolver,
                   source,
                   CxxSource.of(
                       CxxSource.Type.CXX_CPP_OUTPUT,
                       new FakeSourcePath(source),
-                      ImmutableList.<String>of()),
-                  CxxSourceRuleFactory.PicType.PIC);
+                      ImmutableList.<String>of()));
           break;
         default:
           throw new IllegalStateException();
@@ -152,7 +146,7 @@ public class NdkCxxPlatformTest {
       ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> cxxPlatforms)
       throws NoSuchBuildTargetException {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     RuleKeyBuilderFactory ruleKeyBuilderFactory =
         new DefaultRuleKeyBuilderFactory(
@@ -166,22 +160,23 @@ public class NdkCxxPlatformTest {
         ImmutableMap.builder();
     for (Map.Entry<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> entry : cxxPlatforms.entrySet()) {
       BuildRule rule = CxxLinkableEnhancer.createCxxLinkableBuildRule(
+          CxxPlatformUtils.DEFAULT_CONFIG,
           entry.getValue().getCxxPlatform(),
           new FakeBuildRuleParamsBuilder(target).build(),
+          resolver,
           pathResolver,
           target,
           Linker.LinkType.EXECUTABLE,
           Optional.<String>absent(),
           Paths.get("output"),
-          SourcePathArg.from(
-              pathResolver,
-              new FakeSourcePath("input.o")),
           Linker.LinkableDepType.SHARED,
-          ImmutableList.<BuildRule>of(),
+          ImmutableList.<NativeLinkable>of(),
           Optional.<Linker.CxxRuntimeType>absent(),
           Optional.<SourcePath>absent(),
           ImmutableSet.<BuildTarget>of(),
-          ImmutableSet.<FrameworkPath>of());
+          NativeLinkableInput.builder()
+              .setArgs(SourcePathArg.from(pathResolver, new FakeSourcePath("input.o")))
+              .build());
       ruleKeys.put(entry.getKey(), ruleKeyBuilderFactory.build(rule));
     }
     return ruleKeys.build();
@@ -193,12 +188,12 @@ public class NdkCxxPlatformTest {
   public void checkRootAndPlatformDoNotAffectRuleKeys() throws Exception {
 
     // Test all major compiler and runtime combinations.
-    ImmutableList<Pair<NdkCxxPlatforms.Compiler.Type, NdkCxxPlatforms.CxxRuntime>> configs =
+    ImmutableList<Pair<NdkCxxPlatformCompiler.Type, NdkCxxPlatforms.CxxRuntime>> configs =
         ImmutableList.of(
-            new Pair<>(NdkCxxPlatforms.Compiler.Type.GCC, NdkCxxPlatforms.CxxRuntime.GNUSTL),
-            new Pair<>(NdkCxxPlatforms.Compiler.Type.CLANG, NdkCxxPlatforms.CxxRuntime.GNUSTL),
-            new Pair<>(NdkCxxPlatforms.Compiler.Type.CLANG, NdkCxxPlatforms.CxxRuntime.LIBCXX));
-    for (Pair<NdkCxxPlatforms.Compiler.Type, NdkCxxPlatforms.CxxRuntime> config : configs) {
+            new Pair<>(NdkCxxPlatformCompiler.Type.GCC, NdkCxxPlatforms.CxxRuntime.GNUSTL),
+            new Pair<>(NdkCxxPlatformCompiler.Type.CLANG, NdkCxxPlatforms.CxxRuntime.GNUSTL),
+            new Pair<>(NdkCxxPlatformCompiler.Type.CLANG, NdkCxxPlatforms.CxxRuntime.LIBCXX));
+    for (Pair<NdkCxxPlatformCompiler.Type, NdkCxxPlatforms.CxxRuntime> config : configs) {
       Map<String, ImmutableMap<NdkCxxPlatforms.TargetCpuType, RuleKey>>
           preprocessAndCompileRukeKeys = Maps.newHashMap();
       Map<String, ImmutableMap<NdkCxxPlatforms.TargetCpuType, RuleKey>>
@@ -220,7 +215,7 @@ public class NdkCxxPlatformTest {
           ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> platforms =
               NdkCxxPlatforms.getPlatforms(
                   filesystem,
-                  ImmutableNdkCxxPlatforms.Compiler.builder()
+                  NdkCxxPlatformCompiler.builder()
                       .setType(config.getFirst())
                       .setVersion("gcc-version")
                       .setGccVersion("clang-version")

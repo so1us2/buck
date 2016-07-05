@@ -16,6 +16,8 @@
 
 package com.facebook.buck.artifact_cache;
 
+import com.facebook.buck.io.BorrowablePath;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.rules.RuleKey;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -28,12 +30,15 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 public class InMemoryArtifactCache implements ArtifactCache {
 
   private final Map<RuleKey, Artifact> artifacts = Maps.newConcurrentMap();
+
+  public int getArtifactCount() {
+    return artifacts.size();
+  }
 
   public boolean hasArtifact(RuleKey ruleKey) {
     return artifacts.containsKey(ruleKey);
@@ -44,17 +49,17 @@ public class InMemoryArtifactCache implements ArtifactCache {
   }
 
   @Override
-  public CacheResult fetch(RuleKey ruleKey, Path output) {
+  public CacheResult fetch(RuleKey ruleKey, LazyPath output) {
     Artifact artifact = artifacts.get(ruleKey);
     if (artifact == null) {
       return CacheResult.miss();
     }
     try {
-      Files.write(output, artifact.data);
+      Files.write(output.get(), artifact.data);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
-    return CacheResult.hit("in-memory", artifact.metadata);
+    return CacheResult.hit("in-memory", artifact.metadata, artifact.data.length);
   }
 
   public void store(
@@ -73,8 +78,8 @@ public class InMemoryArtifactCache implements ArtifactCache {
   public ListenableFuture<Void> store(
       ImmutableSet<RuleKey> ruleKeys,
       ImmutableMap<String, String> metadata,
-      Path output) {
-    try (InputStream inputStream = Files.newInputStream(output)) {
+      BorrowablePath output) {
+    try (InputStream inputStream = Files.newInputStream(output.getPath())) {
       store(ruleKeys, metadata, ByteStreams.toByteArray(inputStream));
     } catch (IOException e) {
       throw Throwables.propagate(e);

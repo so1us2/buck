@@ -24,6 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Ordering;
 
@@ -38,7 +39,7 @@ import java.util.SortedSet;
     getterVisibility = JsonAutoDetect.Visibility.NONE,
     setterVisibility = JsonAutoDetect.Visibility.NONE)
 @BuckStyleImmutable
-@Value.Immutable
+@Value.Immutable(prehash = true)
 abstract class AbstractBuildTarget
     implements
     Comparable<AbstractBuildTarget>,
@@ -116,7 +117,6 @@ abstract class AbstractBuildTarget
    * If this build target is //third_party/java/guava:guava-latest, then this would return
    * "//third_party/java/guava:guava-latest".
    */
-  @Value.Derived
   public String getFullyQualifiedName() {
     return getUnflavoredBuildTarget().getFullyQualifiedName() + getFlavorPostfix();
   }
@@ -189,6 +189,20 @@ abstract class AbstractBuildTarget
       }
     }
     return builder.build();
+  }
+
+  public BuildTarget withAppendedFlavors(Set<Flavor> flavorsToAppend) {
+    BuildTarget.Builder builder = BuildTarget.builder(getBuildTarget());
+    builder.addAllFlavors(flavorsToAppend);
+    return builder.build();
+  }
+
+  public BuildTarget withAppendedFlavors(Flavor... flavors) {
+    return withAppendedFlavors(ImmutableSet.copyOf(flavors));
+  }
+
+  public BuildTarget withAppendedFlavor(Flavor flavor) {
+    return withAppendedFlavors(ImmutableSet.of(flavor));
   }
 
   public BuildTarget withoutCell() {

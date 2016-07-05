@@ -25,6 +25,7 @@ import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.AccumulateClassNamesStep;
 import com.facebook.buck.jvm.java.Classpaths;
 import com.facebook.buck.jvm.java.HasClasspathEntries;
+import com.facebook.buck.jvm.java.JavaRuntimeLauncher;
 import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.jvm.java.Keystore;
 import com.facebook.buck.model.BuildTarget;
@@ -43,9 +44,9 @@ import com.facebook.buck.rules.RuleKeyBuilderFactory;
 import com.facebook.buck.rules.Sha1HashCode;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
+import com.facebook.buck.rules.coercer.ManifestEntries;
 import com.facebook.buck.rules.keys.AbiRule;
 import com.facebook.buck.shell.AbstractGenruleStep;
-import com.facebook.buck.shell.EchoStep;
 import com.facebook.buck.shell.SymlinkFilesIntoDirectoryStep;
 import com.facebook.buck.step.AbstractExecutionStep;
 import com.facebook.buck.step.ExecutionContext;
@@ -170,6 +171,12 @@ public class AndroidBinary
     }
   }
 
+  enum RelinkerMode {
+    ENABLED,
+    DISABLED,
+    ;
+  }
+
   @AddToRuleKey
   private final Keystore keystore;
   @AddToRuleKey
@@ -186,6 +193,7 @@ public class AndroidBinary
   @AddToRuleKey
   private final Optional<SourcePath> proguardJarOverride;
   private final String proguardMaxHeapSize;
+  private final Optional<String> proguardAgentPath;
   @AddToRuleKey
   private final ResourceCompressionMode resourceCompressionMode;
   @AddToRuleKey
@@ -210,12 +218,17 @@ public class AndroidBinary
   private final Optional<Boolean> packageAssetLibraries;
   @AddToRuleKey
   private final Optional<Boolean> compressAssetLibraries;
+  @AddToRuleKey
+  private final ManifestEntries manifestEntries;
+  @AddToRuleKey
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
 
   AndroidBinary(
       BuildRuleParams params,
       SourcePathResolver resolver,
       Optional<SourcePath> proguardJarOverride,
       String proguardMaxHeapSize,
+      Optional<String> proguardAgentPath,
       Keystore keystore,
       PackageType packageType,
       DexSplitMode dexSplitMode,
@@ -237,13 +250,17 @@ public class AndroidBinary
       Optional<Integer> xzCompressionLevel,
       ListeningExecutorService dxExecutorService,
       Optional<Boolean> packageAssetLibraries,
-      Optional<Boolean> compressAssetLibraries) {
+      Optional<Boolean> compressAssetLibraries,
+      ManifestEntries manifestEntries,
+      JavaRuntimeLauncher javaRuntimeLauncher) {
     super(params, resolver);
     this.proguardJarOverride = proguardJarOverride;
     this.proguardMaxHeapSize = proguardMaxHeapSize;
+    this.proguardAgentPath = proguardAgentPath;
     this.keystore = keystore;
     this.packageType = packageType;
     this.dexSplitMode = dexSplitMode;
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.buildTargetsToExcludeFromDex = ImmutableSet.copyOf(buildTargetsToExcludeFromDex);
     this.sdkProguardConfig = sdkProguardConfig;
     this.optimizationPasses = proguardOptimizationPasses;
@@ -264,6 +281,7 @@ public class AndroidBinary
     this.xzCompressionLevel = xzCompressionLevel;
     this.packageAssetLibraries = packageAssetLibraries;
     this.compressAssetLibraries = compressAssetLibraries;
+    this.manifestEntries = manifestEntries;
 
     if (ExopackageMode.enabledForSecondaryDexes(exopackageModes)) {
       Preconditions.checkArgument(enhancementResult.getPreDexMerge().isPresent(),
@@ -327,7 +345,17 @@ public class AndroidBinary
     return optimizationPasses;
   }
 
-  public Optional<Boolean> getPackageAssetLibraries() { return packageAssetLibraries; }
+  public Optional<Boolean> getPackageAssetLibraries() {
+    return packageAssetLibraries;
+  }
+
+  public ManifestEntries getManifestEntries() {
+    return manifestEntries;
+  }
+
+  JavaRuntimeLauncher getJavaRuntimeLauncher() {
+    return javaRuntimeLauncher;
+  }
 
   @VisibleForTesting
   AndroidGraphEnhancementResult getEnhancementResult() {
@@ -548,7 +576,8 @@ public class AndroidBinary
             .toSet(),
         getResolver().getAbsolutePath(keystore.getPathToStore()),
         getResolver().getAbsolutePath(keystore.getPathToPropertiesFile()),
-        /* debugMode */ false);
+        /* debugMode */ false,
+        javaRuntimeLauncher);
     steps.add(apkBuilderCommand);
 
     // The `ApkBuilderStep` delegates to android tools to build a ZIP with timestamps in it, making
@@ -577,13 +606,6 @@ public class AndroidBinary
         apkPath);
     steps.add(zipalign);
 
-    // Inform the user where the APK can be found.
-    EchoStep success = new EchoStep(
-        String.format("built APK for %s at %s",
-            getBuildTarget().getFullyQualifiedName(),
-            apkPath));
-    steps.add(success);
-
     buildableContext.recordArtifact(getApkPath());
     return steps.build();
   }
@@ -609,7 +631,11 @@ public class AndroidBinary
     AndroidPackageableCollection packageableCollection =
         enhancementResult.getPackageableCollection();
     // Execute preprocess_java_classes_binary, if appropriate.
-    ImmutableSet<Path> classpathEntriesToDex;
+    ImmutableSet<Path> classpathEntriesToDex =
+        FluentIterable
+            .from(enhancementResult.getClasspathEntriesToDex())
+            .transform(getResolver().deprecatedPathFunction())
+            .toSet();
     if (preprocessJavaClassesBash.isPresent()) {
       // Symlink everything in dexTransitiveDependencies.classpathEntriesToDex to the input
       // directory. Expect parallel outputs in the output directory and update classpathEntriesToDex
@@ -622,9 +648,9 @@ public class AndroidBinary
           new SymlinkFilesIntoDirectoryStep(
               getProjectFilesystem(),
               getProjectFilesystem().getRootPath(),
-              enhancementResult.getClasspathEntriesToDex(),
+              classpathEntriesToDex,
               preprocessJavaClassesInDir));
-      classpathEntriesToDex = FluentIterable.from(enhancementResult.getClasspathEntriesToDex())
+      classpathEntriesToDex = FluentIterable.from(classpathEntriesToDex)
           .transform(new Function<Path, Path>() {
             @Override
             public Path apply(Path classpathEntry) {
@@ -661,9 +687,6 @@ public class AndroidBinary
           environmentVariablesBuilder.put("ANDROID_BOOTCLASSPATH", bootclasspath);
         }
       });
-
-    } else {
-      classpathEntriesToDex = enhancementResult.getClasspathEntriesToDex();
     }
 
     // Execute proguard if desired (transforms input classpaths).
@@ -816,7 +839,7 @@ public class AndroidBinary
       ImmutableList.Builder<Step> steps,
       BuildableContext buildableContext) {
     final ImmutableSetMultimap<JavaLibrary, Path> classpathEntriesMap =
-        getTransitiveClasspathEntries();
+        Classpaths.getClasspathEntries(ImmutableSet.<BuildRule>copyOf(rulesToExcludeFromDex));
     ImmutableSet.Builder<Path> additionalLibraryJarsForProguardBuilder = ImmutableSet.builder();
 
     for (JavaLibrary buildRule : rulesToExcludeFromDex) {
@@ -846,11 +869,13 @@ public class AndroidBinary
         .getPathToGeneratedProguardConfigDir();
     // Run ProGuard on the classpath entries.
     ProGuardObfuscateStep.create(
+        javaRuntimeLauncher,
         getProjectFilesystem(),
         proguardJarOverride.isPresent() ?
             Optional.of(getResolver().getAbsolutePath(proguardJarOverride.get())) :
             Optional.<Path>absent(),
         proguardMaxHeapSize,
+        proguardAgentPath,
         proguardConfigDir.resolve("proguard.txt"),
         proguardConfigsBuilder.build(),
         sdkProguardConfig,
@@ -1099,12 +1124,14 @@ public class AndroidBinary
   @Override
   public ImmutableSetMultimap<JavaLibrary, Path> getTransitiveClasspathEntries() {
     // This is used primarily for buck audit classpath.
-    return Classpaths.getClasspathEntries(getClasspathDeps());
+    return Classpaths.getClasspathEntries(ImmutableSet.copyOf(
+        getResolver().filterBuildRuleInputs(enhancementResult.getClasspathEntriesToDex())));
   }
 
   @Override
   public ImmutableSet<JavaLibrary> getTransitiveClasspathDeps() {
-    return Classpaths.getClasspathDeps(getClasspathDeps());
+    return Classpaths.getClasspathDeps(ImmutableSet.copyOf(
+        getResolver().filterBuildRuleInputs(enhancementResult.getClasspathEntriesToDex())));
   }
 
   @Override

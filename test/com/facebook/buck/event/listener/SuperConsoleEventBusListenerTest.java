@@ -20,6 +20,7 @@ import static com.facebook.buck.event.listener.ConsoleTestUtils.postStoreFinishe
 import static com.facebook.buck.event.listener.ConsoleTestUtils.postStoreScheduled;
 import static com.facebook.buck.event.listener.ConsoleTestUtils.postStoreStarted;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
@@ -27,8 +28,13 @@ import com.facebook.buck.artifact_cache.ArtifactCacheEvent;
 import com.facebook.buck.artifact_cache.CacheResult;
 import com.facebook.buck.artifact_cache.DirArtifactCacheEvent;
 import com.facebook.buck.artifact_cache.HttpArtifactCacheEvent;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.CommandEvent;
+import com.facebook.buck.cli.FakeBuckConfig;
+import com.facebook.buck.distributed.DistBuildStatus;
+import com.facebook.buck.distributed.DistBuildStatusEvent;
+import com.facebook.buck.distributed.thrift.BuildStatus;
+import com.facebook.buck.distributed.thrift.LogRecord;
 import com.facebook.buck.event.ArtifactCompressionEvent;
 import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.event.BuckEventBusFactory;
@@ -69,6 +75,7 @@ import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.timing.Clock;
 import com.facebook.buck.timing.IncrementingFakeClock;
 import com.facebook.buck.util.BuckConstant;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.DefaultExecutionEnvironment;
 import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
@@ -89,17 +96,25 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 public class SuperConsoleEventBusListenerTest {
   private static final String TARGET_ONE = "TARGET_ONE";
   private static final String TARGET_TWO = "TARGET_TWO";
+  private static final String DOWNLOAD_STRING =
+      "[+] DOWNLOADING... (0.00 B/S, TOTAL: 0.00 B, 0 Artifacts)";
+  private static final String FINISHED_DOWNLOAD_STRING =
+      "[-] DOWNLOADING... (0.00 B/S AVG, TOTAL: 0.00 B, 0 Artifacts)";
 
   private static final TestResultSummaryVerbosity noisySummaryVerbosity =
       TestResultSummaryVerbosity.of(true, true);
@@ -111,6 +126,10 @@ public class SuperConsoleEventBusListenerTest {
 
   private FileSystem vfs;
   private Path logPath;
+  private SuperConsoleConfig emptySuperConsoleConfig =
+      new SuperConsoleConfig(FakeBuckConfig.builder().build());
+
+  private final TimeZone timeZone = TimeZone.getTimeZone("UTC");
 
   @Before
   public void createTestLogFile() {
@@ -120,9 +139,9 @@ public class SuperConsoleEventBusListenerTest {
 
   @Test
   public void testSimpleBuild() {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -143,6 +162,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            new SuperConsoleConfig(FakeBuckConfig.builder().build()),
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -151,7 +171,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     ProjectBuildFileParseEvents.Started parseEventStarted =
@@ -192,9 +213,16 @@ public class SuperConsoleEventBusListenerTest {
         configureTestEventAtTime(ParseEvent.finished(parseStarted,
             Optional.<TargetGraph>absent()),
             300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
     rawEventBus.post(
         configureTestEventAtTime(
-            ActionGraphEvent.finished(ActionGraphEvent.started()),
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
             400L,
             TimeUnit.MILLISECONDS,
             /* threadId */ 0L));
@@ -202,13 +230,16 @@ public class SuperConsoleEventBusListenerTest {
     final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
 
     validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.1s"));
 
     rawEventBus.post(configureTestEventAtTime(
         BuildRuleEvent.started(fakeRule),
         600L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
-    validateConsole(console, listener, 700L, ImmutableList.of(parsingLine,
+    validateConsole(console, listener, 700L, ImmutableList.of(
+        parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.3s",
         " |=> //banana:stand...  0.1s (checking local cache)"));
 
@@ -219,6 +250,7 @@ public class SuperConsoleEventBusListenerTest {
         701L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 702L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.3s",
         " |=> //banana:stand...  0.1s (running artifact_compress[0.0s])"));
 
@@ -227,6 +259,7 @@ public class SuperConsoleEventBusListenerTest {
         703L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 704L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.3s",
         " |=> //banana:stand...  0.1s (checking local cache)"));
 
@@ -241,6 +274,7 @@ public class SuperConsoleEventBusListenerTest {
         740L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 741L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.3s",
         " |=> //banana:stand...  0.1s (running dir_artifact_fetch[0.0s])"));
 
@@ -250,6 +284,7 @@ public class SuperConsoleEventBusListenerTest {
         742L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 800L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.4s",
         " |=> //banana:stand...  0.2s (checking local cache)"));
 
@@ -263,6 +298,7 @@ public class SuperConsoleEventBusListenerTest {
         800L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 900L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.5s",
         " |=> //banana:stand...  0.3s (running doing_something[0.1s])"));
 
@@ -280,6 +316,7 @@ public class SuperConsoleEventBusListenerTest {
         1000L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 1000L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.6s",
         " |=> IDLE"));
 
@@ -288,6 +325,7 @@ public class SuperConsoleEventBusListenerTest {
         1010L, TimeUnit.MILLISECONDS, /* threadId */ 2L));
 
     validateConsole(console, listener, 1100L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.7s",
         " |=> IDLE",
         " |=> //chicken:dance...  0.1s (checking local cache)"));
@@ -309,7 +347,9 @@ public class SuperConsoleEventBusListenerTest {
 
     final String buildingLine = "[-] BUILDING...FINISHED 0.8s";
 
-    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine, buildingLine));
+    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        buildingLine));
 
     rawEventBus.post(configureTestEventAtTime(
         ConsoleEvent.severe("I've made a huge mistake."),
@@ -321,6 +361,7 @@ public class SuperConsoleEventBusListenerTest {
         1600L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine),
         ImmutableList.of("I've made a huge mistake."));
 
@@ -330,16 +371,21 @@ public class SuperConsoleEventBusListenerTest {
         2500L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 3000L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         "[+] INSTALLING...0.5s"));
 
     rawEventBus.post(configureTestEventAtTime(
-        InstallEvent.finished(installEventStarted, true, Optional.<Long>absent()),
+        InstallEvent.finished(
+            installEventStarted,
+            true, Optional.<Long>absent(),
+            Optional.<String>absent()),
         4000L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     final String installingFinished = "[-] INSTALLING...FINISHED 1.5s";
 
     validateConsole(console, listener, 5000L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         installingFinished));
 
@@ -350,6 +396,7 @@ public class SuperConsoleEventBusListenerTest {
         rawEventBus, 0L, TARGET_TWO, 6010L);
 
     validateConsole(console, listener, 6011L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         installingFinished,
         "[+] HTTP CACHE UPLOAD...0.0s (0 COMPLETE/0 FAILED/0 UPLOADING/2 PENDING)"));
@@ -358,6 +405,7 @@ public class SuperConsoleEventBusListenerTest {
         postStoreStarted(rawEventBus, 0, 6015L, storeScheduledOne);
 
     validateConsole(console, listener, 7000, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         installingFinished,
         "[+] HTTP CACHE UPLOAD...1.0s (0 COMPLETE/0 FAILED/1 UPLOADING/1 PENDING)"));
@@ -365,6 +413,7 @@ public class SuperConsoleEventBusListenerTest {
     postStoreFinished(rawEventBus, 0, 7020L, true, storeStartedOne);
 
     validateConsole(console, listener, 7020, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         installingFinished,
         "[+] HTTP CACHE UPLOAD...1.0s (1 COMPLETE/0 FAILED/0 UPLOADING/1 PENDING)"));
@@ -374,6 +423,7 @@ public class SuperConsoleEventBusListenerTest {
     postStoreFinished(rawEventBus, 0, 7030L, false, storeStartedTwo);
 
     validateConsole(console, listener, 7040, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
         buildingLine,
         installingFinished,
         "[+] HTTP CACHE UPLOAD...1.0s (1 COMPLETE/1 FAILED/0 UPLOADING/0 PENDING)"));
@@ -390,9 +440,9 @@ public class SuperConsoleEventBusListenerTest {
 
   @Test
   public void testSimpleBuildWithProgress() throws IOException {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -413,6 +463,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -421,10 +472,12 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     ProgressEstimator e = new ProgressEstimator(
         getStorageForTest().getParent().getParent(),
-        eventBus);
+        eventBus,
+        ObjectMappers.newDefaultInstance());
     listener.setProgressEstimator(e);
     eventBus.register(listener);
 
@@ -449,16 +502,23 @@ public class SuperConsoleEventBusListenerTest {
         configureTestEventAtTime(ParseEvent.finished(parseStarted,
             Optional.<TargetGraph>absent()),
             300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
     rawEventBus.post(
         configureTestEventAtTime(
-            ActionGraphEvent.finished(ActionGraphEvent.started()),
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
             400L,
             TimeUnit.MILLISECONDS,
             /* threadId */ 0L));
-
     final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
 
     validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.1s" + " [0%] (0/10 JOBS, 0 UPDATED, " +
             "0.0% CACHE MISS)"));
 
@@ -467,6 +527,7 @@ public class SuperConsoleEventBusListenerTest {
         600L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 800L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.4s" + " [1%] (0/10 JOBS, 0 UPDATED, " +
             "0.0% CACHE MISS)",
         " |=> //banana:stand...  0.2s (checking local cache)"));
@@ -481,6 +542,7 @@ public class SuperConsoleEventBusListenerTest {
         800L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 900L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.5s" + " [1%] (0/10 JOBS, 0 UPDATED, " +
             "0.0% CACHE MISS)",
         " |=> //banana:stand...  0.3s (running doing_something[0.1s])"));
@@ -499,6 +561,7 @@ public class SuperConsoleEventBusListenerTest {
         1000L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
 
     validateConsole(console, listener, 1000L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.6s [1%] (1/10 JOBS, 1 UPDATED, 10.0% CACHE MISS)",
         " |=> IDLE"));
 
@@ -507,6 +570,7 @@ public class SuperConsoleEventBusListenerTest {
         1010L, TimeUnit.MILLISECONDS, /* threadId */ 2L));
 
     validateConsole(console, listener, 1100L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.7s [2%] (1/10 JOBS, 1 UPDATED, 10.0% CACHE MISS)",
         " |=> IDLE",
         " |=> //chicken:dance...  0.1s (checking local cache)"));
@@ -529,14 +593,250 @@ public class SuperConsoleEventBusListenerTest {
     final String buildingLine = "[-] BUILDING...FINISHED 0.8s" +
         " [100%] (2/10 JOBS, 2 UPDATED, 20.0% CACHE MISS)";
 
-    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine, buildingLine));
+    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        buildingLine));
+  }
+
+  @Test
+  public void testSimpleDistBuildWithProgress() throws IOException {
+    Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
+    BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
+    EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
+    TestConsole console = new TestConsole();
+
+    BuildTarget fakeTarget = BuildTargetFactory.newInstance("//banana:stand");
+    BuildTarget cachedTarget = BuildTargetFactory.newInstance("//chicken:dance");
+    ImmutableSet<BuildTarget> buildTargets = ImmutableSet.of(fakeTarget, cachedTarget);
+    Iterable<String> buildArgs = Iterables.transform(buildTargets, Functions.toStringFunction());
+
+    SuperConsoleEventBusListener listener =
+        new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
+            console,
+            fakeClock,
+            silentSummaryVerbosity,
+            new DefaultExecutionEnvironment(
+                ImmutableMap.copyOf(System.getenv()),
+                System.getProperties()),
+            Optional.<WebServer>absent(),
+            Locale.US,
+            logPath,
+            timeZone);
+    ProgressEstimator e = new ProgressEstimator(
+        getStorageForTest().getParent().getParent(),
+        eventBus,
+        ObjectMappers.newDefaultInstance());
+    listener.setProgressEstimator(e);
+    eventBus.register(listener);
+
+    ProjectBuildFileParseEvents.Started parseEventStarted =
+        new ProjectBuildFileParseEvents.Started();
+    rawEventBus.post(
+        configureTestEventAtTime(
+            parseEventStarted,
+            0L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    validateConsole(console, listener, 0L, ImmutableList.of(
+        "[+] PARSING BUCK FILES...0.0s"));
+
+    validateConsole(
+        console, listener, 100L, ImmutableList.of(
+            "[+] PARSING BUCK FILES...0.1s"));
+
+    rawEventBus.post(
+        configureTestEventAtTime(
+            new ProjectBuildFileParseEvents.Finished(parseEventStarted),
+            200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    validateConsole(
+        console, listener, 200L, ImmutableList.of(
+            "[-] PARSING BUCK FILES...FINISHED 0.2s"));
+
+    // trigger a distributed build instead of a local build
+    BuildEvent.Started buildEventStarted = BuildEvent.started(buildArgs, true);
+    rawEventBus.post(
+        configureTestEventAtTime(
+            buildEventStarted,
+            200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ParseEvent.Started parseStarted = ParseEvent.started(buildTargets);
+    rawEventBus.post(configureTestEventAtTime(
+        parseStarted,
+        200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsole(console, listener, 300L, ImmutableList.of(
+        "[+] PROCESSING BUCK FILES...0.1s"));
+
+    rawEventBus.post(
+        configureTestEventAtTime(ParseEvent.finished(parseStarted,
+            Optional.<TargetGraph>absent()),
+            300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
+    rawEventBus.post(
+        configureTestEventAtTime(
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
+            400L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+
+    final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
+
+    validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
+        "[+] DISTBUILD STATUS: INIT...",
+        "[+] BUILDING...0.1s [0%]"));
+
+    rawEventBus.post(configureTestEventAtTime(
+        new DistBuildStatusEvent(
+          DistBuildStatus.builder()
+            .setStatus(BuildStatus.QUEUED)
+            .setMessage("step 1")
+            .setETAMillis(2000)
+            .setLogBook(Optional.<List<LogRecord>>absent())
+            .build()
+        ), 800L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsole(console, listener, 900L, ImmutableList.of(
+        parsingLine,
+        DOWNLOAD_STRING,
+        "[+] DISTBUILD STATUS: QUEUED... ETA: 2.0s (step 1)",
+        "[+] BUILDING...0.5s [29%]"));
+
+
+    LinkedList<LogRecord> debugLogs = new LinkedList<LogRecord>();
+    LogRecord log = new LogRecord();
+    log.setName("buck-client");
+    log.setTimestampMillis(0);
+    debugLogs.add(log);
+    final String distDebugLine = "Distributed build debug info:";
+    final String logLine1 = "[1970-01-01 00:00:00.000] buck-client";
+
+    rawEventBus.post(configureTestEventAtTime(
+        new DistBuildStatusEvent(
+            DistBuildStatus.builder()
+                .setStatus(BuildStatus.BUILDING)
+                .setMessage("step 2")
+                .setETAMillis(1800)
+                .setLogBook(debugLogs)
+                .build()
+        ), 1000L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsole(console, listener, 1100L, ImmutableList.of(
+        distDebugLine,
+        logLine1,
+        parsingLine,
+        DOWNLOAD_STRING,
+        "[+] DISTBUILD STATUS: BUILDING... ETA: 1.8s (step 2)",
+        "[+] BUILDING...0.7s [50%]"));
+
+
+    log = new LogRecord();
+    log.setName("buck-frontend");
+    log.setTimestampMillis(100);
+    debugLogs.add(log);
+    final String logLine2 = "[1970-01-01 00:00:00.100] buck-frontend";
+
+    rawEventBus.post(configureTestEventAtTime(
+        new DistBuildStatusEvent(
+            DistBuildStatus.builder()
+                .setStatus(BuildStatus.BUILDING)
+                .setMessage("step 2")
+                .setETAMillis(1600)
+                .setLogBook(debugLogs)
+                .build()
+        ), 1200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsole(console, listener, 1300L, ImmutableList.of(
+        distDebugLine,
+        logLine1,
+        logLine2,
+        parsingLine,
+        DOWNLOAD_STRING,
+        "[+] DISTBUILD STATUS: BUILDING... ETA: 1.6s (step 2)",
+        "[+] BUILDING...0.9s [64%]"));
+
+
+    log = new LogRecord();
+    log.setName("build_slave_start");
+    log.setTimestampMillis(200);
+    debugLogs.add(log);
+    final String logLine3 = "[1970-01-01 00:00:00.200] build_slave_start";
+
+    log = new LogRecord();
+    log.setName("build_slave_end");
+    log.setTimestampMillis(300);
+    debugLogs.add(log);
+    final String logLine4 = "[1970-01-01 00:00:00.300] build_slave_end";
+
+    rawEventBus.post(configureTestEventAtTime(
+        new DistBuildStatusEvent(
+            DistBuildStatus.builder()
+                .setStatus(BuildStatus.FINISHED_SUCCESSFULLY)
+                .setMessage("step 3")
+                .setETAMillis(0)
+                .setLogBook(debugLogs)
+                .build()
+        ), 1400L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    final String distbuildLine = "[-] DISTBUILD STATUS: FINISHED_SUCCESSFULLY... (step 3)";
+    validateConsole(console, listener, 1500L, ImmutableList.of(
+        distDebugLine,
+        logLine1,
+        logLine2,
+        logLine3,
+        logLine4,
+        parsingLine,
+        DOWNLOAD_STRING,
+        distbuildLine,
+        "[+] BUILDING...1.1s [100%]"));
+
+    rawEventBus.post(configureTestEventAtTime(
+        BuildEvent.finished(buildEventStarted, 0),
+        1600L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    final String buildingLine = "[-] BUILDING...FINISHED 1.2s [100%]";
+
+    validateConsole(console, listener, 1600L, ImmutableList.of(
+        distDebugLine,
+        logLine1,
+        logLine2,
+        logLine3,
+        logLine4,
+        parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        distbuildLine,
+        buildingLine));
+
+    rawEventBus.post(configureTestEventAtTime(
+        ConsoleEvent.severe("I've made a huge mistake."),
+        1700L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsoleWithLogLines(
+        console,
+        listener,
+        1750L,
+        ImmutableList.of(
+            distDebugLine,
+            logLine1,
+            logLine2,
+            logLine3,
+            logLine4,
+            parsingLine,
+            FINISHED_DOWNLOAD_STRING,
+            distbuildLine,
+            buildingLine),
+        ImmutableList.of("I've made a huge mistake."));
   }
 
   @Test
   public void testSimpleTest() {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -552,6 +852,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -560,7 +861,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     ProjectBuildFileParseEvents.Started parseEventStarted =
@@ -601,9 +903,16 @@ public class SuperConsoleEventBusListenerTest {
         configureTestEventAtTime(ParseEvent.finished(parseStarted,
             Optional.<TargetGraph>absent()),
             300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
     rawEventBus.post(
         configureTestEventAtTime(
-            ActionGraphEvent.finished(ActionGraphEvent.started()),
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
             400L,
             TimeUnit.MILLISECONDS,
             /* threadId */ 0L));
@@ -611,6 +920,7 @@ public class SuperConsoleEventBusListenerTest {
     final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
 
     validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.1s"));
 
     rawEventBus.post(configureTestEventAtTime(
@@ -619,6 +929,7 @@ public class SuperConsoleEventBusListenerTest {
 
 
     validateConsole(console, listener, 800L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.4s",
         " |=> //:test...  0.2s (checking local cache)"));
 
@@ -642,7 +953,9 @@ public class SuperConsoleEventBusListenerTest {
 
     final String buildingLine = "[-] BUILDING...FINISHED 0.8s";
 
-    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine, buildingLine));
+    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        buildingLine));
 
     rawEventBus.post(
         configureTestEventAtTime(
@@ -661,6 +974,7 @@ public class SuperConsoleEventBusListenerTest {
         3000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.5s"));
 
@@ -677,6 +991,7 @@ public class SuperConsoleEventBusListenerTest {
         3200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.7s",
             " |=> //:test...  0.1s"));
@@ -699,6 +1014,7 @@ public class SuperConsoleEventBusListenerTest {
         3400L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.9s",
             " |=> //:test...  0.3s (running step_name[0.1s])"));
@@ -716,6 +1032,7 @@ public class SuperConsoleEventBusListenerTest {
         3600L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.1s",
             " |=> //:test...  0.5s"));
@@ -735,6 +1052,7 @@ public class SuperConsoleEventBusListenerTest {
         3800L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.3s",
             " |=> //:test...  0.7s (running Foo[0.1s])"));
@@ -764,6 +1082,7 @@ public class SuperConsoleEventBusListenerTest {
         4000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.5s (1 PASS/0 FAIL)",
             " |=> //:test...  0.9s"));
@@ -794,6 +1113,7 @@ public class SuperConsoleEventBusListenerTest {
         4200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             testingLine),
         ImmutableList.<String>of(),
@@ -809,9 +1129,9 @@ public class SuperConsoleEventBusListenerTest {
 
   @Test
   public void testSkippedTest() {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -827,6 +1147,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -835,7 +1156,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     ProjectBuildFileParseEvents.Started parseEventStarted =
@@ -876,9 +1198,16 @@ public class SuperConsoleEventBusListenerTest {
         configureTestEventAtTime(ParseEvent.finished(parseStarted,
             Optional.<TargetGraph>absent()),
             300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
     rawEventBus.post(
         configureTestEventAtTime(
-            ActionGraphEvent.finished(ActionGraphEvent.started()),
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
             400L,
             TimeUnit.MILLISECONDS,
             /* threadId */ 0L));
@@ -886,6 +1215,7 @@ public class SuperConsoleEventBusListenerTest {
     final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
 
     validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.1s"));
 
     rawEventBus.post(configureTestEventAtTime(
@@ -894,6 +1224,7 @@ public class SuperConsoleEventBusListenerTest {
 
 
     validateConsole(console, listener, 800L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.4s",
         " |=> //:test...  0.2s (checking local cache)"));
 
@@ -914,7 +1245,9 @@ public class SuperConsoleEventBusListenerTest {
 
     final String buildingLine = "[-] BUILDING...FINISHED 0.8s";
 
-    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine, buildingLine));
+    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        buildingLine));
 
     rawEventBus.post(
         configureTestEventAtTime(
@@ -933,6 +1266,7 @@ public class SuperConsoleEventBusListenerTest {
         3000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.5s"));
 
@@ -949,6 +1283,7 @@ public class SuperConsoleEventBusListenerTest {
         3200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.7s",
             " |=> //:test...  0.1s"));
@@ -971,6 +1306,7 @@ public class SuperConsoleEventBusListenerTest {
         3400L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.9s",
             " |=> //:test...  0.3s (running step_name[0.1s])"));
@@ -988,6 +1324,7 @@ public class SuperConsoleEventBusListenerTest {
         3600L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.1s",
             " |=> //:test...  0.5s"));
@@ -1007,6 +1344,7 @@ public class SuperConsoleEventBusListenerTest {
         3800L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.3s",
             " |=> //:test...  0.7s (running Foo[0.1s])"));
@@ -1036,6 +1374,7 @@ public class SuperConsoleEventBusListenerTest {
         4000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.5s (0 PASS/1 SKIP/0 FAIL)",
             " |=> //:test...  0.9s"));
@@ -1066,6 +1405,7 @@ public class SuperConsoleEventBusListenerTest {
         4200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             testingLine),
         ImmutableList.<String>of(),
@@ -1081,9 +1421,9 @@ public class SuperConsoleEventBusListenerTest {
 
   @Test
   public void testFailingTest() {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -1099,6 +1439,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             noisySummaryVerbosity,
@@ -1107,7 +1448,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     ProjectBuildFileParseEvents.Started parseEventStarted =
@@ -1148,9 +1490,16 @@ public class SuperConsoleEventBusListenerTest {
         configureTestEventAtTime(ParseEvent.finished(parseStarted,
             Optional.<TargetGraph>absent()),
             300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
     rawEventBus.post(
         configureTestEventAtTime(
-            ActionGraphEvent.finished(ActionGraphEvent.started()),
+            actionGraphStarted,
+            300L,
+            TimeUnit.MILLISECONDS,
+            /* threadId */ 0L));
+    rawEventBus.post(
+        configureTestEventAtTime(
+            ActionGraphEvent.finished(actionGraphStarted),
             400L,
             TimeUnit.MILLISECONDS,
             /* threadId */ 0L));
@@ -1158,6 +1507,7 @@ public class SuperConsoleEventBusListenerTest {
     final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
 
     validateConsole(console, listener, 540L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.1s"));
 
     rawEventBus.post(configureTestEventAtTime(
@@ -1166,6 +1516,7 @@ public class SuperConsoleEventBusListenerTest {
 
 
     validateConsole(console, listener, 800L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
         "[+] BUILDING...0.4s",
         " |=> //:test...  0.2s (checking local cache)"));
 
@@ -1186,7 +1537,9 @@ public class SuperConsoleEventBusListenerTest {
 
     final String buildingLine = "[-] BUILDING...FINISHED 0.8s";
 
-    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine, buildingLine));
+    validateConsole(console, listener, 1300L, ImmutableList.of(parsingLine,
+        FINISHED_DOWNLOAD_STRING,
+        buildingLine));
 
     rawEventBus.post(
         configureTestEventAtTime(
@@ -1205,6 +1558,7 @@ public class SuperConsoleEventBusListenerTest {
         3000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.5s"));
 
@@ -1221,6 +1575,7 @@ public class SuperConsoleEventBusListenerTest {
         3200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.7s",
             " |=> //:test...  0.1s"));
@@ -1243,6 +1598,7 @@ public class SuperConsoleEventBusListenerTest {
         3400L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...0.9s",
             " |=> //:test...  0.3s (running step_name[0.1s])"));
@@ -1260,6 +1616,7 @@ public class SuperConsoleEventBusListenerTest {
         3600L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.1s",
             " |=> //:test...  0.5s"));
@@ -1279,6 +1636,7 @@ public class SuperConsoleEventBusListenerTest {
         3800L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.3s",
             " |=> //:test...  0.7s (running Foo[0.1s])"));
@@ -1308,6 +1666,7 @@ public class SuperConsoleEventBusListenerTest {
         4000L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             "[+] TESTING...1.5s (0 PASS/1 FAIL)",
             " |=> //:test...  0.9s"),
@@ -1340,6 +1699,7 @@ public class SuperConsoleEventBusListenerTest {
         4200L,
         ImmutableList.of(
             parsingLine,
+            FINISHED_DOWNLOAD_STRING,
             buildingLine,
             testingLine),
         ImmutableList.<String>of(),
@@ -1362,9 +1722,9 @@ public class SuperConsoleEventBusListenerTest {
 
   @Test
   public void testBuildRuleSuspendResumeEvents() {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
     EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
@@ -1386,6 +1746,7 @@ public class SuperConsoleEventBusListenerTest {
             fakeTarget, new RuleKey("aaaa")));
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1394,7 +1755,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     // Start the build.
@@ -1467,6 +1829,7 @@ public class SuperConsoleEventBusListenerTest {
         200L,
         ImmutableList.of(
             parsingLine,
+            DOWNLOAD_STRING,
             "[+] BUILDING...0.2s",
             " |=> IDLE"));
 
@@ -1486,6 +1849,7 @@ public class SuperConsoleEventBusListenerTest {
         300L,
         ImmutableList.of(
             parsingLine,
+            DOWNLOAD_STRING,
             "[+] BUILDING...0.3s",
             " |=> //banana:stand...  0.1s (checking local cache)"));
 
@@ -1506,6 +1870,7 @@ public class SuperConsoleEventBusListenerTest {
         500L,
         ImmutableList.of(
             parsingLine,
+            DOWNLOAD_STRING,
             "[+] BUILDING...0.5s",
             " |=> //banana:stand...  0.3s (running doing_something[0.1s])"));
 
@@ -1537,6 +1902,7 @@ public class SuperConsoleEventBusListenerTest {
         700L,
         ImmutableList.of(
             parsingLine,
+            DOWNLOAD_STRING,
             "[+] BUILDING...0.7s",
             " |=> IDLE"));
   }
@@ -1550,6 +1916,7 @@ public class SuperConsoleEventBusListenerTest {
 
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1558,7 +1925,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     rawEventBus.post(
@@ -1576,6 +1944,7 @@ public class SuperConsoleEventBusListenerTest {
     TestConsole console = new TestConsole();
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1584,7 +1953,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     rawEventBus.post(
@@ -1624,7 +1994,7 @@ public class SuperConsoleEventBusListenerTest {
         .build();
     String contents = new Gson().toJson(storageContents);
     Files.createDirectories(storagePath.getParent());
-    Files.write(storagePath, contents.getBytes());
+    Files.write(storagePath, contents.getBytes(StandardCharsets.UTF_8));
 
     Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
     BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
@@ -1632,6 +2002,7 @@ public class SuperConsoleEventBusListenerTest {
     TestConsole console = new TestConsole();
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1640,10 +2011,12 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     ProgressEstimator e = new ProgressEstimator(
         getStorageForTest().getParent().getParent(),
-        eventBus);
+        eventBus,
+        ObjectMappers.newDefaultInstance());
     listener.setProgressEstimator(e);
     eventBus.register(listener);
 
@@ -1688,6 +2061,7 @@ public class SuperConsoleEventBusListenerTest {
     TestConsole console = new TestConsole();
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            emptySuperConsoleConfig,
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1696,7 +2070,8 @@ public class SuperConsoleEventBusListenerTest {
                 System.getProperties()),
             Optional.<WebServer>absent(),
             Locale.US,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     rawEventBus.post(ConsoleEvent.info("Hello world!"));
@@ -1723,6 +2098,96 @@ public class SuperConsoleEventBusListenerTest {
 
     validateConsole(console, listener, 0L, ImmutableList.of(
         "[-] GENERATING PROJECT...FINISHED 0.0s"));
+  }
+
+  @Test
+  public void renderLinesWithLineLimit() throws IOException {
+    Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
+    TestConsole console = new TestConsole();
+    try (SuperConsoleEventBusListener listener =
+             new SuperConsoleEventBusListener(
+                 emptySuperConsoleConfig,
+                 console,
+                 fakeClock,
+                 silentSummaryVerbosity,
+                 new DefaultExecutionEnvironment(
+                     ImmutableMap.copyOf(System.getenv()),
+                     System.getProperties()),
+                 Optional.<WebServer>absent(),
+                 Locale.US,
+                 logPath,
+                 timeZone)) {
+
+      FakeThreadStateRenderer fakeRenderer =
+          new FakeThreadStateRenderer(ImmutableList.of(2L, 1L, 4L, 8L, 5L));
+      ImmutableList.Builder<String> lines;
+
+      ImmutableList<String> fullOutput = ImmutableList.of(
+          " |=> Status of thread 2",
+          " |=> Status of thread 1",
+          " |=> Status of thread 4",
+          " |=> Status of thread 8",
+          " |=> Status of thread 5");
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 10000, false);
+      assertThat(
+          lines.build(),
+          equalTo(fullOutput));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(false));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 10000, true);
+      assertThat(
+          lines.build(),
+          equalTo(fullOutput));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(true));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 6, false);
+      assertThat(
+          lines.build(),
+          equalTo(fullOutput));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(false));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 5, false);
+      assertThat(
+          lines.build(),
+          equalTo(fullOutput));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(false));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 4, false);
+      assertThat(
+          lines.build(),
+          equalTo(
+              ImmutableList.of(
+                  " |=> Status of thread 2",
+                  " |=> Status of thread 1",
+                  " |=> Status of thread 4",
+                  " |=> 2 MORE THREADS: t8 t5")));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(true));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 2, false);
+      assertThat(
+          lines.build(),
+          equalTo(
+              ImmutableList.of(
+                  " |=> Status of thread 2",
+                  " |=> 4 MORE THREADS: t1 t4 t8 t5")));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(true));
+
+      lines = ImmutableList.builder();
+      listener.renderLines(fakeRenderer, lines, 1, false);
+      assertThat(
+          lines.build(),
+          equalTo(
+              ImmutableList.of(
+                  " |=> 5 THREADS: t2 t1 t4 t8 t5")));
+      assertThat(fakeRenderer.lastSortWasByTime(), is(true));
+    }
   }
 
   private void validateConsole(TestConsole console,
@@ -1779,6 +2244,7 @@ public class SuperConsoleEventBusListenerTest {
     TestConsole console = new TestConsole();
     SuperConsoleEventBusListener listener =
         new SuperConsoleEventBusListener(
+            new SuperConsoleConfig(FakeBuckConfig.builder().build()),
             console,
             fakeClock,
             silentSummaryVerbosity,
@@ -1788,7 +2254,8 @@ public class SuperConsoleEventBusListenerTest {
             Optional.<WebServer>absent(),
             // Note we use de_DE to ensure we get a decimal comma in the output.
             Locale.GERMAN,
-            logPath);
+            logPath,
+            timeZone);
     eventBus.register(listener);
 
     rawEventBus.post(
@@ -1806,5 +2273,66 @@ public class SuperConsoleEventBusListenerTest {
 
     validateConsole(console, listener, 0L, ImmutableList.of(
                         "[-] GENERATING PROJECT...FINISHED 0,0s"));
+  }
+
+  @Test
+  public void testBuildTimeDoesNotDisplayNegativeOffset() {
+    Clock fakeClock = new IncrementingFakeClock(TimeUnit.SECONDS.toNanos(1));
+    BuckEventBus eventBus = BuckEventBusFactory.newInstance(fakeClock);
+    EventBus rawEventBus = BuckEventBusFactory.getEventBusFor(eventBus);
+    TestConsole console = new TestConsole();
+
+    BuildTarget fakeTarget = BuildTargetFactory.newInstance("//banana:stand");
+    ImmutableSet<BuildTarget> buildTargets = ImmutableSet.of(fakeTarget);
+    Iterable<String> buildArgs = Iterables.transform(buildTargets, Functions.toStringFunction());
+
+    SuperConsoleEventBusListener listener =
+        new SuperConsoleEventBusListener(
+            new SuperConsoleConfig(FakeBuckConfig.builder().build()),
+            console,
+            fakeClock,
+            silentSummaryVerbosity,
+            new DefaultExecutionEnvironment(
+                ImmutableMap.copyOf(System.getenv()),
+                System.getProperties()),
+            Optional.<WebServer>absent(),
+            Locale.US,
+            logPath,
+            timeZone);
+    eventBus.register(listener);
+
+    // Do a full parse and action graph cycle before the build event starts
+    // This sequencing occurs when running `buck project`
+    ParseEvent.Started parseStarted = ParseEvent.started(buildTargets);
+    rawEventBus.post(configureTestEventAtTime(
+        parseStarted,
+        100L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+    rawEventBus.post(configureTestEventAtTime(
+        ParseEvent.finished(parseStarted, Optional.<TargetGraph>absent()),
+        200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    ActionGraphEvent.Started actionGraphStarted = ActionGraphEvent.started();
+    rawEventBus.post(configureTestEventAtTime(
+        actionGraphStarted,
+        200L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    validateConsole(console, listener, 200L, ImmutableList.of("[+] PROCESSING BUCK FILES...0.1s"));
+
+    rawEventBus.post(configureTestEventAtTime(
+        ActionGraphEvent.finished(actionGraphStarted),
+        300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+    BuildEvent.Started buildEventStarted = BuildEvent.started(buildArgs);
+    rawEventBus.post(
+        configureTestEventAtTime(
+            buildEventStarted,
+            300L, TimeUnit.MILLISECONDS, /* threadId */ 0L));
+
+
+    final String parsingLine = "[-] PROCESSING BUCK FILES...FINISHED 0.2s";
+
+    validateConsole(console, listener, 433L, ImmutableList.of(parsingLine,
+        DOWNLOAD_STRING,
+        "[+] BUILDING...0.1s"));
   }
 }

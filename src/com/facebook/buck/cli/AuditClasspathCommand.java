@@ -21,14 +21,14 @@ import com.facebook.buck.graph.Dot;
 import com.facebook.buck.json.BuildFileParseException;
 import com.facebook.buck.jvm.java.HasClasspathEntries;
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.BuildTargetException;
 import com.facebook.buck.parser.BuildTargetParser;
 import com.facebook.buck.parser.BuildTargetPatternParser;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.ActionGraphCache;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.TargetGraph;
-import com.facebook.buck.rules.TargetGraphToActionGraph;
-import com.facebook.buck.rules.TargetGraphTransformer;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.buck.util.MoreExceptions;
@@ -130,23 +130,19 @@ public class AuditClasspathCommand extends AbstractCommand {
           getEnableProfiling(),
           pool.getExecutor(),
           targets);
-    } catch (BuildFileParseException e) {
+    } catch (BuildFileParseException | BuildTargetException e) {
       params.getBuckEventBus().post(ConsoleEvent.severe(
           MoreExceptions.getHumanReadableOrLocalizedMessage(e)));
       return 1;
     }
 
-    TargetGraphTransformer targetGraphTransformer = new TargetGraphToActionGraph(
-        params.getBuckEventBus(),
-        new BuildTargetNodeToBuildRuleTransformer());
-
     try {
       if (shouldGenerateDotOutput()) {
         return printDotOutput(params, targetGraph);
       } else if (shouldGenerateJsonOutput()) {
-        return printJsonClasspath(params, targetGraph, targetGraphTransformer, targets);
+        return printJsonClasspath(params, targetGraph, targets);
       } else {
-        return printClasspath(params, targetGraph, targetGraphTransformer, targets);
+        return printClasspath(params, targetGraph, targets);
       }
     } catch (NoSuchBuildTargetException e) {
       throw new HumanReadableException(e.getHumanReadableErrorMessage());
@@ -182,10 +178,9 @@ public class AuditClasspathCommand extends AbstractCommand {
   int printClasspath(
       CommandRunnerParams params,
       TargetGraph targetGraph,
-      TargetGraphTransformer targetGraphTransformer,
       ImmutableSet<BuildTarget> targets) throws NoSuchBuildTargetException {
-    BuildRuleResolver resolver =
-        Preconditions.checkNotNull(targetGraphTransformer.apply(targetGraph)).getSecond();
+    BuildRuleResolver resolver = Preconditions.checkNotNull(
+        ActionGraphCache.getFreshActionGraph(params.getBuckEventBus(), targetGraph)).getResolver();
     SortedSet<Path> classpathEntries = Sets.newTreeSet();
 
     for (BuildTarget target : targets) {
@@ -210,11 +205,10 @@ public class AuditClasspathCommand extends AbstractCommand {
   int printJsonClasspath(
       CommandRunnerParams params,
       TargetGraph targetGraph,
-      TargetGraphTransformer targetGraphTransformer,
       ImmutableSet<BuildTarget> targets)
       throws IOException, NoSuchBuildTargetException {
-    BuildRuleResolver resolver =
-        Preconditions.checkNotNull(targetGraphTransformer.apply(targetGraph)).getSecond();
+    BuildRuleResolver resolver = Preconditions.checkNotNull(
+        ActionGraphCache.getFreshActionGraph(params.getBuckEventBus(), targetGraph)).getResolver();
     Multimap<String, String> targetClasspaths = LinkedHashMultimap.create();
 
     for (BuildTarget target : targets) {

@@ -20,6 +20,7 @@ import com.facebook.buck.io.FileScrubber;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
@@ -33,11 +34,22 @@ import java.util.Arrays;
 
 public class ObjectFileScrubbers {
 
+  private static final int GLOBAL_HEADER_SIZE = 8;
+  private static final ImmutableSet<String> SPECIAL_ENTRIES = ImmutableSet.of("/", "//");
+  public static final byte[] GLOBAL_HEADER = "!<arch>\n".getBytes(Charsets.US_ASCII);
+  public static final byte[] GLOBAL_THIN_HEADER = "!<thin>\n".getBytes(Charsets.US_ASCII);
   public static final byte[] END_OF_FILE_HEADER_MARKER = {0x60, 0x0A};
 
   private ObjectFileScrubbers() {}
 
-  public static FileScrubber createDateUidGidScrubber(final byte[] expectedGlobalHeader) {
+  private static boolean checkHeader(byte[] header) throws FileScrubber.ScrubException {
+    checkArchive(
+        Arrays.equals(GLOBAL_HEADER, header) || Arrays.equals(GLOBAL_THIN_HEADER, header),
+        "invalid global header");
+    return Arrays.equals(GLOBAL_THIN_HEADER, header);
+  }
+
+  public static FileScrubber createDateUidGidScrubber() {
     return new FileScrubber() {
 
       /**
@@ -48,14 +60,12 @@ public class ObjectFileScrubbers {
       @Override
       public void scrubFile(FileChannel file) throws IOException, ScrubException {
         try {
-          ByteBuffer header = ByteBuffer.allocate(expectedGlobalHeader.length);
-          file.read(header, 0);
+          ByteBuffer header = ByteBuffer.allocate(GLOBAL_HEADER_SIZE);
+          file.read(header);
           // Grab the global header chunk and verify it's accurate.
           header.position(0);
-          byte[] globalHeader = getBytes(header, expectedGlobalHeader.length);
-          checkArchive(
-              Arrays.equals(expectedGlobalHeader, globalHeader),
-              "invalid global header");
+          byte[] globalHeader = getBytes(header, GLOBAL_HEADER_SIZE);
+          boolean thin = checkHeader(globalHeader);
 
           // Iterate over all the file meta-data entries, injecting zero's for timestamp,
           // UID, and GID.
@@ -68,17 +78,18 @@ public class ObjectFileScrubbers {
               10 /* file size */ +
               2 /* file magic */;
 
-          int start = expectedGlobalHeader.length;
+          long start = GLOBAL_HEADER_SIZE;
           ByteBuffer buffer = ByteBuffer.allocate(entrySize);
           while (start < file.size()) {
             checkArchive(file.size() - start >= entrySize, "Invalid entry metadata format");
 
             buffer.clear();
-            int read = file.read(buffer, start);
+            file.position(start);
+            int read = file.read(buffer);
             checkArchive(read == entrySize, "Not all bytes have been read");
 
             buffer.position(0); // position points just past the last byte read, so need to reset
-            /* File name */ getBytes(buffer, 16);
+            String fileName = new String(getBytes(buffer, 16), Charsets.US_ASCII).trim();
 
             // Inject 0's for the non-deterministic meta-data entries.
             /* File modification timestamp */ putIntAsDecimalString(buffer, 12, 0);
@@ -86,7 +97,7 @@ public class ObjectFileScrubbers {
             /* Group ID */ putIntAsDecimalString(buffer, 6, 0);
 
             /* File mode */ putIntAsOctalString(buffer, 8, 0100644);
-            int fileSize = getDecimalStringAsInt(buffer, 10);
+            long fileSize = getDecimalStringAsLong(buffer, 10);
 
             // Lastly, grab the file magic entry and verify it's accurate.
             byte[] fileMagic = getBytes(buffer, 2);
@@ -96,11 +107,15 @@ public class ObjectFileScrubbers {
 
             // write the changes
             buffer.position(0); // position points just past the last byte accessed, need to reset
-            int written = file.write(buffer, start);
+            file.position(start);
+            int written = file.write(buffer);
             checkArchive(written == entrySize, "Not all bytes have been written");
 
             // Skip the file data.
-            start += entrySize + fileSize + fileSize % 2;
+            start += entrySize;
+            if (!thin || SPECIAL_ENTRIES.contains(fileName)) {
+              start += fileSize + fileSize % 2;
+            }
           }
 
           // Convert any low-level exceptions to `ArchiveExceptions`s.
@@ -127,6 +142,12 @@ public class ObjectFileScrubbers {
     byte[] bytes = getBytes(buffer, len);
     String str = new String(bytes, Charsets.US_ASCII);
     return Integer.parseInt(str.trim());
+  }
+
+  public static long getDecimalStringAsLong(ByteBuffer buffer, int len) {
+    byte[] bytes = getBytes(buffer, len);
+    String str = new String(bytes, Charsets.US_ASCII).trim();
+    return str.isEmpty() ? 0 : Long.parseLong(str.trim());
   }
 
   public static long getLittleEndianLong(ByteBuffer buffer) {

@@ -23,7 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.jvm.java.DefaultJavaLibrary;
 import com.facebook.buck.model.BuildTarget;
@@ -40,6 +40,7 @@ import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.rules.args.StringArg;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -84,7 +85,7 @@ public class ThriftJavaEnhancerTest {
         new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance(target)).build(),
         resolver,
         new CommandTool.Builder()
-            .addArg(new FakeSourcePath("compiler"))
+            .addArg(new StringArg("compiler"))
             .build(),
         ImmutableList.<String>of(),
         Paths.get("output"),
@@ -151,7 +152,7 @@ public class ThriftJavaEnhancerTest {
   @Test
   public void createBuildRule() {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     BuildRuleParams flavoredParams = new FakeBuildRuleParamsBuilder(TARGET).build();
 
@@ -208,7 +209,7 @@ public class ThriftJavaEnhancerTest {
   @Test
   public void exportedDeps() {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     BuildRuleParams flavoredParams =
         new FakeBuildRuleParamsBuilder(TARGET).build();

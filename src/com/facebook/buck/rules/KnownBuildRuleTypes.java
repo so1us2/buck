@@ -29,8 +29,8 @@ import com.facebook.buck.android.AndroidPrebuiltAarDescription;
 import com.facebook.buck.android.AndroidResourceDescription;
 import com.facebook.buck.android.ApkGenruleDescription;
 import com.facebook.buck.android.GenAidlDescription;
-import com.facebook.buck.android.ImmutableNdkCxxPlatforms;
 import com.facebook.buck.android.NdkCxxPlatform;
+import com.facebook.buck.android.NdkCxxPlatformCompiler;
 import com.facebook.buck.android.NdkCxxPlatforms;
 import com.facebook.buck.android.NdkLibraryDescription;
 import com.facebook.buck.android.PrebuiltNativeLibraryDescription;
@@ -65,7 +65,6 @@ import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxLibraryDescription;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.CxxPlatforms;
-import com.facebook.buck.python.CxxPythonExtensionDescription;
 import com.facebook.buck.cxx.CxxTestDescription;
 import com.facebook.buck.cxx.DefaultCxxPlatforms;
 import com.facebook.buck.cxx.InferBuckConfig;
@@ -94,24 +93,33 @@ import com.facebook.buck.js.IosReactNativeLibraryDescription;
 import com.facebook.buck.js.ReactNativeBuckConfig;
 import com.facebook.buck.jvm.groovy.GroovyBuckConfig;
 import com.facebook.buck.jvm.groovy.GroovyLibraryDescription;
+import com.facebook.buck.jvm.groovy.GroovyTestDescription;
 import com.facebook.buck.jvm.java.JavaBinaryDescription;
 import com.facebook.buck.jvm.java.JavaBuckConfig;
 import com.facebook.buck.jvm.java.JavaLibraryDescription;
+import com.facebook.buck.jvm.java.JavaOptions;
 import com.facebook.buck.jvm.java.JavaTestDescription;
 import com.facebook.buck.jvm.java.JavacOptions;
 import com.facebook.buck.jvm.java.KeystoreDescription;
 import com.facebook.buck.jvm.java.PrebuiltJarDescription;
+import com.facebook.buck.jvm.scala.ScalaBuckConfig;
+import com.facebook.buck.jvm.scala.ScalaLibraryDescription;
+import com.facebook.buck.jvm.scala.ScalaTestDescription;
 import com.facebook.buck.log.CommandThreadFactory;
 import com.facebook.buck.log.Logger;
+import com.facebook.buck.lua.CxxLuaExtensionDescription;
 import com.facebook.buck.lua.LuaBinaryDescription;
 import com.facebook.buck.lua.LuaBuckConfig;
+import com.facebook.buck.lua.LuaConfig;
 import com.facebook.buck.lua.LuaLibraryDescription;
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.FlavorDomain;
+import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.ocaml.OCamlBinaryDescription;
 import com.facebook.buck.ocaml.OCamlBuckConfig;
 import com.facebook.buck.ocaml.OCamlLibraryDescription;
 import com.facebook.buck.ocaml.PrebuiltOCamlLibraryDescription;
+import com.facebook.buck.python.CxxPythonExtensionDescription;
 import com.facebook.buck.python.PrebuiltPythonLibraryDescription;
 import com.facebook.buck.python.PythonBinaryDescription;
 import com.facebook.buck.python.PythonBuckConfig;
@@ -125,6 +133,8 @@ import com.facebook.buck.shell.ExportFileDescription;
 import com.facebook.buck.shell.GenruleDescription;
 import com.facebook.buck.shell.ShBinaryDescription;
 import com.facebook.buck.shell.ShTestDescription;
+import com.facebook.buck.swift.SwiftLibraryDescription;
+import com.facebook.buck.shell.WorkerToolDescription;
 import com.facebook.buck.thrift.ThriftBuckConfig;
 import com.facebook.buck.thrift.ThriftCxxEnhancer;
 import com.facebook.buck.thrift.ThriftJavaEnhancer;
@@ -220,13 +230,13 @@ public class KnownBuildRuleTypes {
         testTempDirOverride).build();
   }
 
-  private static void buildAppleCxxPlatforms(
+  private static ImmutableList<AppleCxxPlatform> buildAppleCxxPlatforms(
       Supplier<Optional<Path>> appleDeveloperDirectorySupplier,
       ImmutableList<Path> extraToolchainPaths,
       ImmutableList<Path> extraPlatformPaths,
       BuckConfig buckConfig,
       AppleConfig appleConfig,
-      ImmutableMap.Builder<Flavor, AppleCxxPlatform> platformFlavorsToAppleSdkPathsBuilder)
+      ProcessExecutor processExecutor)
       throws IOException {
     Optional<Path> appleDeveloperDirectory = appleDeveloperDirectorySupplier.get();
     if (appleDeveloperDirectory.isPresent() &&
@@ -234,9 +244,10 @@ public class KnownBuildRuleTypes {
       LOG.error(
         "Developer directory is set to %s, but is not a directory",
         appleDeveloperDirectory.get());
-      return;
+      return ImmutableList.of();
     }
 
+    ImmutableList.Builder<AppleCxxPlatform> appleCxxPlatformsBuilder = ImmutableList.builder();
     ImmutableMap<String, AppleToolchain> toolchains =
         AppleToolchainDiscovery.discoverAppleToolchains(
             appleDeveloperDirectory,
@@ -259,12 +270,32 @@ public class KnownBuildRuleTypes {
             targetSdkVersion,
             architecture,
             appleSdkPaths,
-            buckConfig);
-        platformFlavorsToAppleSdkPathsBuilder.put(
-            appleCxxPlatform.getCxxPlatform().getFlavor(),
-            appleCxxPlatform);
+            buckConfig,
+            appleConfig,
+            Optional.of(processExecutor));
+        appleCxxPlatformsBuilder.add(appleCxxPlatform);
       }
     }
+    return appleCxxPlatformsBuilder.build();
+  }
+
+  @VisibleForTesting
+  static CxxPlatform getHostCxxPlatformFromConfig(
+      CxxBuckConfig cxxBuckConfig,
+      ImmutableMap<Flavor, CxxPlatform> cxxPlatforms,
+      CxxPlatform defaultCxxPlatform) {
+    Optional<String> hostCxxPlatform = cxxBuckConfig.getHostPlatform();
+    if (hostCxxPlatform.isPresent()) {
+      ImmutableFlavor hostFlavor = ImmutableFlavor.of(hostCxxPlatform.get());
+      if (cxxPlatforms.containsKey(hostFlavor)) {
+        return CxxPlatforms.copyPlatformWithFlavorAndConfig(
+            cxxPlatforms.get(hostFlavor),
+            cxxBuckConfig,
+            DefaultCxxPlatforms.FLAVOR);
+      }
+    }
+
+    return defaultCxxPlatform;
   }
 
   @VisibleForTesting
@@ -286,31 +317,29 @@ public class KnownBuildRuleTypes {
 
     AppleConfig appleConfig = new AppleConfig(config);
 
-    ImmutableMap.Builder<Flavor, AppleCxxPlatform> platformFlavorsToAppleCxxPlatformsBuilder =
-        ImmutableMap.builder();
-    buildAppleCxxPlatforms(
+    ImmutableList<AppleCxxPlatform> appleCxxPlatforms = buildAppleCxxPlatforms(
         appleConfig.getAppleDeveloperDirectorySupplier(processExecutor),
         appleConfig.getExtraToolchainPaths(),
         appleConfig.getExtraPlatformPaths(),
         config,
         appleConfig,
-        platformFlavorsToAppleCxxPlatformsBuilder);
-    ImmutableMap<Flavor, AppleCxxPlatform> platformFlavorsToAppleCxxPlatforms =
-        platformFlavorsToAppleCxxPlatformsBuilder.build();
+        processExecutor);
+    FlavorDomain<AppleCxxPlatform> platformFlavorsToAppleCxxPlatforms =
+        FlavorDomain.from("Apple C++ Platform", appleCxxPlatforms);
 
     // Setup the NDK C/C++ platforms.
     Optional<Path> ndkRoot = androidDirectoryResolver.findAndroidNdkDir();
     ImmutableMap.Builder<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> ndkCxxPlatformsBuilder =
         ImmutableMap.builder();
     if (ndkRoot.isPresent()) {
-      NdkCxxPlatforms.Compiler.Type compilerType =
+      NdkCxxPlatformCompiler.Type compilerType =
           androidConfig.getNdkCompiler().or(NdkCxxPlatforms.DEFAULT_COMPILER_TYPE);
       String gccVersion = androidConfig.getNdkGccVersion().or(NdkCxxPlatforms.DEFAULT_GCC_VERSION);
-      NdkCxxPlatforms.Compiler compiler =
-          ImmutableNdkCxxPlatforms.Compiler.builder()
+      NdkCxxPlatformCompiler compiler =
+          NdkCxxPlatformCompiler.builder()
               .setType(compilerType)
               .setVersion(
-                  compilerType == NdkCxxPlatforms.Compiler.Type.GCC ?
+                  compilerType == NdkCxxPlatformCompiler.Type.GCC ?
                       gccVersion :
                       androidConfig.getNdkClangVersion().or(NdkCxxPlatforms.DEFAULT_CLANG_VERSION))
               .setGccVersion(gccVersion)
@@ -339,13 +368,18 @@ public class KnownBuildRuleTypes {
           ndkCxxPlatform.getCxxPlatform());
     }
 
-    for (Map.Entry<Flavor, AppleCxxPlatform> entry :
-        platformFlavorsToAppleCxxPlatforms.entrySet()) {
-      cxxPlatformsBuilder.put(entry.getKey(), entry.getValue().getCxxPlatform());
+    for (AppleCxxPlatform appleCxxPlatform : platformFlavorsToAppleCxxPlatforms.getValues()) {
+      cxxPlatformsBuilder.put(
+          appleCxxPlatform.getCxxPlatform().getFlavor(),
+          appleCxxPlatform.getCxxPlatform());
     }
 
-    // Add the default, config-defined C/C++ platform.
-    CxxPlatform systemDefaultCxxPlatform = DefaultCxxPlatforms.build(platform, cxxBuckConfig);
+    // Add the host's own C/C++ platform.
+    CxxPlatform systemDefaultCxxPlatform = getHostCxxPlatformFromConfig(
+        cxxBuckConfig,
+        cxxPlatformsBuilder.build(),
+        DefaultCxxPlatforms.build(platform, cxxBuckConfig));
+
     cxxPlatformsBuilder.put(systemDefaultCxxPlatform.getFlavor(), systemDefaultCxxPlatform);
     ImmutableMap<Flavor, CxxPlatform> cxxPlatformsMap = cxxPlatformsBuilder.build();
 
@@ -384,7 +418,7 @@ public class KnownBuildRuleTypes {
 
     RustBuckConfig rustBuckConfig = new RustBuckConfig(config);
 
-    GoBuckConfig goBuckConfig = new GoBuckConfig(config, processExecutor);
+    GoBuckConfig goBuckConfig = new GoBuckConfig(config, processExecutor, cxxPlatforms);
 
     HalideBuckConfig halideBuckConfig = new HalideBuckConfig(config);
 
@@ -393,17 +427,13 @@ public class KnownBuildRuleTypes {
     PythonBuckConfig pyConfig = new PythonBuckConfig(config, new ExecutableFinder());
     ImmutableList<PythonPlatform> pythonPlatformsList =
         pyConfig.getPythonPlatforms(processExecutor);
-    ImmutableMap.Builder<Flavor, PythonPlatform> pythonPlatformsMapBuilder = ImmutableMap.builder();
-    for (PythonPlatform pythonPlatform : pythonPlatformsList) {
-      pythonPlatformsMapBuilder.put(pythonPlatform.getFlavor(), pythonPlatform);
-    }
-    ImmutableMap<Flavor, PythonPlatform> pythonPlatformsMap = pythonPlatformsMapBuilder.build();
     FlavorDomain<PythonPlatform> pythonPlatforms =
-        new FlavorDomain<>("Python Platform", pythonPlatformsMap);
+        FlavorDomain.from("Python Platform", pythonPlatformsList);
     PythonBinaryDescription pythonBinaryDescription =
         new PythonBinaryDescription(
             pyConfig,
             pythonPlatforms,
+            cxxBuckConfig,
             defaultCxxPlatform,
             cxxPlatforms);
 
@@ -427,21 +457,27 @@ public class KnownBuildRuleTypes {
 
     JavaBuckConfig javaConfig = new JavaBuckConfig(config);
     JavacOptions defaultJavacOptions = javaConfig.getDefaultJavacOptions();
+    JavaOptions defaultJavaOptions = javaConfig.getDefaultJavaOptions();
+
+    ScalaBuckConfig scalaConfig = new ScalaBuckConfig(config);
 
     InferBuckConfig inferBuckConfig = new InferBuckConfig(config);
 
+    LuaConfig luaConfig = new LuaBuckConfig(config, new ExecutableFinder());
+
     CxxBinaryDescription cxxBinaryDescription =
         new CxxBinaryDescription(
+            cxxBuckConfig,
             inferBuckConfig,
             defaultCxxPlatform,
-            cxxPlatforms,
-            cxxBuckConfig.getPreprocessMode());
+            cxxPlatforms);
 
-    CxxLibraryDescription cxxLibraryDescription = new CxxLibraryDescription(
-        cxxBuckConfig,
-        inferBuckConfig,
-        cxxPlatforms,
-        cxxBuckConfig.getPreprocessMode());
+    CxxLibraryDescription cxxLibraryDescription =
+        new CxxLibraryDescription(
+            cxxBuckConfig,
+            defaultCxxPlatform,
+            inferBuckConfig,
+            cxxPlatforms);
 
     CodeSignIdentityStore codeSignIdentityStore =
         CodeSignIdentityStore.fromSystem(processExecutor);
@@ -451,22 +487,28 @@ public class KnownBuildRuleTypes {
     AppleLibraryDescription appleLibraryDescription =
         new AppleLibraryDescription(
             cxxLibraryDescription,
-            cxxPlatforms,
             platformFlavorsToAppleCxxPlatforms,
             defaultCxxPlatform,
             codeSignIdentityStore,
-            provisioningProfileStore);
+            provisioningProfileStore,
+            appleConfig.getDefaultDebugInfoFormat());
     builder.register(appleLibraryDescription);
 
     AppleBinaryDescription appleBinaryDescription =
         new AppleBinaryDescription(
             cxxBinaryDescription,
+            platformFlavorsToAppleCxxPlatforms,
+            codeSignIdentityStore,
+            provisioningProfileStore,
+            appleConfig.getDefaultDebugInfoFormat());
+    builder.register(appleBinaryDescription);
+
+    SwiftLibraryDescription swiftLibraryDescription =
+        new SwiftLibraryDescription(
             cxxPlatforms,
             platformFlavorsToAppleCxxPlatforms,
-            defaultCxxPlatform,
-            codeSignIdentityStore,
-            provisioningProfileStore);
-    builder.register(appleBinaryDescription);
+            defaultCxxPlatform);
+    builder.register(swiftLibraryDescription);
 
     // Create an executor service exclusively for the smart dexing step.
     ListeningExecutorService dxExecutorService =
@@ -476,20 +518,30 @@ public class KnownBuildRuleTypes {
                 new CommandThreadFactory("SmartDexing")));
 
 
-    builder.register(new AndroidAarDescription(new AndroidManifestDescription(), ndkCxxPlatforms));
+    builder.register(
+        new AndroidAarDescription(
+            new AndroidManifestDescription(),
+            cxxBuckConfig,
+            ndkCxxPlatforms));
     builder.register(
         new AndroidBinaryDescription(
+            defaultJavaOptions,
             defaultJavacOptions,
             proGuardConfig,
             ndkCxxPlatforms,
-            dxExecutorService));
+            dxExecutorService,
+            cxxBuckConfig));
     builder.register(new AndroidBuildConfigDescription(defaultJavacOptions));
-    builder.register(new AndroidInstrumentationApkDescription(
+    builder.register(
+        new AndroidInstrumentationApkDescription(
             proGuardConfig,
             defaultJavacOptions,
             ndkCxxPlatforms,
-            dxExecutorService));
-    builder.register(new AndroidInstrumentationTestDescription(defaultTestRuleTimeoutMs));
+            dxExecutorService,
+            cxxBuckConfig));
+    builder.register(new AndroidInstrumentationTestDescription(
+        defaultJavaOptions,
+        defaultTestRuleTimeoutMs));
     builder.register(new AndroidLibraryDescription(defaultJavacOptions));
     builder.register(new AndroidManifestDescription());
     builder.register(new AndroidPrebuiltAarDescription(defaultJavacOptions));
@@ -497,7 +549,7 @@ public class KnownBuildRuleTypes {
     builder.register(new AndroidResourceDescription());
     builder.register(new ApkGenruleDescription());
     builder.register(new AppleAssetCatalogDescription());
-    builder.register(new ApplePackageDescription());
+    builder.register(new ApplePackageDescription(appleConfig, platformFlavorsToAppleCxxPlatforms));
     AppleBundleDescription appleBundleDescription =
         new AppleBundleDescription(
             appleBinaryDescription,
@@ -520,11 +572,13 @@ public class KnownBuildRuleTypes {
             defaultCxxPlatform,
             codeSignIdentityStore,
             provisioningProfileStore,
-            appleConfig.getAppleDeveloperDirectorySupplierForTests(processExecutor)));
+            appleConfig.getAppleDeveloperDirectorySupplierForTests(processExecutor),
+            appleConfig.getDefaultDebugInfoFormat()));
     builder.register(new CoreDataModelDescription());
     builder.register(new CSharpLibraryDescription());
     builder.register(cxxBinaryDescription);
     builder.register(cxxLibraryDescription);
+    builder.register(new CxxLuaExtensionDescription(luaConfig, cxxBuckConfig, cxxPlatforms));
     builder.register(
         new CxxPythonExtensionDescription(pythonPlatforms, cxxBuckConfig, cxxPlatforms));
     builder.register(
@@ -533,45 +587,66 @@ public class KnownBuildRuleTypes {
             defaultCxxPlatform,
             cxxPlatforms,
             defaultTestRuleTimeoutMs));
-    builder.register(new DBinaryDescription(dBuckConfig, defaultCxxPlatform));
-    builder.register(new DLibraryDescription(dBuckConfig));
-    builder.register(new DTestDescription(
-            dBuckConfig, defaultTestRuleTimeoutMs, defaultCxxPlatform));
+    builder.register(new DBinaryDescription(dBuckConfig, cxxBuckConfig, defaultCxxPlatform));
+    builder.register(new DLibraryDescription(dBuckConfig, cxxBuckConfig, defaultCxxPlatform));
+    builder.register(
+        new DTestDescription(
+            dBuckConfig,
+            cxxBuckConfig,
+            defaultCxxPlatform,
+            defaultTestRuleTimeoutMs));
     builder.register(new ExportFileDescription());
     builder.register(new GenruleDescription());
     builder.register(new GenAidlDescription());
-    builder.register(new GoBinaryDescription(goBuckConfig, defaultCxxPlatform));
+    builder.register(new GoBinaryDescription(goBuckConfig));
     builder.register(new GoLibraryDescription(goBuckConfig));
     builder.register(
         new GoTestDescription(
             goBuckConfig,
+            defaultTestRuleTimeoutMs));
+    GroovyBuckConfig groovyBuckConfig = new GroovyBuckConfig(config);
+    builder.register(
+        new GroovyLibraryDescription(
+            groovyBuckConfig,
+            defaultJavacOptions));
+    builder.register(
+        new GroovyTestDescription(
+            groovyBuckConfig,
+            defaultJavaOptions,
+            defaultJavacOptions,
             defaultTestRuleTimeoutMs,
-            defaultCxxPlatform));
-    builder.register(new GroovyLibraryDescription(new GroovyBuckConfig(config)));
-    builder.register(new GwtBinaryDescription());
+            testTempDirOverride
+        )
+    );
+    builder.register(new GwtBinaryDescription(defaultJavaOptions));
     builder.register(
       new HalideLibraryDescription(
-        defaultCxxPlatform,
-        cxxPlatforms,
-        cxxBuckConfig.getPreprocessMode(),
-        halideBuckConfig));
+          cxxBuckConfig,
+          defaultCxxPlatform,
+          cxxPlatforms,
+          halideBuckConfig));
     builder.register(new IosReactNativeLibraryDescription(reactNativeBuckConfig));
-    builder.register(new JavaBinaryDescription(defaultJavacOptions, defaultCxxPlatform));
+    builder.register(new JavaBinaryDescription(
+        defaultJavaOptions,
+        defaultJavacOptions,
+        defaultCxxPlatform));
     builder.register(new JavaLibraryDescription(defaultJavacOptions));
     builder.register(
         new JavaTestDescription(
+            defaultJavaOptions,
             defaultJavacOptions,
             defaultTestRuleTimeoutMs,
             defaultCxxPlatform,
             testTempDirOverride));
     builder.register(new KeystoreDescription());
-    builder.register(new LuaBinaryDescription(new LuaBuckConfig(config, new ExecutableFinder())));
+    builder.register(
+        new LuaBinaryDescription(luaConfig, cxxBuckConfig, defaultCxxPlatform, cxxPlatforms));
     builder.register(new LuaLibraryDescription());
     builder.register(new NdkLibraryDescription(ndkVersion, ndkCxxPlatforms));
     OCamlBuckConfig ocamlBuckConfig = new OCamlBuckConfig(platform, config);
     builder.register(new OCamlBinaryDescription(ocamlBuckConfig));
     builder.register(new OCamlLibraryDescription(ocamlBuckConfig));
-    builder.register(new PrebuiltCxxLibraryDescription(cxxPlatforms));
+    builder.register(new PrebuiltCxxLibraryDescription(cxxBuckConfig, cxxPlatforms));
     builder.register(new PrebuiltDotNetLibraryDescription());
     builder.register(new PrebuiltJarDescription());
     builder.register(new PrebuiltNativeLibraryDescription());
@@ -585,17 +660,26 @@ public class KnownBuildRuleTypes {
             pythonBinaryDescription,
             pyConfig,
             pythonPlatforms,
+            cxxBuckConfig,
             defaultCxxPlatform,
             defaultTestRuleTimeoutMs,
             cxxPlatforms));
     builder.register(new RemoteFileDescription(downloader));
     builder.register(new RobolectricTestDescription(
+            defaultJavaOptions,
             defaultJavacOptions,
             defaultTestRuleTimeoutMs,
             defaultCxxPlatform,
             testTempDirOverride));
     builder.register(new RustBinaryDescription(rustBuckConfig));
     builder.register(new RustLibraryDescription(rustBuckConfig));
+    builder.register(new ScalaLibraryDescription(scalaConfig));
+    builder.register(new ScalaTestDescription(
+        scalaConfig,
+        defaultJavaOptions,
+        defaultTestRuleTimeoutMs,
+        defaultCxxPlatform,
+        testTempDirOverride));
     builder.register(new ShBinaryDescription());
     builder.register(new ShTestDescription(defaultTestRuleTimeoutMs));
     ThriftBuckConfig thriftBuckConfig = new ThriftBuckConfig(config);
@@ -615,6 +699,7 @@ public class KnownBuildRuleTypes {
                 new ThriftPythonEnhancer(thriftBuckConfig, ThriftPythonEnhancer.Type.NORMAL),
                 new ThriftPythonEnhancer(thriftBuckConfig, ThriftPythonEnhancer.Type.TWISTED),
                 new ThriftPythonEnhancer(thriftBuckConfig, ThriftPythonEnhancer.Type.ASYNCIO))));
+    builder.register(new WorkerToolDescription());
     builder.register(new XcodePostbuildScriptDescription());
     builder.register(new XcodePrebuildScriptDescription());
     builder.register(new XcodeWorkspaceConfigDescription());

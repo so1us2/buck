@@ -26,6 +26,7 @@ import com.facebook.buck.rules.ConstructorArgMarshaller;
 import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.caliper.AfterExperiment;
 import com.google.caliper.BeforeExperiment;
 import com.google.caliper.Param;
@@ -33,6 +34,8 @@ import com.google.caliper.api.Macrobenchmark;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.junit.After;
 import org.junit.Before;
@@ -41,7 +44,6 @@ import org.junit.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ParserBenchmark {
@@ -57,7 +59,7 @@ public class ParserBenchmark {
   private ProjectFilesystem filesystem;
   private Cell cell;
   private BuckEventBus eventBus;
-  private ExecutorService executorService;
+  private ListeningExecutorService executorService;
 
   @Before
   public void setUpTest() throws Exception {
@@ -111,9 +113,10 @@ public class ParserBenchmark {
         .build();
 
     eventBus = BuckEventBusFactory.newInstance();
-    executorService = Executors.newFixedThreadPool(threadCount);
+    executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(threadCount));
 
-    DefaultTypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory();
+    DefaultTypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory(
+        ObjectMappers.newDefaultInstance());
     ConstructorArgMarshaller marshaller = new ConstructorArgMarshaller(typeCoercerFactory);
     parser = new Parser(
         new ParserConfig(config),
@@ -143,6 +146,7 @@ public class ParserBenchmark {
         ImmutableList.of(
             TargetNodePredicateSpec.of(
                 Predicates.alwaysTrue(),
-                BuildFileSpec.fromRecursivePath(Paths.get("")))));
+                BuildFileSpec.fromRecursivePath(Paths.get("")))),
+        /* ignoreBuckAutodepsFiles */ false);
   }
 }

@@ -15,20 +15,24 @@
  */
 package com.facebook.buck.event;
 
+import com.facebook.buck.event.external.events.ConsoleEventExternalInterface;
+
 import java.util.logging.Level;
 
 /**
  * Event for messages.  Post ConsoleEvents to the event bus where you would normally use
  * {@code java.util.logging}.
  */
-public class ConsoleEvent extends AbstractBuckEvent {
+public class ConsoleEvent extends AbstractBuckEvent implements ConsoleEventExternalInterface {
 
   private final Level level;
+  private final boolean containsAnsiEscapeCodes;
   private final String message;
 
-  protected ConsoleEvent(Level level, String message) {
+  protected ConsoleEvent(Level level, boolean containsAnsiEscapeCodes, String message) {
     super(EventKey.unique());
     this.level = level;
+    this.containsAnsiEscapeCodes = containsAnsiEscapeCodes;
     this.message = message;
   }
 
@@ -36,16 +40,25 @@ public class ConsoleEvent extends AbstractBuckEvent {
     return level;
   }
 
+  public boolean containsAnsiEscapeCodes() {
+    return containsAnsiEscapeCodes;
+  }
+
+  @Override
   public String getMessage() {
     return message;
   }
 
   public static ConsoleEvent create(Level level, String message) {
-    return new ConsoleEvent(level, message);
+    return new ConsoleEvent(level, /* containsAnsiEscapeCodes */ false, message);
   }
 
   public static ConsoleEvent create(Level level, String message, Object... args) {
     return ConsoleEvent.create(level, String.format(message, args));
+  }
+
+  public static ConsoleEvent createForMessageWithAnsiEscapeCodes(Level level, String message) {
+    return new ConsoleEvent(level, /* containsAnsiEscapeCodes */ true, message);
   }
 
   public static ConsoleEvent finer(String message) {
@@ -90,7 +103,7 @@ public class ConsoleEvent extends AbstractBuckEvent {
 
   @Override
   public String getEventName() {
-    return "ConsoleEvent";
+    return CONSOLE_EVENT;
   }
 
   @Override

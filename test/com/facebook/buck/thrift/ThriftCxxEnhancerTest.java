@@ -20,14 +20,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.cxx.CxxPlatformUtils;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxLibrary;
 import com.facebook.buck.cxx.CxxLibraryBuilder;
 import com.facebook.buck.cxx.CxxLibraryDescription;
 import com.facebook.buck.cxx.CxxPlatform;
-import com.facebook.buck.cxx.CxxPreprocessMode;
 import com.facebook.buck.cxx.DefaultCxxPlatforms;
 import com.facebook.buck.cxx.InferBuckConfig;
 import com.facebook.buck.cxx.NativeLinkable;
@@ -45,9 +45,10 @@ import com.facebook.buck.rules.FakeBuildRuleParamsBuilder;
 import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.rules.args.StringArg;
 import com.facebook.buck.rules.coercer.SourceList;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
 import com.facebook.buck.rules.coercer.SourceWithFlagsList;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -68,19 +69,16 @@ public class ThriftCxxEnhancerTest {
   private static final BuildTarget TARGET = BuildTargetFactory.newInstance("//:test#cpp");
   private static final BuckConfig BUCK_CONFIG = FakeBuckConfig.builder().build();
   private static final ThriftBuckConfig THRIFT_BUCK_CONFIG = new ThriftBuckConfig(BUCK_CONFIG);
-  private static final CxxBuckConfig CXX_BUCK_CONFIG = new CxxBuckConfig(BUCK_CONFIG);
   private static final CxxPlatform CXX_PLATFORM = DefaultCxxPlatforms.build(
       new CxxBuckConfig(BUCK_CONFIG));
   private static final FlavorDomain<CxxPlatform> CXX_PLATFORMS =
-      new FlavorDomain<>(
-          "C/C++ Platform",
-          ImmutableMap.of(CXX_PLATFORM.getFlavor(), CXX_PLATFORM));
+      FlavorDomain.of("C/C++ Platform", CXX_PLATFORM);
   private static final CxxLibraryDescription CXX_LIBRARY_DESCRIPTION =
       new CxxLibraryDescription(
-          CXX_BUCK_CONFIG,
+          CxxPlatformUtils.DEFAULT_CONFIG,
+          CXX_PLATFORM,
           new InferBuckConfig(BUCK_CONFIG),
-          CXX_PLATFORMS,
-          CxxPreprocessMode.SEPARATE);
+          CXX_PLATFORMS);
   private static final ThriftCxxEnhancer ENHANCER_CPP =
       new ThriftCxxEnhancer(
           THRIFT_BUCK_CONFIG,
@@ -110,7 +108,7 @@ public class ThriftCxxEnhancerTest {
         new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance(target)).build(),
         resolver,
         new CommandTool.Builder()
-            .addArg(new FakeSourcePath("compiler"))
+            .addArg(new StringArg("compiler"))
             .build(),
         ImmutableList.<String>of(),
         Paths.get("output"),
@@ -522,7 +520,7 @@ public class ThriftCxxEnhancerTest {
   @Test
   public void createBuildRule() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     BuildRuleParams flavoredParams = new FakeBuildRuleParamsBuilder(TARGET).build();
 
@@ -577,7 +575,7 @@ public class ThriftCxxEnhancerTest {
   @Test
   public void cppSrcsAndHeadersArePropagated() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     BuildRuleParams flavoredParams = new FakeBuildRuleParamsBuilder(TARGET).build();
 
@@ -610,10 +608,10 @@ public class ThriftCxxEnhancerTest {
     // propagated.
     CxxLibraryDescription cxxLibraryDescription =
         new CxxLibraryDescription(
-            CXX_BUCK_CONFIG,
+            CxxPlatformUtils.DEFAULT_CONFIG,
+            CXX_PLATFORM,
             new InferBuckConfig(BUCK_CONFIG),
-            CXX_PLATFORMS,
-            CxxPreprocessMode.SEPARATE) {
+            CXX_PLATFORMS) {
           @Override
           public <A extends Arg> BuildRule createBuildRule(
               TargetGraph targetGraph,
@@ -646,6 +644,62 @@ public class ThriftCxxEnhancerTest {
         arg,
         sources,
         ImmutableSortedSet.<BuildRule>of());
+  }
+
+  @Test
+  public void cppCompileFlagsArePropagated() throws Exception {
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(resolver);
+    BuildRuleParams flavoredParams = new FakeBuildRuleParamsBuilder(TARGET).build();
+
+    final ImmutableList<String> compilerFlags = ImmutableList.of("-flag");
+
+    ThriftConstructorArg arg = new ThriftConstructorArg();
+    arg.cppOptions = Optional.absent();
+    arg.cppDeps = Optional.absent();
+    arg.cpp2Deps = Optional.absent();
+    arg.cpp2CompilerFlags = Optional.of(compilerFlags);
+    arg.cppCompilerFlags = Optional.of(compilerFlags);
+    arg.cppHeaderNamespace = Optional.absent();
+    arg.cppExportedHeaders = Optional.absent();
+    arg.cppSrcs = Optional.absent();
+
+    ThriftCompiler thrift = createFakeThriftCompiler("//:thrift_source", pathResolver);
+    resolver.addToIndex(thrift);
+
+    // Run the enhancer with a modified C++ description which checks that appropriate args are
+    // propagated.
+    CxxLibraryDescription cxxLibraryDescription =
+        new CxxLibraryDescription(
+            CxxPlatformUtils.DEFAULT_CONFIG,
+            CXX_PLATFORM,
+            new InferBuckConfig(BUCK_CONFIG),
+            CXX_PLATFORMS) {
+          @Override
+          public <A extends Arg> BuildRule createBuildRule(
+              TargetGraph targetGraph,
+              BuildRuleParams params,
+              BuildRuleResolver resolver,
+              A args) throws NoSuchBuildTargetException {
+            assertThat(args.compilerFlags.get(), Matchers.hasItem("-flag"));
+            return super.createBuildRule(targetGraph, params, resolver, args);
+          }
+        };
+    for (boolean cpp2 : ImmutableList.of(true, false)) {
+      ThriftCxxEnhancer enhancer =
+          new ThriftCxxEnhancer(
+              THRIFT_BUCK_CONFIG,
+              cxxLibraryDescription,
+              cpp2);
+      enhancer.createBuildRule(
+          TargetGraph.EMPTY,
+          flavoredParams,
+          resolver,
+          arg,
+          ImmutableMap.<String, ThriftSource>of(),
+          ImmutableSortedSet.<BuildRule>of());
+    }
   }
 
 }

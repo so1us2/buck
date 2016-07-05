@@ -22,7 +22,6 @@ import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.zip.Unzip;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -62,6 +61,9 @@ public class PexStep extends ShellStep {
   // The list of prebuilt python libraries to add to the PEX.
   private final ImmutableSet<Path> prebuiltLibraries;
 
+  // The list of native libraries to preload into the interpreter.
+  private final ImmutableSet<String> preloadLibraries;
+
   private final boolean zipSafe;
 
   public PexStep(
@@ -76,6 +78,7 @@ public class PexStep extends ShellStep {
       ImmutableMap<Path, Path> resources,
       ImmutableMap<Path, Path> nativeLibraries,
       ImmutableSet<Path> prebuiltLibraries,
+      ImmutableSet<String> preloadLibraries,
       boolean zipSafe) {
     super(filesystem.getRootPath());
 
@@ -90,6 +93,7 @@ public class PexStep extends ShellStep {
     this.resources = resources;
     this.nativeLibraries = nativeLibraries;
     this.prebuiltLibraries = prebuiltLibraries;
+    this.preloadLibraries = preloadLibraries;
     this.zipSafe = zipSafe;
   }
 
@@ -138,7 +142,7 @@ public class PexStep extends ShellStep {
                   "nativeLibraries", nativeLibrariesBuilder.build(),
                   "prebuiltLibraries", prebuiltLibrariesBuilder.build())));
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -153,6 +157,10 @@ public class PexStep extends ShellStep {
 
     if (!zipSafe) {
       builder.add("--no-zip-safe");
+    }
+
+    for (String lib : preloadLibraries) {
+      builder.add("--preload", lib);
     }
 
     builder.add(destination.toString());

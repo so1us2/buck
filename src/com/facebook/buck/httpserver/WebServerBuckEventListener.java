@@ -19,7 +19,9 @@ package com.facebook.buck.httpserver;
 import com.facebook.buck.cli.ProgressEvent;
 import com.facebook.buck.event.BuckEventListener;
 import com.facebook.buck.event.CompilerErrorEvent;
+import com.facebook.buck.event.ConsoleEvent;
 import com.facebook.buck.event.InstallEvent;
+import com.facebook.buck.event.ProjectGenerationEvent;
 import com.facebook.buck.model.BuildId;
 import com.facebook.buck.parser.ParseEvent;
 import com.facebook.buck.rules.BuildEvent;
@@ -105,6 +107,11 @@ public class WebServerBuckEventListener implements BuckEventListener {
   }
 
   @Subscribe
+  public void consoleEvent(ConsoleEvent event) {
+    streamingWebSocketServlet.tellClients(event);
+  }
+
+  @Subscribe
   public void buildProgressUpdated(ProgressEvent.BuildProgressUpdated event) {
     streamingWebSocketServlet.tellClients(event);
   }
@@ -117,6 +124,18 @@ public class WebServerBuckEventListener implements BuckEventListener {
   @Subscribe
   public void projectGenerationProgressUpdated(
       ProgressEvent.ProjectGenerationProgressUpdated event) {
+    streamingWebSocketServlet.tellClients(event);
+  }
+
+  @Subscribe
+  public void projectGenerationStarted(
+      ProjectGenerationEvent.Started event) {
+    streamingWebSocketServlet.tellClients(event);
+  }
+
+  @Subscribe
+  public void projectGenerationFinished(
+      ProjectGenerationEvent.Finished event) {
     streamingWebSocketServlet.tellClients(event);
   }
 }

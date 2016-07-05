@@ -16,7 +16,9 @@ page at http://checkstyle.sourceforge.net/config.html -->
     -->
   </module>
 
-  <module name="NewlineAtEndOfFile"/>
+  <module name="NewlineAtEndOfFile">
+    <property name="lineSeparator" value="lf_cr_crlf"/>
+  </module>
 
   <module name="RegexpSingleline">
     <!-- Checks that FIXME is not used in comments.  TODO is preferred.
@@ -311,11 +313,9 @@ page at http://checkstyle.sourceforge.net/config.html -->
     <module name="OperatorWrap">
       <property name="tokens" value="ASSIGN, BAND, BAND_ASSIGN, BOR,
         BOR_ASSIGN, BSR, BSR_ASSIGN, BXOR, BXOR_ASSIGN, DIV, DIV_ASSIGN,
-        EQUAL, GE, GT, LAND, LE, LITERAL_CATCH, LITERAL_DO, LITERAL_ELSE,
-        LITERAL_FINALLY, LITERAL_FOR, LITERAL_IF, LITERAL_RETURN,
-        LITERAL_SYNCHRONIZED, LITERAL_TRY, LITERAL_WHILE, LOR, LT, MINUS,
-        MINUS_ASSIGN, MOD, MOD_ASSIGN, NOT_EQUAL, PLUS, PLUS_ASSIGN,
-        SL, SL_ASSIGN, SR_ASSIGN, STAR, STAR_ASSIGN"/>
+        EQUAL, GE, GT, LAND, LE, LOR, LT, MINUS, MINUS_ASSIGN, MOD, MOD_ASSIGN,
+        NOT_EQUAL, PLUS, PLUS_ASSIGN, SL, SL_ASSIGN, SR_ASSIGN, STAR,
+        STAR_ASSIGN"/>
       <property name="option" value="eol"/>
     </module>
 

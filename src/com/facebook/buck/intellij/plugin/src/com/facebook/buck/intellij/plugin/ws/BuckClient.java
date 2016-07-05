@@ -23,7 +23,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import com.facebook.buck.intellij.plugin.ws.buckevents.BuckEventHandlerInterface;
+import com.facebook.buck.intellij.plugin.ws.buckevents.BuckEventsHandlerInterface;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 
@@ -32,7 +33,7 @@ public class BuckClient {
     private int mPort = -1;
     private String mHost = "localhost";;
 
-    private WebSocketClient mWSClient = new WebSocketClient();
+    private final WebSocketClient mWSClient = new WebSocketClient();
     private BuckSocket mWSSocket;
     private boolean mConnected = false;
     private long mLastActionTime = 0;
@@ -41,12 +42,13 @@ public class BuckClient {
 
     private ScheduledThreadPoolExecutor scheduledThreadPoolExecutor;
     private ScheduledFuture<?> scheduledFuture;
+    private static final Logger LOG = Logger.getInstance(BuckClient.class);
 
     public boolean isConnected() {
         return mConnected;
     }
 
-    public BuckClient(String host, int port, final BuckEventHandlerInterface handler) {
+    public BuckClient(String host, int port, final BuckEventsHandlerInterface handler) {
 
         scheduledThreadPoolExecutor =
             new ScheduledThreadPoolExecutor(
@@ -59,7 +61,7 @@ public class BuckClient {
                     }
             );
         mWSSocket = new BuckSocket(
-            new BuckEventHandlerInterface() {
+            new BuckEventsHandlerInterface() {
                 @Override
                 public void onConnect() {
                     handler.onConnect();
@@ -86,7 +88,7 @@ public class BuckClient {
         mPort = port;
     }
 
-    public BuckClient(int port, BuckEventHandlerInterface handler) {
+    public BuckClient(int port, BuckEventsHandlerInterface handler) {
         this("localhost", port, handler);
     }
 
@@ -123,16 +125,25 @@ public class BuckClient {
             }
         }
     }
+
     public void disconnect() {
         if (mConnected) {
             scheduledFuture.cancel(true);
-            try {
-                mWSClient.stop();
-                mConnected = false;
-            } catch (Throwable t) {
-                Logger.getInstance(this.getClass()).error(
-                        "Could not disconnect from buck. " + t.getMessage());
-            }
+            ApplicationManager.getApplication().executeOnPooledThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        mWSClient.stop();
+                        mConnected = false;
+                    } catch (InterruptedException e) {
+                        LOG.debug(
+                            "Could not disconnect from buck. " + e);
+                    } catch (Throwable t) {
+                        LOG.error(
+                            "Could not disconnect from buck. " + t.getMessage());
+                    }
+                }
+            });
         }
     }
 
@@ -147,7 +158,7 @@ public class BuckClient {
                     mLastActionTime = (new Date()).getTime();
                 }
             } catch (Throwable t) {
-                Logger.getInstance(this.getClass()).error("Could not send ping");
+                LOG.error("Could not send ping");
             }
         }
     }

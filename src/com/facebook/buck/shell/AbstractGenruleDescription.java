@@ -17,10 +17,13 @@
 package com.facebook.buck.shell;
 
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.HasTests;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.Description;
+import com.facebook.buck.rules.Hint;
 import com.facebook.buck.rules.ImplicitDepsInferringDescription;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
@@ -28,6 +31,7 @@ import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.MacroArg;
 import com.facebook.buck.rules.macros.ClasspathMacroExpander;
 import com.facebook.buck.rules.macros.ExecutableMacroExpander;
+import com.facebook.buck.rules.macros.WorkerMacroExpander;
 import com.facebook.buck.rules.macros.LocationMacroExpander;
 import com.facebook.buck.rules.macros.MacroException;
 import com.facebook.buck.rules.macros.MacroExpander;
@@ -52,6 +56,7 @@ public abstract class AbstractGenruleDescription<T extends AbstractGenruleDescri
       ImmutableMap.<String, MacroExpander>builder()
           .put("classpath", new ClasspathMacroExpander())
           .put("exe", new ExecutableMacroExpander())
+          .put("worker", new WorkerMacroExpander())
           .put("location", new LocationMacroExpander())
           .build());
 
@@ -138,12 +143,19 @@ public abstract class AbstractGenruleDescription<T extends AbstractGenruleDescri
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg implements HasTests {
     public String out;
     public Optional<String> bash;
     public Optional<String> cmd;
     public Optional<String> cmdExe;
     public Optional<ImmutableList<SourcePath>> srcs;
+
+    @Hint(isDep = false) public Optional<ImmutableSortedSet<BuildTarget>> tests;
+
+    @Override
+    public ImmutableSortedSet<BuildTarget> getTests() {
+      return tests.get();
+    }
   }
 
 }

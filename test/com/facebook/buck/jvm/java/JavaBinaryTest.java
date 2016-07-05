@@ -19,7 +19,7 @@ package com.facebook.buck.jvm.java;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.DefaultDirectoryTraverser;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.BuildRule;
@@ -48,7 +48,7 @@ public class JavaBinaryTest {
   @Test
   public void testGetExecutableCommand() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     // prebuilt_jar //third_party/generator:generator
@@ -80,6 +80,7 @@ public class JavaBinaryTest {
             new JavaBinary(
                 params,
                 new SourcePathResolver(ruleResolver),
+                new ExternalJavaRuntimeLauncher("/foobar/java"),
                 "com.facebook.base.Main",
                 null,
                 /* merge manifests */ true,
@@ -95,7 +96,7 @@ public class JavaBinaryTest {
     // run from a /tmp directory, if necessary.
     String expectedClasspath = basePath + javaBinary.getPathToOutput();
 
-    List<String> expectedCommand = ImmutableList.of("java", "-jar", expectedClasspath);
+    List<String> expectedCommand = ImmutableList.of("/foobar/java", "-jar", expectedClasspath);
     assertEquals(expectedCommand, javaBinary.getExecutableCommand().getCommandPrefix(pathResolver));
 
     assertFalse(

@@ -56,7 +56,7 @@ import com.facebook.buck.apple.xcode.xcodeproj.PBXVariantGroup;
 import com.facebook.buck.apple.xcode.xcodeproj.ProductType;
 import com.facebook.buck.apple.xcode.xcodeproj.SourceTreePath;
 import com.facebook.buck.apple.xcode.xcodeproj.XCBuildConfiguration;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxDescriptionEnhancer;
@@ -73,7 +73,6 @@ import com.facebook.buck.io.AlwaysFoundExecutableFinder;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.js.IosReactNativeLibraryBuilder;
 import com.facebook.buck.js.ReactNativeBuckConfig;
-import com.facebook.buck.js.ReactNativeFlavors;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.Either;
@@ -83,14 +82,16 @@ import com.facebook.buck.model.HasBuildTarget;
 import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildTargetSourcePath;
+import com.facebook.buck.rules.Cell;
 import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.PathSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TargetNode;
+import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.rules.coercer.FrameworkPath;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.shell.ExportFileBuilder;
 import com.facebook.buck.shell.ExportFileDescription;
 import com.facebook.buck.testutil.AllExistingProjectFilesystem;
@@ -143,12 +144,12 @@ public class ProjectGeneratorTest {
       OUTPUT_DIRECTORY.resolve(PROJECT_CONTAINER);
   private static final Path OUTPUT_PROJECT_FILE_PATH =
       OUTPUT_PROJECT_BUNDLE_PATH.resolve("project.pbxproj");
-  private static final FlavorDomain<CxxPlatform> PLATFORMS =
-      new FlavorDomain<>("C/C++ platform", ImmutableMap.<Flavor, CxxPlatform>of());
+  private static final FlavorDomain<CxxPlatform> PLATFORMS = FlavorDomain.of("C/C++ platform");
   private static final CxxPlatform DEFAULT_PLATFORM = CxxPlatformUtils.DEFAULT_PLATFORM;
   private static final Flavor DEFAULT_FLAVOR = ImmutableFlavor.of("default");
   private SettableFakeClock clock;
   private ProjectFilesystem projectFilesystem;
+  private Cell projectCell;
   private FakeProjectFilesystem fakeProjectFilesystem;
   private HalideBuckConfig halideBuckConfig;
   private CxxBuckConfig cxxBuckConfig;
@@ -158,10 +159,13 @@ public class ProjectGeneratorTest {
   private Path rootPath;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws InterruptedException, IOException {
     clock = new SettableFakeClock(0, 0);
     fakeProjectFilesystem = new FakeProjectFilesystem(clock);
-    projectFilesystem = fakeProjectFilesystem;
+    projectCell = (new TestCellBuilder())
+      .setFilesystem(fakeProjectFilesystem)
+      .build();
+    projectFilesystem = projectCell.getFilesystem();
     rootPath = projectFilesystem.getRootPath();
 
     // Add files and directories used to test resources.
@@ -935,16 +939,7 @@ public class ProjectGeneratorTest {
 
   private void assertThatHeaderSymlinkTreeContains(Path root, ImmutableMap<String, String> content)
       throws IOException {
-    for (Map.Entry<String, String> entry : content.entrySet()) {
-      Path link = root.resolve(Paths.get(entry.getKey()));
-      Path target = Paths.get(entry.getValue()).toAbsolutePath();
-      assertTrue(projectFilesystem.isSymLink(link));
-      assertEquals(
-          target,
-          projectFilesystem.readSymLink(link));
-    }
-
-    // Check the tree's header map.
+    // Read the tree's header map.
     byte[] headerMapBytes;
     try (InputStream headerMapInputStream =
              projectFilesystem.newFileInputStream(root.resolve(".tree.hmap"))) {
@@ -953,10 +948,22 @@ public class ProjectGeneratorTest {
     HeaderMap headerMap = HeaderMap.deserialize(headerMapBytes);
     assertNotNull(headerMap);
     assertThat(headerMap.getNumEntries(), equalTo(content.size()));
-    for (String key : content.keySet()) {
+    for (Map.Entry<String, String> entry : content.entrySet()) {
+      String key = entry.getKey();
+      Path link = root.resolve(Paths.get(key));
+      Path target = Paths.get(entry.getValue()).toAbsolutePath();
+      // Check the filesystem symlink
+      assertTrue(projectFilesystem.isSymLink(link));
+      assertEquals(
+          target,
+          projectFilesystem.readSymLink(link));
+
+      // Check the header map
       assertThat(
           headerMap.lookup(key),
-          equalTo(BuckConstant.BUCK_OUTPUT_PATH.relativize(root).resolve(key).toString()));
+          equalTo(Paths.get("../../")
+                      .resolve(projectCell.getRoot().getFileName())
+                      .resolve(link).toString()));
     }
   }
 
@@ -1048,7 +1055,12 @@ public class ProjectGeneratorTest {
     // use by the Xcode compilation step.
     ImmutableSet<BuildTarget> requiredBuildTargets = projectGenerator.getRequiredBuildTargets();
     assertTrue(requiredBuildTargets.contains(compilerTarget));
-    assertTrue(requiredBuildTargets.contains(libTarget));
+    assertThat(
+        requiredBuildTargets,
+        hasItem(
+            libTarget.withFlavors(
+                HalideLibraryDescription.HALIDE_COMPILE_FLAVOR,
+                DEFAULT_PLATFORM.getFlavor())));
   }
 
   @Test
@@ -1368,7 +1380,7 @@ public class ProjectGeneratorTest {
                 ImmutableSortedMap.of(
                     "Debug",
                     ImmutableMap.<String, String>of())))
-        .setLinkerFlags(Optional.of(ImmutableList.of("-lhello")))
+        .setLinkerFlags(Optional.of(ImmutableList.of("-Xlinker", "-lhello")))
         .build();
 
     ProjectGenerator projectGenerator = createProjectGeneratorForCombinedProject(
@@ -1433,7 +1445,7 @@ public class ProjectGeneratorTest {
                 ImmutableSortedMap.of(
                     "Debug",
                     ImmutableMap.<String, String>of())))
-        .setExportedLinkerFlags(Optional.of(ImmutableList.of("-lhello")))
+        .setExportedLinkerFlags(Optional.of(ImmutableList.of("-Xlinker", "-lhello")))
         .build();
 
     ProjectGenerator projectGenerator = createProjectGeneratorForCombinedProject(
@@ -1460,7 +1472,7 @@ public class ProjectGeneratorTest {
                 ImmutableSortedMap.of(
                     "Debug",
                     ImmutableMap.<String, String>of())))
-        .setExportedLinkerFlags(Optional.of(ImmutableList.of("-lhello")))
+        .setExportedLinkerFlags(Optional.of(ImmutableList.of("-Xlinker", "-lhello")))
         .build();
 
     BuildTarget dependentBuildTarget = BuildTarget.builder(rootPath, "//foo", "bin").build();
@@ -2141,7 +2153,7 @@ public class ProjectGeneratorTest {
             .setSections(
                 ImmutableMap.of(
                     "react-native",
-                    ImmutableMap.of("packager", "react-native/packager.sh")))
+                    ImmutableMap.of("packager_worker", "react-native/packager.sh")))
             .setFilesystem(filesystem)
             .build());
     TargetNode<?> rnLibraryNode = IosReactNativeLibraryBuilder
@@ -2186,65 +2198,6 @@ public class ProjectGeneratorTest {
     assertThat(
         shellScriptBuildPhase.getShellScript(),
         startsWith("BASE_DIR="));
-  }
-
-  @Test
-  public void testNoBundleFlavoredAppleBundleRuleWithRNLibraryDependency() throws IOException {
-    BuildTarget rnLibraryTarget = BuildTarget.builder(rootPath, "//foo", "rn_library")
-        .addFlavors(DEFAULT_FLAVOR)
-        .build();
-    ProjectFilesystem filesystem = new AllExistingProjectFilesystem();
-    ReactNativeBuckConfig buckConfig = new ReactNativeBuckConfig(
-        FakeBuckConfig.builder()
-            .setSections(
-                ImmutableMap.of(
-                    "react-native",
-                    ImmutableMap.of("packager", "react-native/packager.sh")))
-            .setFilesystem(filesystem)
-            .build());
-    TargetNode<?> rnLibraryNode = IosReactNativeLibraryBuilder
-        .builder(rnLibraryTarget, buckConfig)
-        .setBundleName("Apps/Foo/FooBundle.js")
-        .setEntryPath(new PathSourcePath(filesystem, Paths.get("js/FooApp.js")))
-        .build();
-
-    BuildTarget sharedLibraryTarget = BuildTarget
-        .builder(rootPath, "//dep", "shared")
-        .addFlavors(CxxDescriptionEnhancer.SHARED_FLAVOR)
-        .build();
-    TargetNode<?> sharedLibraryNode = AppleLibraryBuilder
-        .createBuilder(sharedLibraryTarget)
-        .build();
-
-    BuildTarget bundleTarget = BuildTarget.builder(rootPath, "//foo", "bundle")
-        .addFlavors(ReactNativeFlavors.DO_NOT_BUNDLE)
-        .build();
-    TargetNode<?> bundleNode = AppleBundleBuilder
-        .createBuilder(bundleTarget)
-        .setExtension(Either.<AppleBundleExtension, String>ofLeft(AppleBundleExtension.BUNDLE))
-        .setInfoPlist(new FakeSourcePath("Info.plist"))
-        .setBinary(sharedLibraryTarget)
-        .setDeps(Optional.of(ImmutableSortedSet.of(rnLibraryTarget)))
-        .build();
-
-    ProjectGenerator projectGenerator = createProjectGeneratorForCombinedProject(
-        ImmutableSet.of(rnLibraryNode, sharedLibraryNode, bundleNode),
-        ImmutableSet.<ProjectGenerator.Option>of());
-
-    projectGenerator.createXcodeProjects();
-
-    PBXProject project = projectGenerator.getGeneratedProject();
-    PBXTarget target = assertTargetExistsAndReturnTarget(
-        project, "//foo:bundle#rn_no_bundle");
-    assertThat(target.getName(), equalTo("//foo:bundle#rn_no_bundle"));
-    assertThat(target.isa(), equalTo("PBXNativeTarget"));
-
-    PBXShellScriptBuildPhase phase = getSingletonPhaseByType(
-        target,
-        PBXShellScriptBuildPhase.class);
-    assertThat(
-        phase.getShellScript(),
-        containsString("rm -rf ${JS_OUT}"));
   }
 
   @Test
@@ -3276,13 +3229,14 @@ public class ProjectGeneratorTest {
     ProjectGenerator projectGenerator = new ProjectGenerator(
         targetGraph,
         ImmutableSet.<BuildTarget>of(),
-        projectFilesystem,
+        projectCell,
         OUTPUT_DIRECTORY,
         PROJECT_NAME,
         "BUCK",
         ProjectGenerator.SEPARATED_PROJECT_OPTIONS,
         Optional.<BuildTarget>absent(),
         ImmutableList.<String>of(),
+        ImmutableList.<BuildTarget>of(),
         new AlwaysFoundExecutableFinder(),
         ImmutableMap.<String, String>of(),
         PLATFORMS,
@@ -3456,6 +3410,48 @@ public class ProjectGeneratorTest {
   }
 
   @Test
+  public void applicationTestDoesNotCopyHostAppBundleIntoTestBundle() throws IOException {
+    BuildTarget hostAppBinaryTarget =
+        BuildTarget.builder(rootPath, "//foo", "HostAppBinary").build();
+    TargetNode<?> hostAppBinaryNode = AppleBinaryBuilder
+        .createBuilder(hostAppBinaryTarget)
+        .build();
+
+    BuildTarget hostAppTarget = BuildTarget.builder(rootPath, "//foo", "HostApp").build();
+    TargetNode<?> hostAppNode = AppleBundleBuilder
+        .createBuilder(hostAppTarget)
+        .setExtension(Either.<AppleBundleExtension, String>ofLeft(AppleBundleExtension.APP))
+        .setInfoPlist(new FakeSourcePath("Info.plist"))
+        .setBinary(hostAppBinaryTarget)
+        .build();
+
+    BuildTarget testTarget = BuildTarget.builder(rootPath, "//foo", "AppTest").build();
+    TargetNode<?> testNode = AppleTestBuilder.createBuilder(testTarget)
+        .setConfigs(
+            Optional.of(
+                ImmutableSortedMap.of(
+                    "Debug",
+                    ImmutableMap.<String, String>of())))
+        .setExtension(Either.<AppleBundleExtension, String>ofLeft(AppleBundleExtension.XCTEST))
+        .setInfoPlist(new FakeSourcePath("Info.plist"))
+        .setTestHostApp(Optional.of(hostAppTarget))
+        .build();
+
+    ProjectGenerator projectGenerator = createProjectGeneratorForCombinedProject(
+        ImmutableSet.of(hostAppBinaryNode, hostAppNode, testNode),
+        ImmutableSet.<ProjectGenerator.Option>of());
+
+    projectGenerator.createXcodeProjects();
+
+    PBXTarget testPBXTarget = assertTargetExistsAndReturnTarget(
+        projectGenerator.getGeneratedProject(),
+        "//foo:AppTest");
+
+    // for this test phases should be empty - there should be no copy phases in particular
+    assertThat(testPBXTarget.getBuildPhases().size(), Matchers.equalTo(0));
+  }
+
+  @Test
   public void testAggregateTargetForBundleForBuildWithBuck() throws IOException {
     BuildTarget binaryTarget = BuildTarget.builder(rootPath, "//foo", "binary").build();
     TargetNode<?> binaryNode = AppleBinaryBuilder
@@ -3480,13 +3476,14 @@ public class ProjectGeneratorTest {
     ProjectGenerator projectGenerator = new ProjectGenerator(
         targetGraph,
         FluentIterable.from(nodes).transform(HasBuildTarget.TO_TARGET).toSet(),
-        projectFilesystem,
+        projectCell,
         OUTPUT_DIRECTORY,
         PROJECT_NAME,
         "BUCK",
         ImmutableSet.<ProjectGenerator.Option>of(),
         Optional.of(bundleTarget),
         ImmutableList.of("--flag", "value with spaces"),
+        ImmutableList.<BuildTarget>of(),
         new AlwaysFoundExecutableFinder(),
         ImmutableMap.<String, String>of(),
         PLATFORMS,
@@ -3568,13 +3565,14 @@ public class ProjectGeneratorTest {
     ProjectGenerator projectGenerator = new ProjectGenerator(
         targetGraph,
         FluentIterable.from(nodes).transform(HasBuildTarget.TO_TARGET).toSet(),
-        projectFilesystem,
+        projectCell,
         OUTPUT_DIRECTORY,
         PROJECT_NAME,
         "BUCK",
         ImmutableSet.<ProjectGenerator.Option>of(),
         Optional.of(binaryTarget),
         ImmutableList.of("--flag", "value with spaces"),
+        ImmutableList.<BuildTarget>of(),
         new AlwaysFoundExecutableFinder(),
         ImmutableMap.<String, String>of(),
         PLATFORMS,
@@ -3636,13 +3634,14 @@ public class ProjectGeneratorTest {
     ProjectGenerator projectGenerator = new ProjectGenerator(
         targetGraph,
         FluentIterable.from(nodes).transform(HasBuildTarget.TO_TARGET).toSet(),
-        projectFilesystem,
+        projectCell,
         OUTPUT_DIRECTORY,
         PROJECT_NAME,
         "BUCK",
         ImmutableSet.<ProjectGenerator.Option>of(),
         Optional.of(libraryTarget),
         ImmutableList.of("--flag", "value with spaces"),
+        ImmutableList.<BuildTarget>of(),
         new AlwaysFoundExecutableFinder(),
         ImmutableMap.<String, String>of(),
         PLATFORMS,
@@ -4172,13 +4171,14 @@ public class ProjectGeneratorTest {
     return new ProjectGenerator(
         targetGraph,
         initialBuildTargets,
-        projectFilesystem,
+        projectCell,
         OUTPUT_DIRECTORY,
         PROJECT_NAME,
         "BUCK",
         projectGeneratorOptions,
         Optional.<BuildTarget>absent(),
         ImmutableList.<String>of(),
+        ImmutableList.<BuildTarget>of(),
         new AlwaysFoundExecutableFinder(),
         ImmutableMap.<String, String>of(),
         PLATFORMS,
@@ -4198,7 +4198,7 @@ public class ProjectGeneratorTest {
         return new SourcePathResolver(
             new BuildRuleResolver(
                 targetGraph,
-                new BuildTargetNodeToBuildRuleTransformer()));
+                new DefaultTargetNodeToBuildRuleTransformer()));
       }
     };
   }

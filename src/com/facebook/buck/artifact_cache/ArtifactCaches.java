@@ -16,10 +16,12 @@
 package com.facebook.buck.artifact_cache;
 
 import com.facebook.buck.event.BuckEventBus;
+import com.facebook.buck.event.NetworkEvent.BytesReceivedEvent;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.slb.HttpLoadBalancer;
 import com.facebook.buck.slb.HttpService;
 import com.facebook.buck.slb.LoadBalancedService;
+import com.facebook.buck.slb.RetryingHttpService;
 import com.facebook.buck.slb.SingleUriService;
 import com.facebook.buck.timing.DefaultClock;
 import com.facebook.buck.util.HumanReadableException;
@@ -31,15 +33,23 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.squareup.okhttp.ConnectionPool;
 import com.squareup.okhttp.Interceptor;
+import com.squareup.okhttp.MediaType;
 import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Response;
 import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
+import com.squareup.okhttp.ResponseBody;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import okio.Buffer;
+import okio.BufferedSource;
+import okio.ForwardingSource;
+import okio.Okio;
+import okio.Source;
 
 /**
  * Creates instances of the {@link ArtifactCache}.
@@ -92,7 +102,6 @@ public class ArtifactCaches {
    * @param buckConfig describes how to configure te cache
    * @param projectFilesystem filesystem to store files on
    * @return a cache
-   * @throws InterruptedException
    */
   public static Optional<ArtifactCache> newServedCache(
       ArtifactCacheBuckConfig buckConfig,
@@ -147,13 +156,26 @@ public class ArtifactCaches {
       }
     }
     ImmutableList<ArtifactCache> artifactCaches = builder.build();
+    ArtifactCache result;
 
     if (artifactCaches.size() == 1) {
       // Don't bother wrapping a single artifact cache in MultiArtifactCache.
-      return artifactCaches.get(0);
+      result = artifactCaches.get(0);
     } else {
-      return new MultiArtifactCache(artifactCaches);
+      result = new MultiArtifactCache(artifactCaches);
     }
+
+    // Always support reading two-level cache stores (in case we performed any in the past).
+    result = new TwoLevelArtifactCacheDecorator(
+        result,
+        projectFilesystem,
+        buckEventBus,
+        httpWriteExecutorService,
+        buckConfig.getTwoLevelCachingEnabled(),
+        buckConfig.getTwoLevelCachingMinimumSize(),
+        buckConfig.getTwoLevelCachingMaximumSize());
+
+    return result;
   }
 
   private static ArtifactCache createDirArtifactCache(
@@ -187,7 +209,7 @@ public class ArtifactCaches {
   private static ArtifactCache createHttpArtifactCache(
       HttpCacheEntry cacheDescription,
       final String hostToReportToRemote,
-      BuckEventBus buckEventBus,
+      final BuckEventBus buckEventBus,
       ProjectFilesystem projectFilesystem,
       ListeningExecutorService httpWriteExecutorService,
       ArtifactCacheBuckConfig config) {
@@ -209,14 +231,8 @@ public class ArtifactCaches {
     storeClient.setConnectTimeout(timeoutSeconds, TimeUnit.SECONDS);
     storeClient.setConnectionPool(
         new ConnectionPool(
-            // It's important that this number is greater than the `-j` parallelism,
-            // as if it's too small, we'll overflow the reusable connection pool and
-            // start spamming new connections.  While this isn't the best location,
-            // the other current option is setting this wherever we construct a `Build`
-            // object and have access to the `-j` argument.  However, since that is
-            // created in several places leave it here for now.
-            /* maxIdleConnections */ 200,
-            /* keepAliveDurationMs */ TimeUnit.MINUTES.toMillis(5)));
+            /* maxIdleConnections */ (int) config.getThreadPoolSize(),
+            /* keepAliveDurationMs */ config.getThreadPoolKeepAliveDurationMillis()));
 
     // For fetches, use a client with a read timeout.
     OkHttpClient fetchClient = storeClient.clone();
@@ -251,14 +267,29 @@ public class ArtifactCaches {
           });
     }
 
+    fetchClient.networkInterceptors().add((new Interceptor() {
+      @Override
+      public Response intercept(Chain chain) throws IOException {
+        Response originalResponse = chain.proceed(chain.request());
+        return originalResponse.newBuilder()
+            .body(new ProgressResponseBody(originalResponse.body(), buckEventBus))
+            .build();
+      }
+    }));
+
     HttpService fetchService = null;
     HttpService storeService = null;
     switch (config.getLoadBalancingType()) {
       case CLIENT_SLB:
         HttpLoadBalancer clientSideSlb = config.getSlbConfig().createHttpClientSideSlb(
-            new DefaultClock());
-        fetchService = new LoadBalancedService(clientSideSlb, fetchClient);
-        storeService = new LoadBalancedService(clientSideSlb, storeClient);
+            new DefaultClock(),
+            buckEventBus);
+        fetchService =
+            new RetryingHttpService(
+                buckEventBus,
+                new LoadBalancedService(clientSideSlb, fetchClient, buckEventBus),
+                config.getMaxFetchRetries());
+        storeService = new LoadBalancedService(clientSideSlb, storeClient, buckEventBus);
         break;
 
       case SINGLE_SERVER:
@@ -288,6 +319,52 @@ public class ArtifactCaches {
         doStore,
         projectFilesystem,
         buckEventBus,
-        httpWriteExecutorService);
+        httpWriteExecutorService,
+        cacheDescription.getErrorMessageFormat(),
+        Optional.<Long>absent());
+  }
+
+  private static class ProgressResponseBody extends ResponseBody {
+
+    private final ResponseBody responseBody;
+    private BuckEventBus buckEventBus;
+    private BufferedSource bufferedSource;
+
+    public ProgressResponseBody(
+        ResponseBody responseBody,
+        BuckEventBus buckEventBus) throws IOException {
+      this.responseBody = responseBody;
+      this.buckEventBus = buckEventBus;
+      this.bufferedSource = Okio.buffer(source(responseBody.source()));
+    }
+
+    @Override
+    public MediaType contentType() {
+      return responseBody.contentType();
+    }
+
+    @Override
+    public long contentLength() throws IOException {
+      return responseBody.contentLength();
+    }
+
+    @Override
+    public BufferedSource source() throws IOException {
+      return bufferedSource;
+    }
+
+    private Source source(Source source) {
+      return new ForwardingSource(source) {
+        @Override
+        public long read(Buffer sink, long byteCount) throws IOException {
+          long bytesRead = super.read(sink, byteCount);
+          // read() returns the number of bytes read, or -1 if this source is exhausted.
+          if (byteCount != -1) {
+            buckEventBus.post(new BytesReceivedEvent(byteCount));
+          }
+          return bytesRead;
+        }
+      };
+    }
   }
 }

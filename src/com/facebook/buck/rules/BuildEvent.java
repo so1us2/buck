@@ -18,6 +18,7 @@ package com.facebook.buck.rules;
 
 import com.facebook.buck.event.AbstractBuckEvent;
 import com.facebook.buck.event.EventKey;
+import com.facebook.buck.event.WorkAdvanceEvent;
 import com.facebook.buck.model.BuildTarget;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -27,14 +28,18 @@ import com.google.common.collect.ImmutableSet;
 /**
  * Base class for events about building.
  */
-public abstract class BuildEvent extends AbstractBuckEvent {
+public abstract class BuildEvent extends AbstractBuckEvent implements WorkAdvanceEvent {
 
   public BuildEvent(EventKey eventKey) {
     super(eventKey);
   }
 
   public static Started started(Iterable<String> buildArgs) {
-    return new Started(ImmutableSet.copyOf(buildArgs));
+    return started(buildArgs, false);
+  }
+
+  public static Started started(Iterable<String> buildArgs, boolean isDistributedBuild) {
+    return new Started(ImmutableSet.copyOf(buildArgs), isDistributedBuild);
   }
 
   public static Finished finished(Started started, int exitCode) {
@@ -47,18 +52,24 @@ public abstract class BuildEvent extends AbstractBuckEvent {
     return new RuleCountCalculated(buildTargets, ruleCount);
   }
 
+  public static UnskippedRuleCountUpdated unskippedRuleCountUpdated(int ruleCount) {
+    return new UnskippedRuleCountUpdated(ruleCount);
+  }
+
   public static class Started extends BuildEvent {
 
     private final ImmutableSet<String> buildArgs;
+    private final boolean isDistributedBuild;
 
-    protected Started(ImmutableSet<String> buildArgs) {
+    protected Started(ImmutableSet<String> buildArgs, boolean isDistributedBuild) {
       super(EventKey.unique());
       this.buildArgs = buildArgs;
+      this.isDistributedBuild = isDistributedBuild;
     }
 
     @Override
     public String getEventName() {
-      return "BuildStarted";
+      return BUILD_STARTED;
     }
 
     @Override
@@ -68,6 +79,10 @@ public abstract class BuildEvent extends AbstractBuckEvent {
 
     public ImmutableSet<String> getBuildArgs() {
       return buildArgs;
+    }
+
+    public boolean isDistributedBuild() {
+      return isDistributedBuild;
     }
   }
 
@@ -92,7 +107,7 @@ public abstract class BuildEvent extends AbstractBuckEvent {
 
     @Override
     public String getEventName() {
-      return "BuildFinished";
+      return BUILD_FINISHED;
     }
 
     @Override
@@ -161,4 +176,37 @@ public abstract class BuildEvent extends AbstractBuckEvent {
     }
   }
 
+  public static class UnskippedRuleCountUpdated extends BuildEvent {
+
+    private final int numRules;
+
+    protected UnskippedRuleCountUpdated(int numRulesToBuild) {
+      super(EventKey.unique());
+      this.numRules = numRulesToBuild;
+    }
+
+    public int getNumRules() {
+      return numRules;
+    }
+
+    @Override
+    public String getEventName() {
+      return "UnskippedRuleCountUpdated";
+    }
+
+    @Override
+    protected String getValueString() {
+      return Integer.toString(numRules);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+      return System.identityHashCode(this);
+    }
+  }
 }

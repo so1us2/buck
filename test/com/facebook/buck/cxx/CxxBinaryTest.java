@@ -18,17 +18,21 @@ package com.facebook.buck.cxx;
 
 import static org.junit.Assert.assertTrue;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.CommandTool;
 import com.facebook.buck.rules.FakeBuildRuleParamsBuilder;
+import com.facebook.buck.rules.RuleScheduleInfo;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.Arg;
+import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.rules.coercer.FrameworkPath;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 
@@ -43,7 +47,7 @@ public class CxxBinaryTest {
   @Test
   public void getExecutableCommandUsesAbsolutePath() throws IOException {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     BuildRuleParams linkParams = new FakeBuildRuleParamsBuilder("//:link").build();
@@ -53,20 +57,24 @@ public class CxxBinaryTest {
             new CxxLink(
                 linkParams,
                 pathResolver,
-                CxxPlatformUtils.DEFAULT_PLATFORM.getLd(),
+                CxxPlatformUtils.DEFAULT_PLATFORM.getLd().resolve(ruleResolver),
                 bin,
-                ImmutableList.<Arg>of()));
+                ImmutableList.<Arg>of(),
+                Optional.<RuleScheduleInfo>absent(),
+                /* cacheable */ true));
     BuildRuleParams params = new FakeBuildRuleParamsBuilder("//:target").build();
     CxxBinary binary =
         ruleResolver.addToIndex(
             new CxxBinary(
-                params,
+                params.appendExtraDeps(ImmutableSortedSet.<BuildRule>of(cxxLink)),
                 ruleResolver,
                 pathResolver,
-                bin,
                 cxxLink,
                 new CommandTool.Builder()
-                    .addArg(new BuildTargetSourcePath(cxxLink.getBuildTarget()))
+                    .addArg(
+                        new SourcePathArg(
+                            pathResolver,
+                            new BuildTargetSourcePath(cxxLink.getBuildTarget())))
                     .build(),
                 ImmutableSortedSet.<FrameworkPath>of(),
                 ImmutableList.<BuildTarget>of()));

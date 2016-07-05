@@ -39,9 +39,9 @@ public class CxxLibraryBuilder extends
     super(
         new CxxLibraryDescription(
             cxxBuckConfig,
+            DefaultCxxPlatforms.build(cxxBuckConfig),
             new InferBuckConfig(FakeBuckConfig.builder().build()),
-            cxxPlatforms,
-            CxxPreprocessMode.SEPARATE),
+            cxxPlatforms),
         target);
   }
 

@@ -36,6 +36,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.SourcePaths;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirAndSymlinkFileStep;
@@ -59,6 +60,9 @@ public class JavaBinary extends AbstractBuildRule
   private static final BuildableProperties OUTPUT_TYPE = new BuildableProperties(PACKAGING);
 
   @AddToRuleKey
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
+
+  @AddToRuleKey
   @Nullable
   private final String mainClass;
 
@@ -78,6 +82,7 @@ public class JavaBinary extends AbstractBuildRule
   public JavaBinary(
       BuildRuleParams params,
       SourcePathResolver resolver,
+      JavaRuntimeLauncher javaRuntimeLauncher,
       @Nullable String mainClass,
       @Nullable SourcePath manifestFile,
       boolean mergeManifests,
@@ -86,6 +91,7 @@ public class JavaBinary extends AbstractBuildRule
       DirectoryTraverser directoryTraverser,
       ImmutableSetMultimap<JavaLibrary, Path> transitiveClasspathEntries) {
     super(params, resolver);
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.mainClass = mainClass;
     this.manifestFile = manifestFile;
     this.mergeManifests = mergeManifests;
@@ -194,9 +200,9 @@ public class JavaBinary extends AbstractBuildRule
         getBuildTarget());
 
     return new CommandTool.Builder()
-        .addArg("java")
+        .addArg(javaRuntimeLauncher.getCommand())
         .addArg("-jar")
-        .addArg(new BuildTargetSourcePath(getBuildTarget()))
+        .addArg(new SourcePathArg(getResolver(), new BuildTargetSourcePath(getBuildTarget())))
         .build();
   }
 }

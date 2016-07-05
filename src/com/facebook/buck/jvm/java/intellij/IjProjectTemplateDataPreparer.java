@@ -22,6 +22,7 @@ import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.util.immutables.BuckStyleImmutable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
@@ -38,6 +39,7 @@ import java.nio.file.FileVisitor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +53,13 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class IjProjectTemplateDataPreparer {
+  private static final String ANDROID_MANIFEST_TEMPLATE_PARAMETER = "android_manifest";
+  private static final String APK_PATH_TEMPLATE_PARAMETER = "apk_path";
+  private static final String ASSETS_FOLDER_TEMPLATE_PARAMETER = "asset_folder";
+  private static final String PROGUARD_CONFIG_TEMPLATE_PARAMETER = "proguard_config";
+  private static final String RESOURCES_RELATIVE_PATH_TEMPLATE_PARAMETER = "res";
+
+  private static final String EMPTY_STRING = "";
 
   private JavaPackageFinder javaPackageFinder;
   private IjModuleGraph moduleGraph;
@@ -175,10 +184,11 @@ public class IjProjectTemplateDataPreparer {
 
   @Value.Immutable
   @BuckStyleImmutable
-  public abstract static class AbstractIjSourceFolder implements Comparable<IjSourceFolder> {
+  abstract static class AbstractIjSourceFolder implements Comparable<IjSourceFolder> {
     public abstract String getType();
     public abstract String getUrl();
     public abstract boolean getIsTestSource();
+    public abstract boolean getIsAndroidResources();
     @Nullable public abstract String getPackagePrefix();
 
     @Override
@@ -193,7 +203,7 @@ public class IjProjectTemplateDataPreparer {
 
   @Value.Immutable
   @BuckStyleImmutable
-  public abstract static class AbstractContentRoot implements Comparable<ContentRoot> {
+  abstract static class AbstractContentRoot implements Comparable<ContentRoot> {
     public abstract String getUrl();
     public abstract ImmutableSortedSet<IjSourceFolder> getFolders();
 
@@ -215,36 +225,8 @@ public class IjProjectTemplateDataPreparer {
     return librariesToBeWritten;
   }
 
-  private IjSourceFolder createSourceFolder(IjFolder folder, Path moduleLocationBasePath) {
-    return IjSourceFolder.builder()
-        .setType(folder.getIjName())
-        .setUrl(toModuleDirRelativeString(folder.getPath(), moduleLocationBasePath))
-        .setIsTestSource(folder instanceof TestFolder)
-        .setPackagePrefix(getPackagPrefix(folder))
-        .build();
-  }
-
-  @Nullable
-  private String getPackagPrefix(IjFolder folder) {
-    if (!folder.getWantsPackagePrefix()) {
-      return null;
-    }
-    Path fileToLookupPackageIn;
-    if (!folder.getInputs().isEmpty() &&
-        folder.getInputs().first().getParent().equals(folder.getPath())) {
-      fileToLookupPackageIn = folder.getInputs().first();
-    } else {
-      fileToLookupPackageIn = folder.getPath().resolve("notfound");
-    }
-    String packagePrefix = javaPackageFinder.findJavaPackage(fileToLookupPackageIn);
-    if (packagePrefix.isEmpty()) {
-      // It doesn't matter either way, but an empty prefix looks confusing.
-      return null;
-    }
-    return packagePrefix;
-  }
-
   private ContentRoot createContentRoot(
+      final IjModule module,
       Path contentRootPath,
       ImmutableSet<IjFolder> folders,
       final Path moduleLocationBasePath) {
@@ -253,13 +235,7 @@ public class IjProjectTemplateDataPreparer {
         SimplificationLimit.of(contentRootPath.getNameCount()),
         folders);
     ImmutableSortedSet<IjSourceFolder> sourceFolders = FluentIterable.from(simplifiedFolders)
-        .transform(
-            new Function<IjFolder, IjSourceFolder>() {
-              @Override
-              public IjSourceFolder apply(IjFolder input) {
-                return createSourceFolder(input, moduleLocationBasePath);
-              }
-            })
+        .transform(new IjFolderToIjSourceFolderTransform(module))
         .toSortedSet(Ordering.natural());
     return ContentRoot.builder()
         .setUrl(url)
@@ -267,7 +243,7 @@ public class IjProjectTemplateDataPreparer {
         .build();
   }
 
-  public ImmutableSet<IjFolder> createExcludes(IjModule module) throws IOException {
+  public ImmutableSet<IjFolder> createExcludes(final IjModule module) throws IOException {
     final ImmutableSet.Builder<IjFolder> excludesBuilder = ImmutableSet.builder();
     final Path moduleBasePath = module.getModuleBasePath();
     projectFilesystem.walkRelativeFileTree(
@@ -280,6 +256,11 @@ public class IjProjectTemplateDataPreparer {
             if (filesystemTraversalBoundaryPaths.contains(dir) && !moduleBasePath.equals(dir)) {
               return FileVisitResult.SKIP_SUBTREE;
             }
+
+            if (isRootAndroidResourceDirectory(module, dir)) {
+              return FileVisitResult.SKIP_SUBTREE;
+            }
+
             if (!referencedFolderPaths.contains(dir)) {
               excludesBuilder.add(new ExcludeFolder(dir));
               return FileVisitResult.SKIP_SUBTREE;
@@ -307,6 +288,20 @@ public class IjProjectTemplateDataPreparer {
     return excludesBuilder.build();
   }
 
+  private boolean isRootAndroidResourceDirectory(IjModule module, Path dir) {
+    if (!module.getAndroidFacet().isPresent()) {
+      return false;
+    }
+
+    for (Path resourcePath : module.getAndroidFacet().get().getResourcePaths()) {
+      if (dir.equals(resourcePath)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   public ContentRoot getContentRoot(IjModule module) throws IOException {
     Path moduleBasePath = module.getModuleBasePath();
     Path moduleLocation = module.getModuleImlFilePath();
@@ -315,7 +310,13 @@ public class IjProjectTemplateDataPreparer {
     ImmutableSet<IjFolder> sourcesAndExcludes = FluentIterable.from(module.getFolders())
         .append(createExcludes(module))
         .toSet();
-    return createContentRoot(moduleBasePath, sourcesAndExcludes, moduleLocationBasePath);
+    return createContentRoot(module, moduleBasePath, sourcesAndExcludes, moduleLocationBasePath);
+  }
+
+  public ImmutableSet<IjSourceFolder> getGeneratedSourceFolders(final IjModule module) {
+    return FluentIterable.from(module.getGeneratedSourceCodeFolders())
+        .transform(new IjFolderToIjSourceFolderTransform(module))
+        .toSet();
   }
 
   public ImmutableSet<DependencyEntry> getDependencies(IjModule module) {
@@ -368,4 +369,195 @@ public class IjProjectTemplateDataPreparer {
             })
         .toSortedSet(Ordering.natural());
   }
+
+
+  public Map<String, Object> getAndroidProperties(IjModule module)  throws IOException {
+    Map<String, Object> androidProperties = new HashMap<>();
+    Optional<IjModuleAndroidFacet> androidFacetOptional = module.getAndroidFacet();
+
+    boolean isAndroidFacetPresent = androidFacetOptional.isPresent();
+    androidProperties.put("enabled", isAndroidFacetPresent);
+    if (!isAndroidFacetPresent) {
+      return androidProperties;
+    }
+
+    IjModuleAndroidFacet androidFacet = androidFacetOptional.get();
+
+    androidProperties.put("is_android_library_project", androidFacet.isAndroidLibrary());
+
+    Path basePath = module.getModuleBasePath();
+
+    addAndroidConstants(androidProperties);
+
+    addAndroidApkPaths(androidProperties, module, basePath, androidFacet);
+    addAndroidAssetPaths(androidProperties, androidFacet);
+    addAndroidGenPath(androidProperties, basePath);
+    addAndroidManifestPath(androidProperties, basePath, androidFacet);
+    addAndroidProguardPath(androidProperties, androidFacet);
+    addAndroidResourcePaths(androidProperties, module, androidFacet);
+
+    return androidProperties;
+  }
+
+  private void addAndroidConstants(Map<String, Object> androidProperties) {
+    androidProperties.put("enable_sources_autogeneration", true);
+    androidProperties.put("run_proguard", false);
+
+    // TODO(alsutton): Fix keystore detection
+    androidProperties.put("keystore", "");
+
+    // TODO(alsutton): See if we need nativeLibs and libs
+    androidProperties.put("libs_path", "/libs");
+  }
+
+  private void addAndroidApkPaths(
+      Map<String, Object> androidProperties,
+      IjModule module,
+      Path moduleBasePath,
+      IjModuleAndroidFacet androidFacet) {
+    if (androidFacet.isAndroidLibrary()) {
+      androidProperties.put(APK_PATH_TEMPLATE_PARAMETER, EMPTY_STRING);
+      return;
+    }
+
+    Path apkPath = moduleBasePath
+        .relativize(Paths.get(""))
+        .resolve(Project.ANDROID_APK_DIR)
+        .resolve(Paths.get("").relativize(moduleBasePath))
+        .resolve(module.getName() + ".apk");
+    androidProperties.put(APK_PATH_TEMPLATE_PARAMETER, apkPath);
+  }
+
+  private void addAndroidAssetPaths(
+      Map<String, Object> androidProperties,
+      IjModuleAndroidFacet androidFacet) {
+    ImmutableSet<Path> assetPaths = androidFacet.getAssetPaths();
+    if (assetPaths.isEmpty()) {
+      androidProperties.put(ASSETS_FOLDER_TEMPLATE_PARAMETER, "/assets");
+    } else {
+      androidProperties.put(
+          ASSETS_FOLDER_TEMPLATE_PARAMETER,
+          "/" + Joiner.on(";/").join(androidFacet.getAssetPaths()));
+    }
+  }
+
+  private void addAndroidGenPath(
+      Map<String, Object> androidProperties,
+      Path moduleBasePath) {
+    androidProperties.put(
+        "module_gen_path",
+        "/" + moduleBasePath
+            .relativize(Paths.get(""))
+            .resolve(Project.ANDROID_GEN_DIR)
+            .resolve(Paths.get("").relativize(moduleBasePath))
+            .resolve("gen"));
+  }
+
+  private void addAndroidManifestPath(
+      Map<String, Object> androidProperties,
+      Path moduleBasePath,
+      IjModuleAndroidFacet androidFacet) {
+    Optional<Path> androidManifestPath = androidFacet.getManifestPath();
+    Path manifestPath;
+    if (androidManifestPath.isPresent()) {
+      manifestPath = androidManifestPath.get();
+    } else {
+      manifestPath = moduleBasePath
+                      .relativize(
+                          Paths
+                            .get("")
+                            .resolve("android_res/AndroidManifest.xml"));
+
+    }
+    androidProperties.put(ANDROID_MANIFEST_TEMPLATE_PARAMETER, "/" + manifestPath);
+  }
+
+  private void addAndroidProguardPath(
+      Map<String, Object> androidProperties,
+      IjModuleAndroidFacet androidFacet) {
+    Optional<Path> proguardPath = androidFacet.getProguardConfigPath();
+    if (proguardPath.isPresent()) {
+      androidProperties.put(PROGUARD_CONFIG_TEMPLATE_PARAMETER, proguardPath.get());
+    } else {
+      androidProperties.put(PROGUARD_CONFIG_TEMPLATE_PARAMETER, EMPTY_STRING);
+    }
+  }
+
+  private void addAndroidResourcePaths(
+      Map<String, Object> androidProperties,
+      IjModule module,
+      IjModuleAndroidFacet androidFacet) {
+    ImmutableSet<Path> resourcePaths = androidFacet.getResourcePaths();
+    if (resourcePaths.isEmpty()) {
+      androidProperties.put(RESOURCES_RELATIVE_PATH_TEMPLATE_PARAMETER, EMPTY_STRING);
+    } else {
+      Set<Path> relativeResourcePaths = new HashSet<>(resourcePaths.size());
+      Path moduleBase = module.getModuleBasePath();
+      for (Path resourcePath : resourcePaths) {
+        relativeResourcePaths.add(moduleBase.relativize(resourcePath));
+      }
+
+      androidProperties.put(
+          RESOURCES_RELATIVE_PATH_TEMPLATE_PARAMETER,
+          "/" + Joiner.on(";/").join(relativeResourcePaths));
+    }
+  }
+
+  private class IjFolderToIjSourceFolderTransform implements Function<IjFolder, IjSourceFolder> {
+    private Path moduleBasePath;
+    private Optional<IjModuleAndroidFacet> androidFacet;
+
+    IjFolderToIjSourceFolderTransform(IjModule module) {
+      moduleBasePath = module.getModuleBasePath();
+      androidFacet = module.getAndroidFacet();
+    }
+
+    @Override
+    public IjSourceFolder apply(IjFolder input) {
+      String packagePrefix;
+      if (input instanceof AndroidResourceFolder &&
+          androidFacet.isPresent() &&
+          androidFacet.get().getPackageName().isPresent()) {
+        packagePrefix = androidFacet.get().getPackageName().get();
+      } else {
+        packagePrefix = getPackagePrefix(input);
+      }
+      return createSourceFolder(input, moduleBasePath, packagePrefix);
+    }
+
+    private IjSourceFolder createSourceFolder(
+        IjFolder folder,
+        Path moduleLocationBasePath,
+        String packagePrefix) {
+      return IjSourceFolder.builder()
+          .setType(folder.getIjName())
+          .setUrl(toModuleDirRelativeString(folder.getPath(), moduleLocationBasePath))
+          .setIsTestSource(folder instanceof TestFolder)
+          .setIsAndroidResources(folder instanceof AndroidResourceFolder)
+          .setPackagePrefix(packagePrefix)
+          .build();
+    }
+
+
+    @Nullable
+    private String getPackagePrefix(IjFolder folder) {
+      if (!folder.getWantsPackagePrefix()) {
+        return null;
+      }
+      Path fileToLookupPackageIn;
+      if (!folder.getInputs().isEmpty() &&
+          folder.getInputs().first().getParent().equals(folder.getPath())) {
+        fileToLookupPackageIn = folder.getInputs().first();
+      } else {
+        fileToLookupPackageIn = folder.getPath().resolve("notfound");
+      }
+      String packagePrefix = javaPackageFinder.findJavaPackage(fileToLookupPackageIn);
+      if (packagePrefix.isEmpty()) {
+        // It doesn't matter either way, but an empty prefix looks confusing.
+        return null;
+      }
+      return packagePrefix;
+    }
+  }
+
 }

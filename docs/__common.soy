@@ -176,6 +176,7 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
             'project_config',
         ],
         'core': [
+            'export_file',
             'genrule',
             'remote_file',
             'zip_file',
@@ -200,6 +201,9 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
             'go_library',
             'go_test',
         ],
+        'groovy': [
+            'groovy_library',
+        ],
         'halide': [
             'halide_library',
         ],
@@ -220,6 +224,11 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
             'java_test',
             'prebuilt_jar',
             'prebuilt_native_library',
+        ],
+        'lua': [
+            'cxx_lua_extension',
+            'lua_binary',
+            'lua_library',
         ],
         'python': [
             'prebuilt_python_library',
@@ -286,6 +295,10 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
         {param rules: $platformRulesMap['go'] /}
     {/call}
     {call .platformBuildRuleLink}
+        {param platform: 'Groovy' /}
+        {param rules: $platformRulesMap['groovy'] /}
+    {/call}
+    {call .platformBuildRuleLink}
         {param platform: 'Halide' /}
         {param rules: $platformRulesMap['halide'] /}
     {/call}
@@ -296,6 +309,10 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
     {call .platformBuildRuleLink}
         {param platform: 'Java' /}
         {param rules: $platformRulesMap['java'] /}
+    {/call}
+    {call .platformBuildRuleLink}
+        {param platform: 'Lua' /}
+        {param rules: $platformRulesMap['lua'] /}
     {/call}
     {call .platformBuildRuleLink}
         {param platform: 'Python' /}
@@ -315,7 +332,9 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
     {foreach $function in [
         'glob',
         'include_defs',
+        'read_config',
         'subdir_glob',
+        'flatten_dicts',
         ]}
       <li><a href="{ROOT}function/{$function}.html">{$function}()</a>
     {/foreach}
@@ -326,6 +345,7 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
     <li><a href="{ROOT}command/common_parameters.html">Common Parameters</a>
     {foreach $command in [
         'audit',
+        'autodeps',
         'build',
         'clean',
         'fetch',
@@ -333,6 +353,7 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
         'project',
         'query',
         'quickstart',
+        'repl',
         'run',
         'root',
         'server',
@@ -427,6 +448,9 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
  * @param args HTML documentation for each arg for the rule.
  *     Should be created using multiple applications of the {buck.arg}
  *     template.
+ * @param? flavors HTML documentation for each flavor supported by the rule.
+ *     Should be created using multiple applications of the {buck.arg}
+ *     template.
  * @param? examples HTML documentation that shows examples of the build
  *     rule in action.
  * @param? furtherexp Further explanation; HTML shown after arguments and
@@ -446,7 +470,14 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 <h2>Arguments</h2>
 <ul class="{css arglist}">
   {$args|noAutoescape}
+  {call buck.visibility_arg /}
+  {call buck.licenses_arg /}
 </ul>
+
+{if $flavors}
+  <h2>Flavors</h2>
+  {$flavors|noAutoescape}
+{/if}
 
 {if $examples}
   <h2>Examples</h2>
@@ -456,7 +487,6 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
   {$furtherexp|noAutoescape}
 {/if}
 {/template}
-
 
 /**
  * Used to format an argument to a build rule.
@@ -529,15 +559,40 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 
 /**
  * @param overview HTML description of the function.
+ * @param status one of FROZEN, UNFROZEN, or DEPRECATED to indicate the
+       current level of support for the rule.
  * @param args HTML documentation for each arg for the function.
  *     Should be created using multiple applications of the {buck.functionArg}
  *     template.
  * @param? examples HTML documentation that shows examples of the function
  *     in action.
+ * @param? furtherexp Further explanation; HTML shown after arguments and
+        examples.
  */
 {template .function}
-  // For now, functions and build rules should be documented the same way.
-  {call .rule data="all" /}
+{switch $status}
+  {case 'FROZEN'}
+    // Nothing to show here.
+  {case 'UNFROZEN'}
+    <p><small>This is liable to change in the future.</small></p>
+  {case 'DEPRECATED'}
+    <p><small>This will be removed in the future.</small></p>
+{/switch}
+{$overview|noAutoescape}
+
+<h2>Arguments</h2>
+<ul class="{css arglist}">
+  {$args|noAutoescape}
+</ul>
+
+{if $examples}
+  <h2>Examples</h2>
+  {$examples|noAutoescape}
+{/if}
+
+{if $furtherexp}
+  {$furtherexp|noAutoescape}
+{/if}
 {/template}
 
 
@@ -613,8 +668,33 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 {/template}
 
 /***/
+{template .groovy_library}
+{call .ruleLink}{param name : 'groovy_library' /}{/call}
+{/template}
+
+/***/
 {template .java_library}
 {call .ruleLink}{param name : 'java_library' /}{/call}
+{/template}
+
+/***/
+{template .java_test}
+{call .ruleLink}{param name : 'java_test' /}{/call}
+{/template}
+
+/***/
+{template .cxx_lua_extension}
+{call .ruleLink}{param name : 'cxx_lua_extension' /}{/call}
+{/template}
+
+/***/
+{template .lua_binary}
+{call .ruleLink}{param name : 'lua_binary' /}{/call}
+{/template}
+
+/***/
+{template .lua_library}
+{call .ruleLink}{param name : 'lua_library' /}{/call}
 {/template}
 
 /***/
@@ -635,6 +715,11 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 /***/
 {template .project_config}
 {call .ruleLink}{param name : 'project_config' /}{/call}
+{/template}
+
+/***/
+{template .prebuilt_cxx_library}
+{call .ruleLink}{param name : 'prebuilt_cxx_library' /}{/call}
 {/template}
 
 /***/
@@ -673,9 +758,25 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 {/template}
 
 /***/
+{template .fn_include_defs}
+<a href="{ROOT}function/include_defs.html"><code>include_defs()</code></a>
+{/template}
+
+/***/
+{template .fn_read_config}
+<a href="{ROOT}function/read_config.html"><code>read_config()</code></a>
+{/template}
+
+/***/
 {template .string_parameter_macros}
 <a href="{ROOT}function/string_parameter_macros.html">string parameter macros</a>
 {/template}
+
+/***/
+{template .fn_flatten_dicts}
+<a href="{ROOT}function/flatten_dicts.html"><code>flatten_dicts()</code></a>
+{/template}
+
 
 /**
  * @param page
@@ -688,6 +789,11 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 /***/
 {template .build_file}
 {call .concept_link}{param page: 'build_file' /}{param name: 'build file' /}{/call}
+{/template}
+
+/***/
+{template .build_rule}
+{call .concept_link}{param page: 'build_rule' /}{param name: 'build rule' /}{/call}
 {/template}
 
 /***/
@@ -708,6 +814,11 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
  */
 {template .cmd_link}
 <a href="{ROOT}command/{$name}.html"><code>buck {$name}</code></a>
+{/template}
+
+/***/
+{template .cmd_autodeps}
+{call .cmd_link}{param name : 'autodeps' /}{/call}
 {/template}
 
 /***/
@@ -741,6 +852,11 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 {/template}
 
 /***/
+{template .cmd_repl}
+{call .cmd_link}{param name : 'repl' /}{/call}
+{/template}
+
+/***/
 {template .cmd_run}
 {call .cmd_link}{param name : 'run' /}{/call}
 {/template}
@@ -751,20 +867,35 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
 {/template}
 
 /***/
+{template .cmd_test}
+{call .cmd_link}{param name: 'test' /}{/call}
+{/template}
+
+/***/
 {template .cmd_uninstall}
 {call .cmd_link}{param name : 'uninstall' /}{/call}
 {/template}
 
-/**
- * @param section
- */
-{template .concept_buckconfig_section}
-<a href="{ROOT}concept/buckconfig.html#{$section}"><code>.buckconfig</code></a>
+/***/
+{template .cmd_query}
+{call .cmd_link}{param name : 'query' /}{/call}
 {/template}
 
 /***/
 {template .concept_buckconfig}
 <a href="{ROOT}concept/buckconfig.html"><code>.buckconfig</code></a>
+{/template}
+
+/***/
+{template .licenses_arg}
+{call buck.arg}
+  {param name: 'licenses' /}
+  {param default: '[]' /}
+  {param desc}
+  Set of license files for this library.  To get the list of license files for a given{sp}
+  {call buck.build_rule /} and all of its dependencies, you can use {call buck.cmd_query /}.
+  {/param}
+{/call}
 {/template}
 
 /***/
@@ -832,7 +963,7 @@ src="https://www.facebook.com/tr?id=1637165926500152&ev=PageView&noscript=1"
   {param desc}
   If set specifies the maximum amount of time (in milliseconds) in which all of the tests in this
   rule should complete. This overrides the default <code>rule_timeout</code> if any has been
-  specified in {call buck.concept_buckconfig_section}{param section : 'test' /}{/call}.
+  specified in {call buckconfig.test_rule_timeout /}.
   {/param}
 {/call}
 {/template}

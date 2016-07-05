@@ -16,13 +16,13 @@
 
 package com.facebook.buck.slb;
 
-import java.io.IOException;
 import java.net.URI;
 
 public interface HttpLoadBalancer extends AutoCloseable {
-  URI getBestServer() throws IOException;
+  URI getBestServer() throws NoHealthyServersException;
 
-  void reportException(URI server);
+  void reportRequestSuccess(URI server);
+  void reportRequestException(URI server);
 
   @Override
   void close();

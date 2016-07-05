@@ -31,11 +31,11 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Supplier;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.TreeMultimap;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -45,7 +45,6 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 
 public class QueryCommand extends AbstractCommand {
@@ -137,7 +136,7 @@ public class QueryCommand extends AbstractCommand {
   static int runMultipleQuery(
       CommandRunnerParams params,
       BuckQueryEnvironment env,
-      Executor executor,
+      ListeningExecutorService executor,
       String queryFormat,
       List<String> inputsFormattedAsBuildTargets,
       boolean generateJsonOutput)
@@ -168,14 +167,14 @@ public class QueryCommand extends AbstractCommand {
   int runSingleQuery(
       CommandRunnerParams params,
       BuckQueryEnvironment env,
-      Executor executor,
+      ListeningExecutorService executor,
       String query)
       throws IOException, InterruptedException, QueryException {
     Set<QueryTarget> queryResult = env.evaluateQuery(query, executor);
 
     LOG.debug("Printing out the following targets: " + queryResult);
     if (shouldOutputAttributes()) {
-      collectAndPrintAttributes(params, env, queryResult);
+      collectAndPrintAttributes(params, executor, env, queryResult);
     } else if (shouldGenerateDotOutput()) {
       printDotOutput(params, env, queryResult);
     } else if (shouldGenerateJsonOutput()) {
@@ -206,6 +205,7 @@ public class QueryCommand extends AbstractCommand {
 
   private void collectAndPrintAttributes(
       CommandRunnerParams params,
+      ListeningExecutorService executor,
       BuckQueryEnvironment env,
       Set<QueryTarget> queryResult)
       throws InterruptedException, IOException, QueryException {
@@ -220,6 +220,7 @@ public class QueryCommand extends AbstractCommand {
             params.getBuckEventBus(),
             params.getCell(),
             getEnableProfiling(),
+            executor,
             node);
         if (sortedTargetRule == null) {
           params.getConsole().printErrorText(
@@ -251,7 +252,7 @@ public class QueryCommand extends AbstractCommand {
       params.getObjectMapper().writerWithDefaultPrettyPrinter().writeValue(stringWriter, result);
     } catch (IOException e) {
       // Shouldn't be possible while writing to a StringWriter...
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     String output = stringWriter.getBuffer().toString();
     params.getConsole().getStdOut().println(output);

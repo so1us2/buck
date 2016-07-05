@@ -35,6 +35,7 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.keys.AbiRule;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
+import com.facebook.buck.step.fs.MkdirStep;
 import com.facebook.buck.step.fs.WriteFileStep;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -59,6 +60,8 @@ public class DummyRDotJava extends AbstractBuildRule
   @AddToRuleKey
   private final JavacOptions javacOptions;
   @AddToRuleKey
+  private final boolean forceFinalResourceIds;
+  @AddToRuleKey
   private final Optional<String> unionPackage;
 
   public DummyRDotJava(
@@ -67,6 +70,7 @@ public class DummyRDotJava extends AbstractBuildRule
       Set<HasAndroidResourceDeps> androidResourceDeps,
       SourcePath abiJar,
       JavacOptions javacOptions,
+      boolean forceFinalResourceIds,
       Optional<String> unionPackage) {
     super(params, resolver);
     // Sort the input so that we get a stable ABI for the same set of resources.
@@ -74,6 +78,7 @@ public class DummyRDotJava extends AbstractBuildRule
         .toSortedList(HasBuildTarget.BUILD_TARGET_COMPARATOR);
     this.abiJar = abiJar;
     this.javacOptions = javacOptions;
+    this.forceFinalResourceIds = forceFinalResourceIds;
     this.unionPackage = unionPackage;
   }
 
@@ -109,6 +114,7 @@ public class DummyRDotJava extends AbstractBuildRule
           getResolver(),
           androidResourceDeps,
           rDotJavaSrcFolder,
+          forceFinalResourceIds,
           unionPackage);
       steps.add(mergeStep);
       javaSourceFilePaths = mergeStep.getRDotJavaFiles();
@@ -122,10 +128,14 @@ public class DummyRDotJava extends AbstractBuildRule
     steps.add(new MakeCleanDirectoryStep(getProjectFilesystem(), pathToAbiOutputDir));
     Path pathToAbiOutputFile = pathToAbiOutputDir.resolve("abi.jar");
 
+    Path pathToSrcsList = BuildTargets.getGenPath(getBuildTarget(), "__%s__srcs");
+    steps.add(new MkdirStep(getProjectFilesystem(), pathToSrcsList.getParent()));
+
     // Compile the .java files.
     final JavacStep javacStep =
         RDotJava.createJavacStepForDummyRDotJavaFiles(
             javaSourceFilePaths,
+            pathToSrcsList,
             rDotJavaClassesFolder,
             javacOptions,
             getBuildTarget(),

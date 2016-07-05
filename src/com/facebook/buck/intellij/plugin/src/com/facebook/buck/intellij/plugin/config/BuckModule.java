@@ -16,33 +16,42 @@
 
 package com.facebook.buck.intellij.plugin.config;
 
+import com.facebook.buck.intellij.plugin.debugger.AndroidDebugger;
+import com.facebook.buck.intellij.plugin.file.BuckFileType;
 import com.facebook.buck.intellij.plugin.ui.BuckEventsConsumer;
 import com.facebook.buck.intellij.plugin.ui.BuckToolWindowFactory;
 import com.facebook.buck.intellij.plugin.ui.BuckUIManager;
 import com.facebook.buck.intellij.plugin.ws.BuckClient;
-import com.facebook.buck.intellij.plugin.ws.buckevents.BuckEventHandler;
-import com.facebook.buck.intellij.plugin.ws.buckevents.BuckEventsQueue;
+import com.facebook.buck.intellij.plugin.ws.buckevents.BuckEventsHandler;
 import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckEventsConsumerFactory;
+import com.facebook.buck.util.HumanReadableException;
+import com.intellij.execution.ExecutionException;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.ProjectComponent;
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileTypes.FileNameMatcher;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.fileTypes.UnknownFileType;
+import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl;
 import com.intellij.openapi.project.Project;
+
+import java.io.IOException;
+import java.util.List;
 
 public final class BuckModule implements ProjectComponent {
 
     private Project mProject;
     private BuckClient mClient = new BuckClient();
-    private BuckEventHandler mEventHandler;
+    private BuckEventsHandler mEventHandler;
     private BuckEventsConsumer mBu;
+    private static final Logger LOG = Logger.getInstance(BuckModule.class);
 
     public BuckModule(final Project project) {
         mProject = project;
-
-        BuckEventsConsumerFactory consumerFactory = new BuckEventsConsumerFactory(project);
-        BuckEventsQueue queue = new BuckEventsQueue(consumerFactory);
-
-        mEventHandler = new BuckEventHandler(
-            queue,
+        mEventHandler = new BuckEventsHandler(
+            new BuckEventsConsumerFactory(mProject),
             new Runnable() {
                 @Override
                 public void run() {
@@ -72,7 +81,7 @@ public final class BuckModule implements ProjectComponent {
                         }
                     });
                     BuckModule mod = project.getComponent(BuckModule.class);
-                    mod.disconnect("Received disconnect from the server");
+                    mod.disconnect();
                 }
             }
         );
@@ -97,6 +106,7 @@ public final class BuckModule implements ProjectComponent {
     @Override
     public void projectClosed() {
         disconnect();
+        AndroidDebugger.disconnect();
     }
 
     public boolean isConnected() {
@@ -112,25 +122,57 @@ public final class BuckModule implements ProjectComponent {
         }
     }
 
-    public void disconnect(String message) {
-        if (mClient.isConnected()) {
-            if (mBu != null) {
-                mBu.detachWithMessage(message);
-            }
-            mClient.disconnect();
-        }
-    }
-
     public void connect() {
-        if (!mClient.isConnected()) {
-            BuckWSServerPortUtils wsPortUtils = new BuckWSServerPortUtils();
-            int port = wsPortUtils.getPort(this.mProject.getBasePath());
-            if (port != -1) {
-                mClient = new BuckClient(port, mEventHandler);
-                // Initiate connecting
-                this.mClient.connect();
+        ApplicationManager.getApplication().executeOnPooledThread(new Runnable() {
+            @Override
+            public void run() {
+                if (!mClient.isConnected()) {
+                    BuckWSServerPortUtils wsPortUtils = new BuckWSServerPortUtils();
+                    try {
+                        int port = wsPortUtils.getPort(BuckModule.this.mProject.getBasePath());
+                        mClient = new BuckClient(port, mEventHandler);
+                        // Initiate connecting
+                        BuckModule.this.mClient.connect();
+                    } catch (NumberFormatException e) {
+                        LOG.error(e);
+                    } catch (ExecutionException e) {
+                        LOG.error(e);
+                    } catch (IOException e) {
+                        LOG.error(e);
+                    } catch (HumanReadableException e) {
+                        if (mBu == null) {
+                          attach(new BuckEventsConsumer(mProject), "");
+                        }
+                        mBu.consumeConsoleEvent(e.toString());
+                    }
+                }
             }
-        }
+        });
+
+        ApplicationManager.getApplication().runWriteAction(new Runnable() {
+            @Override
+            public void run() {
+                FileTypeManager fileTypeManager = FileTypeManagerImpl.getInstance();
+
+              FileType fileType = fileTypeManager
+                  .getFileTypeByFileName(BuckFileType.INSTANCE.getDefaultExtension());
+
+              // Remove all FileType associations for BUCK files that are not BuckFileType
+              while (!(fileType instanceof  BuckFileType || fileType instanceof UnknownFileType)) {
+                List<FileNameMatcher> fileNameMatchers = fileTypeManager.getAssociations(fileType);
+
+                for (FileNameMatcher fileNameMatcher : fileNameMatchers) {
+                  if (fileNameMatcher.accept(BuckFileType.INSTANCE.getDefaultExtension())) {
+                    fileTypeManager.removeAssociation(fileType, fileNameMatcher);
+                  }
+                }
+
+                fileType = fileTypeManager
+                    .getFileTypeByFileName(BuckFileType.INSTANCE.getDefaultExtension());
+              }
+            }
+
+        });
     }
 
     public void attach(BuckEventsConsumer bu, String target) {

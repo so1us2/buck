@@ -30,6 +30,7 @@ import com.facebook.buck.event.BuckEventListener;
 import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.json.BuildFileParseException;
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.model.BuildTargetException;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.Pair;
 import com.facebook.buck.parser.Parser;
@@ -44,6 +45,7 @@ import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -51,6 +53,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.martiansoftware.nailgun.NGContext;
 
 import org.ini4j.Ini;
@@ -103,6 +106,35 @@ public class InterCellIntegrationTest {
   }
 
   @Test
+  public void shouldBeAbleToUseTargetsCommandXCell() throws IOException {
+    assumeThat(Platform.detect(), is(not(WINDOWS)));
+
+    Pair<ProjectWorkspace, ProjectWorkspace> cells = prepare(
+        "inter-cell/export-file/primary",
+        "inter-cell/export-file/secondary");
+    ProjectWorkspace primary = cells.getFirst();
+    ProjectWorkspace.ProcessResult result = primary.runBuckCommand(
+        "targets",
+        "--show-target-hash",
+        "//:cxxbinary");
+    result.assertSuccess();
+  }
+
+  @Test
+  public void shouldBeAbleToUseProjectCommandXCell() throws IOException {
+    assumeThat(Platform.detect(), is(not(WINDOWS)));
+
+    Pair<ProjectWorkspace, ProjectWorkspace> cells = prepare(
+        "inter-cell/export-file/primary",
+        "inter-cell/export-file/secondary");
+    ProjectWorkspace primary = cells.getFirst();
+
+    ProjectWorkspace.ProcessResult result = primary.runBuckCommand("project", "//:cxxbinary");
+
+    result.assertSuccess();
+  }
+
+  @Test
   public void shouldBeAbleToUseACxxLibraryXCell() throws IOException {
     assumeThat(Platform.detect(), is(not(WINDOWS)));
 
@@ -113,6 +145,27 @@ public class InterCellIntegrationTest {
 
     ProjectWorkspace.ProcessResult result = primary.runBuckBuild("//:cxxbinary");
 
+    result.assertSuccess();
+  }
+
+  @Test
+  public void shouldBeAbleToUseMultipleXCell() throws IOException {
+    assumeThat(Platform.detect(), is(not(WINDOWS)));
+
+    ProjectWorkspace primary = createWorkspace("inter-cell/multi-cell/primary");
+    primary.setUp();
+    ProjectWorkspace secondary = createWorkspace("inter-cell/multi-cell/secondary");
+    secondary.setUp();
+    ProjectWorkspace ternary = createWorkspace("inter-cell/multi-cell/ternary");
+    ternary.setUp();
+    registerCell(secondary, "ternary", ternary);
+    registerCell(primary, "secondary", secondary);
+
+    primary.runBuckCommand("targets", "--show-target-hash", "//:cxxbinary");
+    secondary.runBuckCommand("targets", "--show-target-hash", "//:cxxlib");
+    ternary.runBuckCommand("targets", "--show-target-hash", "//:cxxlib2");
+
+    ProjectWorkspace.ProcessResult result = primary.runBuckBuild("//:cxxbinary");
     result.assertSuccess();
   }
 
@@ -198,7 +251,7 @@ public class InterCellIntegrationTest {
   @SuppressWarnings("PMD.EmptyCatchBlock")
   @Test
   public void xCellVisibilityShouldWorkAsExpected()
-      throws IOException, InterruptedException, BuildFileParseException {
+      throws IOException, InterruptedException, BuildFileParseException, BuildTargetException {
     try {
       parseTargetForXCellVisibility("//:not-visible-target");
       fail("Did not expect parsing to succeed");
@@ -209,24 +262,24 @@ public class InterCellIntegrationTest {
 
   @Test
   public void xCellVisibilityPatternsBasedOnExplicitBuildTargetsWork()
-      throws InterruptedException, BuildFileParseException, IOException {
+      throws InterruptedException, BuildFileParseException, IOException, BuildTargetException {
     parseTargetForXCellVisibility("//:visible-target");
   }
 
   @Test
   public void xCellSingleDirectoryVisibilityPatternsWork()
-      throws InterruptedException, BuildFileParseException, IOException {
+      throws InterruptedException, BuildFileParseException, IOException, BuildTargetException {
     parseTargetForXCellVisibility("//sub2:directory");
   }
 
   @Test
   public void xCellSubDirectoryVisibilityPatternsWork()
-      throws InterruptedException, BuildFileParseException, IOException {
+      throws InterruptedException, BuildFileParseException, IOException, BuildTargetException {
     parseTargetForXCellVisibility("//sub:wild-card");
   }
 
   private void parseTargetForXCellVisibility(String targetName)
-      throws IOException, InterruptedException, BuildFileParseException {
+      throws IOException, InterruptedException, BuildFileParseException, BuildTargetException {
     Pair<ProjectWorkspace, ProjectWorkspace> cells = prepare(
         "inter-cell/visibility/primary",
         "inter-cell/visibility/secondary");
@@ -237,7 +290,8 @@ public class InterCellIntegrationTest {
     registerCell(secondary, "primary", primary);
 
     // We could just do a build, but that's a little extreme since all we need is the target graph
-    TypeCoercerFactory coercerFactory = new DefaultTypeCoercerFactory();
+    TypeCoercerFactory coercerFactory = new DefaultTypeCoercerFactory(
+        ObjectMappers.newDefaultInstance());
     Parser parser = new Parser(
         new ParserConfig(cells.getFirst().asCell().getBuckConfig()),
         coercerFactory,
@@ -254,7 +308,7 @@ public class InterCellIntegrationTest {
         eventBus,
         primaryCell,
         false,
-        Executors.newSingleThreadExecutor(),
+        MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor()),
         ImmutableSet.of(namedTarget));
   }
 

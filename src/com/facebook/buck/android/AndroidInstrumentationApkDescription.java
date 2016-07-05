@@ -21,12 +21,14 @@ import static com.facebook.buck.model.HasBuildTarget.TO_TARGET;
 import com.facebook.buck.android.AndroidBinary.ExopackageMode;
 import com.facebook.buck.android.AndroidBinary.PackageType;
 import com.facebook.buck.android.ResourcesFilter.ResourceCompressionMode;
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.jvm.java.Classpaths;
 import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.jvm.java.JavacOptions;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasBuildTarget;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -60,16 +62,19 @@ public class AndroidInstrumentationApkDescription
   private final JavacOptions javacOptions;
   private final ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> nativePlatforms;
   private final ListeningExecutorService dxExecutorService;
+  private final CxxBuckConfig cxxBuckConfig;
 
   public AndroidInstrumentationApkDescription(
       ProGuardConfig proGuardConfig,
       JavacOptions androidJavacOptions,
       ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> nativePlatforms,
-      ListeningExecutorService dxExecutorService) {
+      ListeningExecutorService dxExecutorService,
+      CxxBuckConfig cxxBuckConfig) {
     this.proGuardConfig = proGuardConfig;
     this.javacOptions = androidJavacOptions;
     this.nativePlatforms = nativePlatforms;
     this.dxExecutorService = dxExecutorService;
+    this.cxxBuckConfig = cxxBuckConfig;
   }
 
   @Override
@@ -139,7 +144,10 @@ public class AndroidInstrumentationApkDescription
         /* buildConfigValuesFile */ Optional.<SourcePath>absent(),
         /* xzCompressionLevel */ Optional.<Integer>absent(),
         nativePlatforms,
-        dxExecutorService);
+        AndroidBinary.RelinkerMode.DISABLED,
+        dxExecutorService,
+        apkUnderTest.getManifestEntries(),
+        cxxBuckConfig);
 
     AndroidGraphEnhancementResult enhancementResult =
         graphEnhancer.createAdditionalBuildables();
@@ -151,6 +159,7 @@ public class AndroidInstrumentationApkDescription
         new SourcePathResolver(resolver),
         proGuardConfig.getProguardJarOverride(),
         proGuardConfig.getProguardMaxHeapSize(),
+        proGuardConfig.getProguardAgentPath(),
         apkUnderTest,
         rulesToExcludeFromDex,
         enhancementResult,
@@ -171,7 +180,7 @@ public class AndroidInstrumentationApkDescription
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     public SourcePath manifest;
     public BuildTarget apk;
     public Optional<ImmutableSortedSet<BuildTarget>> deps;

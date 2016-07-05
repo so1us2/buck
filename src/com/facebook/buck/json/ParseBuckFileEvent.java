@@ -18,14 +18,17 @@ package com.facebook.buck.json;
 
 import com.facebook.buck.event.AbstractBuckEvent;
 import com.facebook.buck.event.EventKey;
+import com.facebook.buck.event.WorkAdvanceEvent;
 import com.google.common.base.Objects;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Base class for events about parsing build files..
  */
-public abstract class ParseBuckFileEvent extends AbstractBuckEvent {
+public abstract class ParseBuckFileEvent extends AbstractBuckEvent implements WorkAdvanceEvent {
   private final Path buckFilePath;
 
   protected ParseBuckFileEvent(EventKey eventKey, Path buckFilePath) {
@@ -46,8 +49,11 @@ public abstract class ParseBuckFileEvent extends AbstractBuckEvent {
     return new Started(buckFilePath);
   }
 
-  public static Finished finished(Started started, int numRules) {
-    return new Finished(started, numRules);
+  public static Finished finished(
+      Started started,
+      List<Map<String, Object>> rules,
+      String profile) {
+    return new Finished(started, rules, profile);
   }
 
   public static class Started extends ParseBuckFileEvent {
@@ -62,11 +68,13 @@ public abstract class ParseBuckFileEvent extends AbstractBuckEvent {
   }
 
   public static class Finished extends ParseBuckFileEvent {
-    private final int numRules;
+    private final List<Map<String, Object>> rules;
+    private final String profile;
 
-    protected Finished(Started started, int numRules) {
+    protected Finished(Started started, List<Map<String, Object>> rules, String profile) {
       super(started.getEventKey(), started.getBuckFilePath());
-      this.numRules = numRules;
+      this.rules = rules;
+      this.profile = profile;
     }
 
     @Override
@@ -75,7 +83,15 @@ public abstract class ParseBuckFileEvent extends AbstractBuckEvent {
     }
 
     public int getNumRules() {
-      return numRules;
+      return rules == null ? 0 : rules.size();
+    }
+
+    public List<Map<String, Object>> getRules() {
+      return rules;
+    }
+
+    public String getProfile() {
+      return profile;
     }
 
     @Override
@@ -90,7 +106,7 @@ public abstract class ParseBuckFileEvent extends AbstractBuckEvent {
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(super.hashCode(), numRules);
+      return Objects.hashCode(super.hashCode(), getNumRules());
     }
   }
 }

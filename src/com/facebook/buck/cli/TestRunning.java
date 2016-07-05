@@ -23,6 +23,8 @@ import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.DefaultJavaPackageFinder;
 import com.facebook.buck.jvm.java.GenerateCodeCoverageReportStep;
+import com.facebook.buck.jvm.java.JavaRuntimeLauncher;
+import com.facebook.buck.jvm.java.JavaBuckConfig;
 import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.jvm.java.JavaTest;
 import com.facebook.buck.log.Logger;
@@ -35,6 +37,7 @@ import com.facebook.buck.rules.BuildResult;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleSuccessType;
 import com.facebook.buck.rules.IndividualTestEvent;
+import com.facebook.buck.rules.TestStatusMessageEvent;
 import com.facebook.buck.rules.TestRule;
 import com.facebook.buck.rules.TestRunEvent;
 import com.facebook.buck.rules.TestSummaryEvent;
@@ -49,10 +52,10 @@ import com.facebook.buck.test.TestResultSummary;
 import com.facebook.buck.test.TestResults;
 import com.facebook.buck.test.TestRuleEvent;
 import com.facebook.buck.test.TestRunningOptions;
+import com.facebook.buck.test.TestStatusMessage;
 import com.facebook.buck.test.result.type.ResultType;
 import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.HumanReadableException;
-import com.facebook.buck.util.Verbosity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Functions;
@@ -94,6 +97,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -175,12 +179,6 @@ public class TestRunning {
     // ListenableFuture.
     List<ListenableFuture<TestResults>> results = Lists.newArrayList();
 
-    // Unless `--verbose 0` is specified, print out test results as they become available.
-    // Failures with the ListenableFuture should always be printed, as they indicate an error with
-    // Buck, not the test being run.
-    Verbosity verbosity = params.getConsole().getVerbosity();
-    final boolean printTestResults = (verbosity != Verbosity.SILENT);
-
     TestRuleKeyFileHelper testRuleKeyFileHelper = new TestRuleKeyFileHelper(buildEngine);
     final AtomicInteger lastReportedTestSequenceNumber = new AtomicInteger();
     final List<TestRun> separateTestRuns = Lists.newArrayList();
@@ -197,10 +195,39 @@ public class TestRunning {
           !options.getTestSelectorList().isEmpty());
 
       final Map<String, UUID> testUUIDMap = new HashMap<>();
+      final AtomicReference<TestStatusMessageEvent.Started> currentTestStatusMessageEvent =
+          new AtomicReference<>();
       TestRule.TestReportingCallback testReportingCallback = new TestRule.TestReportingCallback() {
           @Override
           public void testsDidBegin() {
             LOG.debug("Tests for rule %s began", test.getBuildTarget());
+          }
+
+          @Override
+          public void statusDidBegin(TestStatusMessage didBeginMessage) {
+            LOG.debug("Test status did begin: %s", didBeginMessage);
+            TestStatusMessageEvent.Started startedEvent = TestStatusMessageEvent.started(
+                didBeginMessage);
+            TestStatusMessageEvent.Started previousEvent =
+                currentTestStatusMessageEvent.getAndSet(startedEvent);
+            Preconditions.checkState(
+                previousEvent == null,
+                "Received begin status before end status (%s)",
+                previousEvent);
+            params.getBuckEventBus().post(startedEvent);
+          }
+
+          @Override
+          public void statusDidEnd(TestStatusMessage didEndMessage) {
+            LOG.debug("Test status did end: %s", didEndMessage);
+            TestStatusMessageEvent.Started previousEvent = currentTestStatusMessageEvent.getAndSet(
+                null);
+            Preconditions.checkState(
+                previousEvent != null,
+                "Received end status before begin status (%s)",
+                previousEvent);
+            params.getBuckEventBus().post(
+                TestStatusMessageEvent.finished(previousEvent, didEndMessage));
           }
 
           @Override
@@ -322,7 +349,6 @@ public class TestRunning {
                 testRun.getTest(),
                 testRun.getTestReportingCallback(),
                 testTargets,
-                printTestResults,
                 lastReportedTestSequenceNumber,
                 totalNumberOfTests));
     }
@@ -354,7 +380,6 @@ public class TestRunning {
                       testRun.getTest(),
                       testRun.getTestReportingCallback(),
                       testTargets,
-                      printTestResults,
                       lastReportedTestSequenceNumber,
                       totalNumberOfTests));
             }
@@ -422,6 +447,9 @@ public class TestRunning {
             getReportCommand(
                 rulesUnderTest,
                 defaultJavaPackageFinderOptional,
+                new JavaBuckConfig(params.getBuckConfig())
+                    .getDefaultJavaOptions()
+                    .getJavaRuntimeLauncher(),
                 params.getCell().getFilesystem(),
                 JACOCO_OUTPUT_DIR,
                 options.getCoverageReportFormat(),
@@ -451,7 +479,6 @@ public class TestRunning {
       final TestRule testRule,
       final TestRule.TestReportingCallback testReportingCallback,
       final ImmutableSet<String> testTargets,
-      final boolean printTestResults,
       final AtomicInteger lastReportedTestSequenceNumber,
       final int totalNumberOfTests) {
 
@@ -498,9 +525,7 @@ public class TestRunning {
       @Override
       public void onSuccess(TestResults testResults) {
         LOG.debug("Transforming successful test results %s", testResults);
-        if (printTestResults) {
-          postTestResults(testResults);
-        }
+        postTestResults(testResults);
         transformedTestResults.set(testResults);
       }
 
@@ -527,12 +552,7 @@ public class TestRunning {
                 testRule.getContacts(),
                 FluentIterable.from(
                     testRule.getLabels()).transform(Functions.toStringFunction()).toSet());
-        TestResults newTestResults;
-        if (printTestResults) {
-          newTestResults = postTestResults(testResults);
-        } else {
-          newTestResults = testResults;
-        }
+        TestResults newTestResults = postTestResults(testResults);
         transformedTestResults.set(newTestResults);
       }
     };
@@ -740,6 +760,7 @@ public class TestRunning {
   private static Step getReportCommand(
       ImmutableSet<JavaLibrary> rulesUnderTest,
       Optional<DefaultJavaPackageFinder> defaultJavaPackageFinderOptional,
+      JavaRuntimeLauncher javaRuntimeLauncher,
       ProjectFilesystem filesystem,
       Path outputDirectory,
       CoverageReportFormat format,
@@ -762,6 +783,7 @@ public class TestRunning {
     }
 
     return new GenerateCodeCoverageReportStep(
+        javaRuntimeLauncher,
         filesystem,
         srcDirectories.build(),
         pathsToClasses.build(),

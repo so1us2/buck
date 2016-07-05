@@ -21,6 +21,7 @@ import com.facebook.buck.android.NoAndroidSdkException;
 import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.HasOutputName;
+import com.facebook.buck.model.HasTests;
 import com.facebook.buck.rules.AbstractBuildRule;
 import com.facebook.buck.rules.AddToRuleKey;
 import com.facebook.buck.rules.BuildContext;
@@ -30,6 +31,7 @@ import com.facebook.buck.rules.BuildableContext;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.args.Arg;
+import com.facebook.buck.rules.args.WorkerMacroArg;
 import com.facebook.buck.rules.keys.SupportsInputBasedRuleKey;
 import com.facebook.buck.shell.AbstractGenruleStep.CommandString;
 import com.facebook.buck.step.ExecutionContext;
@@ -49,6 +51,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Sets;
 
 import java.nio.file.Path;
@@ -103,7 +106,8 @@ import java.util.Set;
  * <p>
  * Note that the <code>SRCDIR</code> is populated by symlinking the sources.
  */
-public class Genrule extends AbstractBuildRule implements HasOutputName, SupportsInputBasedRuleKey {
+public class Genrule extends AbstractBuildRule
+    implements HasOutputName, HasTests, SupportsInputBasedRuleKey {
 
   /**
    * The order in which elements are specified in the {@code srcs} attribute of a genrule matters.
@@ -126,6 +130,8 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
   private final Path absolutePathToTmpDirectory;
   private final Path pathToSrcDirectory;
   private final Path absolutePathToSrcDirectory;
+  private final ImmutableSortedSet<BuildTarget> tests;
+  private final Boolean isWorkerGenrule;
 
   protected Genrule(
       BuildRuleParams params,
@@ -134,12 +140,14 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
       Optional<Arg> cmd,
       Optional<Arg> bash,
       Optional<Arg> cmdExe,
-      String out) {
+      String out,
+      ImmutableSortedSet<BuildTarget> tests) {
     super(params, resolver);
     this.srcs = ImmutableList.copyOf(srcs);
     this.cmd = cmd;
     this.bash = bash;
     this.cmdExe = cmdExe;
+    this.tests = tests;
 
     this.out = out;
     BuildTarget target = params.getBuildTarget();
@@ -165,6 +173,7 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
         target.getBasePathWithSlash(),
         String.format("%s__srcs", target.getShortNameAndFlavorPostfix()));
     this.absolutePathToSrcDirectory = getProjectFilesystem().resolve(pathToSrcDirectory);
+    this.isWorkerGenrule = this.isWorkerGenrule();
   }
 
   /** @return the absolute path to the output file */
@@ -274,6 +283,26 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
             });
   }
 
+  @VisibleForTesting
+  public boolean isWorkerGenrule() {
+    Arg cmdArg = this.cmd.orNull();
+    Arg bashArg = this.bash.orNull();
+    Arg cmdExeArg = this.cmdExe.orNull();
+    if ((cmdArg instanceof WorkerMacroArg) ||
+        (bashArg instanceof WorkerMacroArg) ||
+        (cmdExeArg instanceof WorkerMacroArg)) {
+      if ((cmdArg != null && !(cmdArg instanceof WorkerMacroArg)) ||
+          (bashArg != null && !(bashArg instanceof WorkerMacroArg)) ||
+          (cmdExeArg != null && !(cmdExeArg instanceof WorkerMacroArg))) {
+        throw new HumanReadableException("You cannot use a worker macro in one of the cmd, bash, " +
+            "or cmd_exe properties and not in the others for genrule %s.",
+            getBuildTarget().getFullyQualifiedName());
+      }
+      return true;
+    }
+    return false;
+  }
+
   public AbstractGenruleStep createGenruleStep() {
     // The user's command (this.cmd) should be run from the directory that contains only the
     // symlinked files. This ensures that the user can reference only the files that were declared
@@ -293,6 +322,38 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
         Genrule.this.addEnvironmentVariables(context, environmentVariablesBuilder);
       }
     };
+  }
+
+  public WorkerShellStep createWorkerShellStep() {
+    return new WorkerShellStep(
+        getProjectFilesystem(),
+        absolutePathToTmpDirectory,
+        absolutePathToSrcDirectory,
+        convertToWorkerJobParams(cmd),
+        convertToWorkerJobParams(bash),
+        convertToWorkerJobParams(cmdExe)) {
+      @Override
+      protected ImmutableMap<String, String> getEnvironmentVariables(ExecutionContext context) {
+        ImmutableMap.Builder<String, String> envVarBuilder = ImmutableMap.builder();
+        Genrule.this.addEnvironmentVariables(context, envVarBuilder);
+        return envVarBuilder.build();
+      }
+    };
+  }
+
+  private static Optional<WorkerJobParams> convertToWorkerJobParams(Optional<Arg> arg) {
+    return arg
+        .transform(
+            new Function<Arg, WorkerJobParams>() {
+              @Override
+              public WorkerJobParams apply(Arg arg) {
+                WorkerMacroArg workerMacroArg = (WorkerMacroArg) arg;
+                return WorkerJobParams.of(
+                    workerMacroArg.getStartupCommand(),
+                    workerMacroArg.getStartupArgs(),
+                    workerMacroArg.getJobArgs());
+              }
+            });
   }
 
   @Override
@@ -323,7 +384,11 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
     addSymlinkCommands(commands);
 
     // Create a shell command that corresponds to this.cmd.
-    commands.add(createGenruleStep());
+    if (this.isWorkerGenrule) {
+      commands.add(createWorkerShellStep());
+    } else {
+      commands.add(createGenruleStep());
+    }
 
     buildableContext.recordArtifact(pathToOutFile);
     return commands.build();
@@ -368,4 +433,8 @@ public class Genrule extends AbstractBuildRule implements HasOutputName, Support
     return out;
   }
 
+  @Override
+  public ImmutableSortedSet<BuildTarget> getTests() {
+    return tests;
+  }
 }

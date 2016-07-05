@@ -18,7 +18,7 @@ package com.facebook.buck.shell;
 
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -28,6 +28,7 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.Arg;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 import org.hamcrest.Matchers;
 import org.junit.Test;
@@ -37,17 +38,18 @@ public class ShTestDescriptionTest {
   @Test
   public void argsWithLocationMacro() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     BuildRule dep =
         GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:dep"))
             .setOut("out")
             .build(resolver);
-    ShTest shTest =
-        (ShTest) new ShTestBuilder(BuildTargetFactory.newInstance("//:rule"))
+    ShTestBuilder shTestBuilder =
+        new ShTestBuilder(BuildTargetFactory.newInstance("//:rule"))
             .setTest(new FakeSourcePath("test.sh"))
-            .setArgs(ImmutableList.of("$(location //:dep)"))
-            .build(resolver);
+            .setArgs(ImmutableList.of("$(location //:dep)"));
+    assertThat(shTestBuilder.findImplicitDeps(), Matchers.hasItem(dep.getBuildTarget()));
+    ShTest shTest = (ShTest) shTestBuilder.build(resolver);
     assertThat(
         shTest.getDeps(),
         Matchers.contains(dep));
@@ -56,6 +58,33 @@ public class ShTestDescriptionTest {
         Matchers.contains(
             pathResolver.getAbsolutePath(
                 new BuildTargetSourcePath(dep.getBuildTarget())).toString()));
+  }
+
+  @Test
+  public void envWithLocationMacro() throws Exception {
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(resolver);
+    BuildRule dep =
+        GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:dep"))
+            .setOut("out")
+            .build(resolver);
+    ShTestBuilder shTestBuilder =
+        new ShTestBuilder(BuildTargetFactory.newInstance("//:rule"))
+            .setTest(new FakeSourcePath("test.sh"))
+            .setEnv(ImmutableMap.of("LOC", "$(location //:dep)"));
+    assertThat(shTestBuilder.findImplicitDeps(), Matchers.hasItem(dep.getBuildTarget()));
+    ShTest shTest = (ShTest) shTestBuilder.build(resolver);
+    assertThat(
+        shTest.getDeps(),
+        Matchers.contains(dep));
+    assertThat(
+        Arg.stringify(shTest.getEnv()),
+        Matchers.equalTo(
+            ImmutableMap.of(
+                "LOC",
+                pathResolver.getAbsolutePath(
+                    new BuildTargetSourcePath(dep.getBuildTarget())).toString())));
   }
 
 }

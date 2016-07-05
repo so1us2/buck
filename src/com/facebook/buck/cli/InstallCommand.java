@@ -39,6 +39,7 @@ import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetException;
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.parser.SpeculativeParsing;
 import com.facebook.buck.parser.TargetNodeSpec;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -58,10 +59,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.kohsuke.args4j.Option;
 
@@ -70,7 +73,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.Executor;
 
 import javax.annotation.Nullable;
 
@@ -233,7 +235,8 @@ public class InstallCommand extends BuildCommand {
         ExecutionContext.Builder builder = ExecutionContext.builder()
             .setExecutionContext(build.getExecutionContext())
             .setAdbOptions(Optional.of(adbOptions(params.getBuckConfig())))
-            .setTargetDeviceOptions(Optional.of(targetDeviceOptions()));
+            .setTargetDeviceOptions(Optional.of(targetDeviceOptions()))
+            .setExecutors(params.getExecutors());
         exitCode = installApk(
             params,
             (InstallableApk) buildRule,
@@ -254,7 +257,8 @@ public class InstallCommand extends BuildCommand {
             InstallEvent.finished(
                 started,
                 installResult.getExitCode() == 0,
-                installResult.getLaunchedPid()));
+                installResult.getLaunchedPid(),
+                Optional.<String>absent()));
         exitCode = installResult.getExitCode();
         if (exitCode != 0) {
           return exitCode;
@@ -277,7 +281,7 @@ public class InstallCommand extends BuildCommand {
 
   private ImmutableSet<String> getInstallHelperTargets(
       CommandRunnerParams params,
-      Executor executor)
+      ListeningExecutorService executor)
       throws IOException, InterruptedException, BuildTargetException, BuildFileParseException{
 
     ImmutableSet.Builder<String> installHelperTargets = ImmutableSet.builder();
@@ -288,17 +292,22 @@ public class InstallCommand extends BuildCommand {
             params.getBuckConfig(),
             getArguments()).get(index);
 
-        BuildTarget target = params.getParser().resolveTargetSpec(
-            params.getBuckEventBus(),
-            params.getCell(),
-            getEnableProfiling(),
-            executor,
-            spec).iterator().next();
+        BuildTarget target =
+            FluentIterable.from(
+                params.getParser().resolveTargetSpecs(
+                    params.getBuckEventBus(),
+                    params.getCell(),
+                    getEnableProfiling(),
+                    executor,
+                    ImmutableList.of(spec),
+                    SpeculativeParsing.of(false)))
+            .first().get();
 
         TargetNode<?> node = params.getParser().getTargetNode(
             params.getBuckEventBus(),
             params.getCell(),
             getEnableProfiling(),
+            executor,
             target);
 
         if (node != null &&

@@ -16,7 +16,7 @@
 
 package com.facebook.buck.event;
 
-public abstract class ProjectGenerationEvent extends AbstractBuckEvent {
+public abstract class ProjectGenerationEvent extends AbstractBuckEvent implements WorkAdvanceEvent {
 
   public ProjectGenerationEvent() {
     super(EventKey.unique());
@@ -35,25 +35,28 @@ public abstract class ProjectGenerationEvent extends AbstractBuckEvent {
     return new Finished();
   }
 
-  public static Processed processed() { return new Processed(); }
-
+  public static Processed processed() {
+    return new Processed();
+  }
 
   public static class Started extends ProjectGenerationEvent {
     @Override
     public String getEventName() {
-      return "ProjectGenerationStarted";
+      return PROJECT_GENERATION_STARTED;
     }
   }
 
   public static class Finished extends ProjectGenerationEvent {
     @Override
     public String getEventName() {
-      return "ProjectGenerationFinished";
+      return PROJECT_GENERATION_FINISHED;
     }
   }
 
   public static class Processed extends ProjectGenerationEvent {
     @Override
-    public String getEventName() { return "ProjectGenerationProcessed"; }
+    public String getEventName() {
+      return "ProjectGenerationProcessed";
+    }
   }
 }

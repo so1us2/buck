@@ -16,13 +16,17 @@
 
 package com.facebook.buck.apple;
 
+import com.dd.plist.NSArray;
 import com.dd.plist.NSNumber;
 import com.dd.plist.NSObject;
 import com.dd.plist.NSString;
+import com.facebook.buck.cxx.BuildRuleWithBinary;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.CxxPreprocessorInput;
 import com.facebook.buck.cxx.HeaderVisibility;
 import com.facebook.buck.cxx.NativeTestable;
+import com.facebook.buck.file.WriteFile;
+import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.log.Logger;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
@@ -42,6 +46,8 @@ import com.facebook.buck.step.fs.CopyStep;
 import com.facebook.buck.step.fs.FindAndReplaceStep;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirStep;
+import com.facebook.buck.step.fs.MoveStep;
+import com.facebook.buck.step.fs.RmStep;
 import com.facebook.buck.step.fs.WriteFileStep;
 import com.facebook.buck.util.HumanReadableException;
 import com.google.common.base.Joiner;
@@ -68,10 +74,11 @@ import java.util.Set;
  */
 public class AppleBundle
     extends AbstractBuildRule
-    implements NativeTestable, BuildRuleWithAppleBundle {
+    implements NativeTestable, BuildRuleWithAppleBundle, BuildRuleWithBinary {
 
   private static final Logger LOG = Logger.get(AppleBundle.class);
   private static final String CODE_SIGN_ENTITLEMENTS = "CODE_SIGN_ENTITLEMENTS";
+  public static final String DSYM_DWARF_FILE_FOLDER = "Contents/Resources/DWARF/";
 
   @AddToRuleKey
   private final String extension;
@@ -87,6 +94,12 @@ public class AppleBundle
 
   @AddToRuleKey
   private final Optional<BuildRule> binary;
+
+  @AddToRuleKey
+  private final Optional<BuildRule> unstrippedBinaryRule;
+
+  @AddToRuleKey
+  private final Optional<AppleDsym> appleDsym;
 
   @AddToRuleKey
   private final AppleBundleDestinations destinations;
@@ -130,18 +143,24 @@ public class AppleBundle
   @AddToRuleKey
   private final Optional<Tool> codesignAllocatePath;
 
+  @AddToRuleKey
+  private final Optional<Tool> swiftStdlibTool;
+
   // Need to use String here as RuleKeyBuilder requires that paths exist to compute hashes.
   @AddToRuleKey
   private final ImmutableMap<SourcePath, String> extensionBundlePaths;
 
   private final Optional<AppleAssetCatalog> assetCatalog;
-
   private final Optional<String> platformBuildVersion;
+  private final Optional<String> xcodeVersion;
+  private final Optional<String> xcodeBuildVersion;
+
   private final String minOSVersion;
   private final String binaryName;
   private final Path bundleRoot;
   private final Path binaryPath;
   private final Path bundleBinaryPath;
+
   private final boolean hasBinary;
 
   AppleBundle(
@@ -152,6 +171,8 @@ public class AppleBundle
       SourcePath infoPlist,
       Map<String, String> infoPlistSubstitutions,
       Optional<BuildRule> binary,
+      Optional<BuildRule> unstrippedBinaryRule,
+      Optional<AppleDsym> appleDsym,
       AppleBundleDestinations destinations,
       Set<SourcePath> resourceDirs,
       Set<SourcePath> resourceFiles,
@@ -172,6 +193,8 @@ public class AppleBundle
     this.infoPlist = infoPlist;
     this.infoPlistSubstitutions = ImmutableMap.copyOf(infoPlistSubstitutions);
     this.binary = binary;
+    this.unstrippedBinaryRule = unstrippedBinaryRule;
+    this.appleDsym = appleDsym;
     this.destinations = destinations;
     this.resourceDirs = resourceDirs;
     this.resourceFiles = resourceFiles;
@@ -192,6 +215,8 @@ public class AppleBundle
     this.sdkVersion = sdk.getVersion();
     this.minOSVersion = appleCxxPlatform.getMinVersion();
     this.platformBuildVersion = appleCxxPlatform.getBuildVersion();
+    this.xcodeBuildVersion = appleCxxPlatform.getXcodeBuildVersion();
+    this.xcodeVersion = appleCxxPlatform.getXcodeVersion();
 
     bundleBinaryPath = bundleRoot.resolve(binaryPath);
     hasBinary = binary.isPresent() && binary.get().getPathToOutput() != null;
@@ -206,6 +231,7 @@ public class AppleBundle
           CodeSignIdentityStore.fromIdentities(ImmutableList.<CodeSignIdentity>of());
     }
     this.codesignAllocatePath = appleCxxPlatform.getCodesignAllocate();
+    this.swiftStdlibTool = appleCxxPlatform.getSwiftStdlibTool();
   }
 
   public static String getBinaryName(BuildTarget buildTarget, Optional<String> productName) {
@@ -243,9 +269,20 @@ public class AppleBundle
     return bundleRoot.resolve(destinations.getMetadataPath());
   }
 
-  public String getPlatformName() { return platformName; }
+  public String getPlatformName() {
+    return platformName;
+  }
 
-  public Optional<BuildRule> getBinary() { return binary; }
+  public Optional<BuildRule> getBinary() {
+    return binary;
+  }
+
+  public boolean isLegacyWatchApp() {
+    return extension.equals(AppleBundleExtension.APP.toFileExtension()) &&
+        binary.isPresent() &&
+        binary.get().getBuildTarget().getFlavors()
+            .contains(AppleBinaryDescription.LEGACY_WATCH_FLAVOR);
+  }
 
   @Override
   public ImmutableList<Step> getBuildSteps(
@@ -291,19 +328,8 @@ public class AppleBundle
             PlistProcessStep.OutputFormat.BINARY));
 
     if (hasBinary) {
-      stepsBuilder.add(
-          new MkdirStep(
-              getProjectFilesystem(),
-              bundleRoot.resolve(this.destinations.getExecutablesPath())));
-
-      final Path binaryOutputPath = binary.get().getPathToOutput();
-      Preconditions.checkNotNull(binaryOutputPath);
-
-      stepsBuilder.add(
-          CopyStep.forFile(
-              getProjectFilesystem(),
-              binaryOutputPath,
-              bundleBinaryPath));
+      appendCopyBinarySteps(stepsBuilder);
+      appendCopyDsymStep(stepsBuilder, buildableContext);
     }
 
     Path resourcesDestinationPath = bundleRoot.resolve(this.destinations.getResourcesPath());
@@ -412,7 +438,8 @@ public class AppleBundle
               entitlementsPlist,
               provisioningProfileStore,
               resourcesDestinationPath.resolve("embedded.mobileprovision"),
-              signingEntitlementsTempPath);
+              signingEntitlementsTempPath,
+              codeSignIdentityStore);
       stepsBuilder.add(provisioningProfileCopyStep);
 
       Supplier<CodeSignIdentity> codeSignIdentitySupplier = new Supplier<CodeSignIdentity>() {
@@ -445,6 +472,8 @@ public class AppleBundle
         }
       };
 
+      addSwiftStdlibStepIfNeeded(Optional.of(codeSignIdentitySupplier), stepsBuilder);
+
       stepsBuilder.add(
           new CodeSignStep(
               getProjectFilesystem().getRootPath(),
@@ -453,12 +482,101 @@ public class AppleBundle
               signingEntitlementsTempPath,
               codeSignIdentitySupplier,
               codesignAllocatePath));
+    } else {
+      addSwiftStdlibStepIfNeeded(Optional.<Supplier<CodeSignIdentity>>absent(), stepsBuilder);
     }
 
     // Ensure the bundle directory is archived so we can fetch it later.
     buildableContext.recordArtifact(getPathToOutput());
 
     return stepsBuilder.build();
+  }
+
+  private void appendCopyBinarySteps(ImmutableList.Builder<Step> stepsBuilder) {
+    Preconditions.checkArgument(hasBinary);
+
+    final Path binaryOutputPath = binary.get().getPathToOutput();
+    Preconditions.checkNotNull(binaryOutputPath);
+
+    copyBinaryIntoBundle(stepsBuilder, binaryOutputPath);
+    copyAnotherCopyOfWatchKitStub(stepsBuilder, binaryOutputPath);
+  }
+
+  private void copyBinaryIntoBundle(
+      ImmutableList.Builder<Step> stepsBuilder,
+      Path binaryOutputPath) {
+    stepsBuilder.add(
+        new MkdirStep(
+            getProjectFilesystem(),
+            bundleRoot.resolve(this.destinations.getExecutablesPath())));
+    stepsBuilder.add(
+        CopyStep.forFile(
+            getProjectFilesystem(),
+            binaryOutputPath,
+            bundleBinaryPath));
+  }
+
+  private void copyAnotherCopyOfWatchKitStub(
+      ImmutableList.Builder<Step> stepsBuilder,
+      Path binaryOutputPath) {
+    if (binary.get() instanceof WriteFile) {
+      final Path watchKitStubDir = bundleRoot.resolve("_WatchKitStub");
+      stepsBuilder.add(
+          new MkdirStep(getProjectFilesystem(), watchKitStubDir),
+          CopyStep.forFile(
+              getProjectFilesystem(),
+              binaryOutputPath,
+              watchKitStubDir.resolve("WK")));
+    }
+  }
+
+  private void appendCopyDsymStep(
+      ImmutableList.Builder<Step> stepsBuilder,
+      BuildableContext buildableContext) {
+    if (appleDsym.isPresent()) {
+      stepsBuilder.add(
+          CopyStep.forDirectory(
+              getProjectFilesystem(),
+              appleDsym.get().getPathToOutput(),
+              bundleRoot.getParent(),
+              CopyStep.DirectoryMode.DIRECTORY_AND_CONTENTS));
+      appendDsymRenameStepToMatchBundleName(stepsBuilder, buildableContext);
+    }
+  }
+
+  private void appendDsymRenameStepToMatchBundleName(
+      ImmutableList.Builder<Step> stepsBuilder,
+      BuildableContext buildableContext) {
+    Preconditions.checkArgument(hasBinary && appleDsym.isPresent());
+
+    // rename dSYM bundle to match bundle name
+    Path dsymPath = appleDsym.get().getPathToOutput();
+    Path dsymSourcePath = bundleRoot.getParent().resolve(dsymPath.getFileName());
+    Path dsymDestinationPath = bundleRoot.getParent().resolve(
+        bundleRoot.getFileName() + "." + AppleBundleExtension.DSYM.toFileExtension());
+    stepsBuilder.add(new RmStep(getProjectFilesystem(), dsymDestinationPath, true, true));
+    stepsBuilder.add(new MoveStep(getProjectFilesystem(), dsymSourcePath, dsymDestinationPath));
+
+    String dwarfFilename =
+        AppleDsym.getDwarfFilenameForDsymTarget(appleDsym.get().getBuildTarget());
+    if (unstrippedBinaryRule.isPresent()) {
+      Path unstrippedOutput = unstrippedBinaryRule.get().getPathToOutput();
+      Preconditions.checkNotNull(
+          unstrippedOutput,
+          "Unstripped binary %s of bundle %s has null output path. It shouldn't be null, as " +
+              "it used to determine the name of dwarf file inside dSYM bundle.",
+          unstrippedBinaryRule.get(), this);
+      dwarfFilename = unstrippedOutput.getFileName().toString();
+    }
+
+    // rename DWARF file inside dSYM bundle to match bundle name
+    Path dwarfFolder = dsymDestinationPath.resolve(DSYM_DWARF_FILE_FOLDER);
+    Path dwarfSourcePath = dwarfFolder.resolve(dwarfFilename);
+    Path dwarfDestinationPath = dwarfFolder.resolve(MorePaths.getNameWithoutExtension(bundleRoot));
+    stepsBuilder.add(new MoveStep(getProjectFilesystem(), dwarfSourcePath, dwarfDestinationPath));
+
+    // record dSYM so we can fetch it from cache
+    buildableContext.recordArtifact(dsymDestinationPath);
   }
 
   public void addStepsToCopyExtensionBundlesDependencies(
@@ -493,7 +611,7 @@ public class AppleBundle
 
     if (platformName.contains("osx")) {
       keys.put("LSRequiresIPhoneOS", new NSNumber(false));
-    } else if (!platformName.contains("watch")) {
+    } else if (!platformName.contains("watch") && !isLegacyWatchApp()) {
       keys.put("LSRequiresIPhoneOS", new NSNumber(true));
     }
 
@@ -506,6 +624,11 @@ public class AppleBundle
     if (platformName.contains("osx")) {
       keys.put("NSHighResolutionCapable", new NSNumber(true));
       keys.put("NSSupportsAutomaticGraphicsSwitching", new NSNumber(true));
+      keys.put("CFBundleSupportedPlatforms", new NSArray(new NSString("MacOSX")));
+    } else if (platformName.contains("iphoneos")) {
+      keys.put("CFBundleSupportedPlatforms", new NSArray(new NSString("iPhoneOS")));
+    } else if (platformName.contains("iphonesimulator")) {
+      keys.put("CFBundleSupportedPlatforms", new NSArray(new NSString("iPhoneSimulator")));
     }
 
     keys.put("DTPlatformName", new NSString(platformName));
@@ -517,7 +640,42 @@ public class AppleBundle
       keys.put("DTSDKBuild", new NSString(platformBuildVersion.get()));
     }
 
+    if (xcodeBuildVersion.isPresent()) {
+      keys.put("DTXcodeBuild", new NSString(xcodeBuildVersion.get()));
+    }
+
+    if (xcodeVersion.isPresent()) {
+      keys.put("DTXcode", new NSString(xcodeVersion.get()));
+    }
+
     return keys.build();
+  }
+
+  private void addSwiftStdlibStepIfNeeded(
+      Optional<Supplier<CodeSignIdentity>> codeSignIdentitySupplier,
+      ImmutableList.Builder<Step> stepsBuilder) {
+    // It's apparently safe to run this even on a non-swift bundle (in that case, no libs
+    // are copied over).
+    if (swiftStdlibTool.isPresent()) {
+      ImmutableList.Builder<String> swiftStdlibCommand = ImmutableList.builder();
+      swiftStdlibCommand.addAll(swiftStdlibTool.get().getCommandPrefix(getResolver()));
+      swiftStdlibCommand.add(
+          "--scan-executable",
+          bundleBinaryPath.toString(),
+          "--scan-folder",
+          bundleRoot.resolve(destinations.getFrameworksPath()).toString(),
+          "--scan-folder",
+          bundleRoot.resolve(destinations.getPlugInsPath()).toString());
+
+      stepsBuilder.add(
+          new SwiftStdlibStep(
+              getProjectFilesystem().getRootPath(),
+              BuildTargets.getScratchPath(getBuildTarget(), "__swift_temp__%s"),
+              bundleRoot.resolve(Paths.get("Frameworks")),
+              swiftStdlibCommand.build(),
+              codeSignIdentitySupplier)
+      );
+    }
   }
 
   private void addStoryboardProcessingSteps(
@@ -656,5 +814,10 @@ public class AppleBundle
 
   public Path getBundleBinaryPath() {
     return bundleBinaryPath;
+  }
+
+  @Override
+  public BuildRule getBinaryBuildRule() {
+    return binary.get();
   }
 }

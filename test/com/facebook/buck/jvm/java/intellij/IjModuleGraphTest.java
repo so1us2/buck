@@ -23,10 +23,12 @@ import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.android.AndroidBinaryDescription;
 import com.facebook.buck.android.AndroidLibraryBuilder;
+import com.facebook.buck.android.AndroidResourceBuilder;
 import com.facebook.buck.android.AndroidResourceDescription;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.jvm.java.JavaLibraryBuilder;
 import com.facebook.buck.jvm.java.JavaTestBuilder;
+import com.facebook.buck.jvm.java.JvmLibraryArg;
 import com.facebook.buck.jvm.java.KeystoreBuilder;
 import com.facebook.buck.jvm.java.PrebuiltJarBuilder;
 import com.facebook.buck.model.BuildTargetFactory;
@@ -562,6 +564,39 @@ public class IjModuleGraphTest {
                 guavaModule, IjModuleGraph.DependencyType.PROD)));
   }
 
+  @Test
+  public void testModuleAggregationDoesNotCoalesceAndroidResources() {
+    TargetNode<?> blah1 = AndroidResourceBuilder
+        .createBuilder(
+            BuildTargetFactory.newInstance("//android_res/com/example/blah/blah/blah:res"))
+        .build();
+
+    TargetNode<?> blah2 = AndroidResourceBuilder
+        .createBuilder(
+            BuildTargetFactory.newInstance("//android_res/com/example/blah/blah/blah2:res"))
+        .build();
+
+     TargetNode<?> commonApp = AndroidLibraryBuilder
+        .createBuilder(BuildTargetFactory.newInstance("//java/com/example/base:base"))
+        .addDep(blah1.getBuildTarget())
+        .addDep(blah2.getBuildTarget())
+        .build();
+
+    IjModuleGraph moduleGraph = createModuleGraph(
+        ImmutableSet.of(blah1, blah2, commonApp),
+        ImmutableMap.<TargetNode<?>, Path>of(),
+        Functions.constant(Optional.<Path>absent()),
+        IjModuleGraph.AggregationMode.SHALLOW);
+
+    IjModule blah1Module = getModuleForTarget(moduleGraph, blah1);
+    IjModule blah2Module = getModuleForTarget(moduleGraph, blah2);
+
+    assertThat(blah1Module, Matchers.not(Matchers.equalTo(blah2Module)));
+    assertThat(
+        blah1Module.getModuleBasePath(),
+        Matchers.not(Matchers.equalTo(blah2Module.getModuleBasePath())));
+  }
+
   public static IjModuleGraph createModuleGraph(ImmutableSet<TargetNode<?>> targets) {
     return createModuleGraph(targets, ImmutableMap.<TargetNode<?>, Path>of(),
         Functions.constant(Optional.<Path>absent()));
@@ -582,9 +617,9 @@ public class IjModuleGraphTest {
       final ImmutableMap<TargetNode<?>, Path> javaLibraryPaths,
       final Function<? super TargetNode<?>, Optional<Path>> rDotJavaClassPathResolver,
       IjModuleGraph.AggregationMode aggregationMode) {
-    final SourcePathResolver sourcePathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    final SourcePathResolver sourcePathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     DefaultIjLibraryFactory.IjLibraryFactoryResolver sourceOnlyResolver =
         new DefaultIjLibraryFactory.IjLibraryFactoryResolver() {
           @Override
@@ -624,6 +659,12 @@ public class IjModuleGraphTest {
           @Override
           public Optional<Path> getAssetsPath(
               TargetNode<AndroidResourceDescription.Arg> targetNode) {
+            return Optional.absent();
+          }
+
+          @Override
+          public Optional<Path> getAnnotationOutputPath(
+              TargetNode<? extends JvmLibraryArg> targetNode) {
             return Optional.absent();
           }
         });

@@ -24,7 +24,6 @@ import com.facebook.buck.model.BuckVersion;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.ImmutableFlavor;
-import com.facebook.buck.parser.BuildTargetParseException;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.PathSourcePath;
 import com.facebook.buck.rules.SourcePath;
@@ -210,11 +209,7 @@ public class PythonBuckConfig {
   }
 
   public Optional<BuildTarget> getPexTarget() {
-    try {
-      return delegate.getBuildTarget(SECTION, "path_to_pex");
-    } catch (BuildTargetParseException e) {
-      return Optional.absent();
-    }
+    return delegate.getMaybeBuildTarget(SECTION, "path_to_pex");
   }
 
   public Tool getPexTool(BuildRuleResolver resolver) {
@@ -229,13 +224,17 @@ public class PythonBuckConfig {
         BuckVersion.getVersion());
   }
 
-  public Optional<Tool> getPathToPexExecuter(BuildRuleResolver resolver) {
+  public Optional<BuildTarget> getPexExecutorTarget() {
+    return delegate.getMaybeBuildTarget(SECTION, "path_to_pex_executer");
+  }
+
+  public Optional<Tool> getPexExecutor(BuildRuleResolver resolver) {
     return delegate.getTool(SECTION, "path_to_pex_executer", resolver);
   }
 
   public NativeLinkStrategy getNativeLinkStrategy() {
     return delegate.getEnum(SECTION, "native_link_strategy", NativeLinkStrategy.class)
-        .or(NativeLinkStrategy.SPEARATE);
+        .or(NativeLinkStrategy.SEPARATE);
   }
 
   public String getPexExtension() {
@@ -266,9 +265,9 @@ public class PythonBuckConfig {
       Path pythonPath,
       ProcessExecutor.Result versionResult) {
     if (versionResult.getExitCode() == 0) {
-      String versionString = CharMatcher.WHITESPACE.trimFrom(
-          CharMatcher.WHITESPACE.trimFrom(versionResult.getStderr().get()) +
-          CharMatcher.WHITESPACE.trimFrom(versionResult.getStdout().get())
+      String versionString = CharMatcher.whitespace().trimFrom(
+          CharMatcher.whitespace().trimFrom(versionResult.getStderr().get()) +
+          CharMatcher.whitespace().trimFrom(versionResult.getStdout().get())
               .replaceAll("\u001B\\[[;\\d]*m", ""));
       Matcher matcher = PYTHON_VERSION_REGEX.matcher(versionString.split("\\r?\\n")[0]);
       if (!matcher.matches()) {

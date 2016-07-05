@@ -21,7 +21,7 @@ import static com.facebook.buck.util.BuckConstant.GEN_DIR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.JavaBinaryRuleBuilder;
 import com.facebook.buck.jvm.java.JavaLibraryBuilder;
@@ -38,6 +38,7 @@ import com.facebook.buck.rules.NoopBuildRule;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.shell.GenruleBuilder;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.google.common.base.Preconditions;
@@ -72,7 +73,7 @@ public class ExecutableMacroExpanderTest {
   public void testReplaceBinaryBuildRuleRefsInCmd() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildTarget target = BuildTarget.builder(filesystem.getRootPath(), "//cheese", "cake").build();
     createSampleJavaBinaryRule(ruleResolver);
     String originalCmd = "$(exe //java/com/facebook/util:ManifestGenerator) $OUT";
@@ -102,7 +103,7 @@ public class ExecutableMacroExpanderTest {
   @Test
   public void testReplaceRelativeBinaryBuildRuleRefsInCmd() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule rule = createSampleJavaBinaryRule(ruleResolver);
     String originalCmd = "$(exe :ManifestGenerator) $OUT";
 
@@ -130,7 +131,7 @@ public class ExecutableMacroExpanderTest {
   @Test
   public void testDepsGenrule() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule rule = createSampleJavaBinaryRule(ruleResolver);
 
     // Interpolate the build target in the genrule cmd string.
@@ -160,7 +161,7 @@ public class ExecutableMacroExpanderTest {
   public void testBuildTimeDependencies() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     final BuildRule dep1 =
@@ -179,8 +180,14 @@ public class ExecutableMacroExpanderTest {
           @Override
           public Tool getExecutableCommand() {
             return new CommandTool.Builder()
-                .addArg(new BuildTargetSourcePath(dep1.getBuildTarget()))
-                .addArg(new BuildTargetSourcePath(dep2.getBuildTarget()))
+                .addArg(
+                    new SourcePathArg(
+                        getResolver(),
+                        new BuildTargetSourcePath(dep1.getBuildTarget())))
+                .addArg(
+                    new SourcePathArg(
+                        getResolver(),
+                        new BuildTargetSourcePath(dep2.getBuildTarget())))
                 .build();
           }
         });
@@ -206,7 +213,7 @@ public class ExecutableMacroExpanderTest {
   @Test
   public void extractRuleKeyAppendable() throws MacroException {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
     BuildTarget target = BuildTargetFactory.newInstance("//:rule");
     BuildRuleParams params = new FakeBuildRuleParamsBuilder(target).build();

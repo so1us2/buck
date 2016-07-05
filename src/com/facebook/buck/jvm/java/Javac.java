@@ -39,7 +39,7 @@ public interface Javac extends RuleKeyAppendable, Tool {
   Function<String, String> ARGFILES_ESCAPER =
       Escaper.escaper(
           Escaper.Quoter.DOUBLE,
-          CharMatcher.anyOf("#\"'").or(CharMatcher.WHITESPACE));
+          CharMatcher.anyOf("#\"'").or(CharMatcher.whitespace()));
   String SRC_ZIP = ".src.zip";
   String SRC_JAR = "-sources.jar";
 
@@ -52,14 +52,15 @@ public interface Javac extends RuleKeyAppendable, Tool {
       BuildTarget invokingRule,
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList,
+      Path pathToSrcsList,
       Optional<Path> workingDirectory,
+      Optional<Path> usedClassesFile,
       Optional<StandardJavaFileManagerFactory> fileManagerFactory) throws InterruptedException;
 
   String getDescription(
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList);
+      Path pathToSrcsList);
 
   String getShortName();
 

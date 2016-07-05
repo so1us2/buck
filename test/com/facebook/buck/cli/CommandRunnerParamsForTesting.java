@@ -28,23 +28,44 @@ import com.facebook.buck.jvm.core.JavaPackageFinder;
 import com.facebook.buck.jvm.java.FakeJavaPackageFinder;
 import com.facebook.buck.parser.Parser;
 import com.facebook.buck.parser.ParserConfig;
+import com.facebook.buck.rules.ActionGraphCache;
 import com.facebook.buck.rules.Cell;
 import com.facebook.buck.rules.ConstructorArgMarshaller;
 import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
+import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.timing.DefaultClock;
 import com.facebook.buck.util.Console;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.ProcessManager;
+import com.facebook.buck.util.TriState;
 import com.facebook.buck.util.cache.NullFileHashCache;
+import com.facebook.buck.util.environment.BuildEnvironmentDescription;
 import com.facebook.buck.util.environment.Platform;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.HashMap;
 
 public class CommandRunnerParamsForTesting {
+
+  public static final BuildEnvironmentDescription BUILD_ENVIRONMENT_DESCRIPTION =
+      BuildEnvironmentDescription.builder()
+          .setUser("test")
+          .setHostname("test")
+          .setOs("test")
+          .setAvailableCores(1)
+          .setSystemMemory(1024L)
+          .setBuckDirty(TriState.FALSE)
+          .setBuckCommit("test")
+          .setJavaVersion("test")
+          .setJsonProtocolVersion(1)
+          .build();
 
   /** Utility class: do not instantiate. */
   private CommandRunnerParamsForTesting() {}
@@ -62,9 +83,11 @@ public class CommandRunnerParamsForTesting {
       ObjectMapper objectMapper,
       Optional<WebServer> webServer)
       throws IOException, InterruptedException {
-    DefaultTypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory();
+    DefaultTypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory(
+        ObjectMappers.newDefaultInstance());
     return new CommandRunnerParams(
         console,
+        new ByteArrayInputStream("".getBytes("UTF-8")),
         cell,
         Main.createAndroidPlatformTargetSupplier(
             androidDirectoryResolver,
@@ -83,7 +106,10 @@ public class CommandRunnerParamsForTesting {
         Optional.<ProcessManager>absent(),
         webServer,
         config,
-        new NullFileHashCache());
+        new NullFileHashCache(),
+        new HashMap<ExecutionContext.ExecutorPool, ListeningExecutorService>(),
+        BUILD_ENVIRONMENT_DESCRIPTION,
+        new ActionGraphCache());
   }
 
   public static Builder builder() {
@@ -100,7 +126,7 @@ public class CommandRunnerParamsForTesting {
     private Platform platform = Platform.detect();
     private ImmutableMap<String, String> environment = ImmutableMap.copyOf(System.getenv());
     private JavaPackageFinder javaPackageFinder = new FakeJavaPackageFinder();
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private ObjectMapper objectMapper = ObjectMappers.newDefaultInstance();
     private Optional<WebServer> webServer = Optional.absent();
 
     public CommandRunnerParams build()

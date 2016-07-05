@@ -43,6 +43,7 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
@@ -63,6 +64,8 @@ public class ShTest
   private final SourcePath test;
   @AddToRuleKey
   private final ImmutableList<Arg> args;
+  @AddToRuleKey
+  private final ImmutableMap<String, Arg> env;
   private final Optional<Long> testRuleTimeoutMs;
   private final ImmutableSet<Label> labels;
 
@@ -71,11 +74,13 @@ public class ShTest
       SourcePathResolver resolver,
       SourcePath test,
       ImmutableList<Arg> args,
+      ImmutableMap<String, Arg> env,
       Optional<Long> testRuleTimeoutMs,
       Set<Label> labels) {
     super(params, resolver);
     this.test = test;
     this.args = args;
+    this.env = env;
     this.testRuleTimeoutMs = testRuleTimeoutMs;
     this.labels = ImmutableSet.copyOf(labels);
   }
@@ -122,6 +127,7 @@ public class ShTest
             getProjectFilesystem(),
             getResolver().getAbsolutePath(test),
             Arg.stringify(args),
+            Arg.stringify(env),
             testRuleTimeoutMs,
             getBuildTarget().getFullyQualifiedName(),
             getPathToTestOutputResult());
@@ -143,7 +149,7 @@ public class ShTest
 
   @Override
   public Callable<TestResults> interpretTestResults(
-      ExecutionContext context,
+      final ExecutionContext context,
       boolean isUsingTestSelectors,
       boolean isDryRun) {
     final ImmutableSet<String> contacts = getContacts();
@@ -167,7 +173,7 @@ public class ShTest
         public TestResults call() throws Exception {
           Optional<String> resultsFileContents =
               getProjectFilesystem().readFileIfItExists(getPathToTestOutputResult());
-          ObjectMapper mapper = new ObjectMapper();
+          ObjectMapper mapper = context.getObjectMapper();
           TestResultSummary testResultSummary = mapper.readValue(resultsFileContents.get(),
               TestResultSummary.class);
           TestCaseSummary testCaseSummary = new TestCaseSummary(
@@ -210,6 +216,7 @@ public class ShTest
         .setType("custom")
         .addCommand(getResolver().getAbsolutePath(test).toString())
         .addAllCommand(Arg.stringify(args))
+        .setEnv(Arg.stringify(env))
         .addAllLabels(getLabels())
         .addAllContacts(getContacts())
         .build();
@@ -218,6 +225,11 @@ public class ShTest
   @VisibleForTesting
   protected ImmutableList<Arg> getArgs() {
     return args;
+  }
+
+  @VisibleForTesting
+  protected ImmutableMap<String, Arg> getEnv() {
+    return env;
   }
 
 }

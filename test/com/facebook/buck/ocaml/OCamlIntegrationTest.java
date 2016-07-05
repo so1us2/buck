@@ -19,12 +19,15 @@ package com.facebook.buck.ocaml;
 import static com.facebook.buck.ocaml.OCamlRuleBuilder.createOCamlLinkTarget;
 import static com.facebook.buck.ocaml.OCamlRuleBuilder.createStaticLibraryBuildTarget;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Config;
 import com.facebook.buck.cli.FakeBuckConfig;
+import com.facebook.buck.config.Configs;
+import com.facebook.buck.config.RawConfig;
 import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxDescriptionEnhancer;
 import com.facebook.buck.cxx.CxxPlatform;
@@ -64,9 +67,7 @@ public class OCamlIntegrationTest {
 
     ProjectFilesystem filesystem = new ProjectFilesystem(tmp.getRootPath());
 
-    Config rawConfig = Config.createDefaultConfig(
-        filesystem.getRootPath(),
-        ImmutableMap.<String, ImmutableMap<String, String>>of());
+    Config rawConfig = Configs.createDefaultConfig(filesystem.getRootPath(), RawConfig.of());
 
     BuckConfig buckConfig = new BuckConfig(
         rawConfig,
@@ -319,7 +320,33 @@ public class OCamlIntegrationTest {
   }
 
   @Test
-  public void testPrebuiltLibrary() throws IOException {
+  public void testPrebuiltLibraryBytecodeOnly() throws IOException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this,
+        "ocaml",
+        tmp);
+    workspace.setUp();
+
+    BuildTarget target = BuildTargetFactory.newInstance(
+        workspace.getDestPath(),
+        "//ocaml_ext_bc:ocaml_ext");
+    BuildTarget binary = createOCamlLinkTarget(target);
+    BuildTarget bytecode = OCamlBuildRulesGenerator.addBytecodeFlavor(binary);
+    BuildTarget libplus = BuildTargetFactory.newInstance(
+        workspace.getDestPath(),
+        "//ocaml_ext_bc:plus");
+    ImmutableSet<BuildTarget> targets = ImmutableSet.of(target, bytecode, libplus);
+
+    workspace.runBuckCommand("build", target.toString()).assertSuccess();
+    BuckBuildLog buildLog = workspace.getBuildLog();
+    assertTrue(buildLog.getAllTargets().containsAll(targets));
+    assertFalse(buildLog.getAllTargets().contains(binary));
+    buildLog.assertTargetBuiltLocally(target.toString());
+    buildLog.assertTargetBuiltLocally(bytecode.toString());
+  }
+
+  @Test
+  public void testPrebuiltLibraryMac() throws IOException {
     if (Platform.detect() == Platform.MACOS) {
       ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
           this,
@@ -331,21 +358,29 @@ public class OCamlIntegrationTest {
           workspace.getDestPath(),
           "//ocaml_ext_mac:ocaml_ext");
       BuildTarget binary = createOCamlLinkTarget(target);
+      BuildTarget bytecode = OCamlBuildRulesGenerator.addBytecodeFlavor(binary);
       BuildTarget libplus = BuildTargetFactory.newInstance(
           workspace.getDestPath(),
           "//ocaml_ext_mac:plus");
-      ImmutableSet<BuildTarget> targets = ImmutableSet.of(target, binary, libplus);
+      ImmutableSet<BuildTarget> targets = ImmutableSet.of(target, binary, bytecode, libplus);
 
       workspace.runBuckCommand("build", target.toString()).assertSuccess();
       BuckBuildLog buildLog = workspace.getBuildLog();
-      assertTrue(buildLog.getAllTargets().containsAll(targets));
+      for (BuildTarget t : targets) {
+        assertTrue(
+            String.format("Expected %s to be built", t.toString()),
+            buildLog.getAllTargets().contains(t));
+      }
       buildLog.assertTargetBuiltLocally(target.toString());
       buildLog.assertTargetBuiltLocally(binary.toString());
 
       workspace.resetBuildLogFile();
       workspace.runBuckCommand("build", target.toString()).assertSuccess();
-      buildLog = workspace.getBuildLog();
-      assertTrue(buildLog.getAllTargets().containsAll(targets));
+      for (BuildTarget t : targets) {
+        assertTrue(
+            String.format("Expected %s to be built", t.toString()),
+            buildLog.getAllTargets().contains(t));
+      }
       buildLog.assertTargetHadMatchingRuleKey(target.toString());
       buildLog.assertTargetHadMatchingRuleKey(binary.toString());
 
@@ -389,14 +424,8 @@ public class OCamlIntegrationTest {
             CxxSourceRuleFactory.PicType.PDC);
     String sourceName = "cc/cc.cpp";
     BuildTarget ppObj =
-        cxxSourceRuleFactory.createPreprocessBuildTarget(
-            sourceName,
-            CxxSource.Type.CXX,
-            CxxSourceRuleFactory.PicType.PDC);
-    BuildTarget ccObj =
-        cxxSourceRuleFactory.createCompileBuildTarget(
-            sourceName,
-            CxxSourceRuleFactory.PicType.PDC);
+        cxxSourceRuleFactory.createPreprocessBuildTarget(sourceName, CxxSource.Type.CXX);
+    BuildTarget ccObj = cxxSourceRuleFactory.createCompileBuildTarget(sourceName);
     BuildTarget headerSymlinkTreeTarget =
         CxxDescriptionEnhancer.createHeaderSymlinkTreeTarget(
             cclib,
@@ -454,5 +483,33 @@ public class OCamlIntegrationTest {
     buildLog.assertTargetBuiltLocally(ppObj.toString());
     buildLog.assertTargetHadMatchingRuleKey(headerSymlinkTreeTarget.toString());
     buildLog.assertTargetHadMatchingRuleKey(exportedHeaderSymlinkTreeTarget.toString());
+  }
+
+  @Test
+  public void testConfigWarningsFlags() throws IOException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this,
+        "config_warnings_flags",
+        tmp);
+    workspace.setUp();
+
+    BuildTarget target = BuildTargetFactory.newInstance(workspace.getDestPath(),
+        "//:unused_var");
+    BuildTarget binary = createOCamlLinkTarget(target);
+
+    ImmutableSet<BuildTarget> targets = ImmutableSet.of(target, binary);
+
+    workspace.runBuckCommand("build", target.toString()).assertFailure();
+    BuckBuildLog buildLog = workspace.getBuildLog();
+    assertTrue(buildLog.getAllTargets().containsAll(targets));
+    buildLog.assertTargetCanceled(target.toString());
+    buildLog.assertTargetCanceled(binary.toString());
+
+    workspace.resetBuildLogFile();
+    workspace.replaceFileContents(".buckconfig", "warnings_flags=+a", "");
+    workspace.runBuckCommand("build", target.toString()).assertSuccess();
+    buildLog = workspace.getBuildLog();
+    buildLog.assertTargetBuiltLocally(target.toString());
+    buildLog.assertTargetBuiltLocally(binary.toString());
   }
 }

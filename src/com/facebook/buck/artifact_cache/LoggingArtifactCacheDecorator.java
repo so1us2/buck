@@ -16,13 +16,13 @@
 package com.facebook.buck.artifact_cache;
 
 import com.facebook.buck.event.BuckEventBus;
+import com.facebook.buck.io.BorrowablePath;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.rules.RuleKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
-
-import java.nio.file.Path;
 
 /**
  * Decorator for wrapping a {@link ArtifactCache} to log a {@link ArtifactCacheEvent} for the start
@@ -44,8 +44,7 @@ public class LoggingArtifactCacheDecorator implements ArtifactCache {
   }
 
   @Override
-  public CacheResult fetch(RuleKey ruleKey, Path output)
-      throws InterruptedException {
+  public CacheResult fetch(RuleKey ruleKey, LazyPath output) {
     ArtifactCacheEvent.Started started =
         eventFactory.newFetchStartedEvent(ImmutableSet.of(ruleKey));
     eventBus.post(started);
@@ -60,8 +59,7 @@ public class LoggingArtifactCacheDecorator implements ArtifactCache {
   public ListenableFuture<Void> store(
       ImmutableSet<RuleKey> ruleKeys,
       ImmutableMap<String, String> metadata,
-      Path output)
-      throws InterruptedException {
+      BorrowablePath output) {
     ArtifactCacheEvent.Started started = eventFactory.newStoreStartedEvent(ruleKeys, metadata);
     eventBus.post(started);
     ListenableFuture<Void> storeFuture = delegate.store(ruleKeys, metadata, output);

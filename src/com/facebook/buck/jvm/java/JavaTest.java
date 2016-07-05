@@ -16,8 +16,11 @@
 
 package com.facebook.buck.jvm.java;
 
+import com.facebook.buck.event.BuckEventBus;
+import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.log.Logger;
+import com.facebook.buck.model.BuildId;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.AddToRuleKey;
@@ -45,6 +48,7 @@ import com.facebook.buck.test.TestResults;
 import com.facebook.buck.test.TestRunningOptions;
 import com.facebook.buck.test.XmlTestResultParser;
 import com.facebook.buck.test.result.type.ResultType;
+import com.facebook.buck.test.selectors.TestSelectorList;
 import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.ZipFileTraversal;
 import com.google.common.annotations.VisibleForTesting;
@@ -52,7 +56,6 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -93,6 +96,9 @@ public class JavaTest
               new File("build/testrunner/classes").getAbsolutePath()));
 
   @AddToRuleKey
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
+
+  @AddToRuleKey
   private final ImmutableList<String> vmArgs;
 
   private final ImmutableMap<String, String> nativeLibsEnvironment;
@@ -131,7 +137,7 @@ public class JavaTest
 
   private final Optional<Path> testTempDirOverride;
 
-  protected JavaTest(
+  public JavaTest(
       BuildRuleParams params,
       SourcePathResolver resolver,
       Set<SourcePath> srcs,
@@ -144,6 +150,7 @@ public class JavaTest
       ImmutableSet<Path> addtionalClasspathEntries,
       TestType testType,
       CompileToJarStepFactory compileStepFactory,
+      JavaRuntimeLauncher javaRuntimeLauncher,
       List<String> vmArgs,
       Map<String, String> nativeLibsEnvironment,
       ImmutableSet<BuildRule> sourceUnderTest,
@@ -170,6 +177,7 @@ public class JavaTest
         resourcesRoot,
         mavenCoords,
         /* tests */ ImmutableSortedSet.<BuildTarget>of());
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.vmArgs = ImmutableList.copyOf(vmArgs);
     this.nativeLibsEnvironment = ImmutableMap.copyOf(nativeLibsEnvironment);
     this.sourceUnderTest = sourceUnderTest;
@@ -229,6 +237,9 @@ public class JavaTest
         this.vmArgs,
         executionContext.getTargetDeviceOptional());
 
+    BuckEventBus buckEventBus = executionContext.getBuckEventBus();
+    BuildId buildId = buckEventBus.getBuildId();
+    TestSelectorList testSelectorList = options.getTestSelectorList();
     JUnitJvmArgs args = JUnitJvmArgs.builder()
         .setTestType(testType)
         .setDirectoryForTestResults(outDir)
@@ -238,7 +249,7 @@ public class JavaTest
         .setCodeCoverageEnabled(executionContext.isCodeCoverageEnabled())
         .setDebugEnabled(executionContext.isDebugEnabled())
         .setPathToJavaAgent(options.getPathToJavaAgent())
-        .setBuildId(executionContext.getBuckEventBus().getBuildId())
+        .setBuildId(buildId)
         .setBuckModuleBaseSourceCodePath(getBuildTarget().getBasePath())
         .setStdOutLogLevel(stdOutLogLevel)
         .setStdErrLogLevel(stdErrLogLevel)
@@ -246,13 +257,14 @@ public class JavaTest
         .setExtraJvmArgs(properVmArgs)
         .addAllTestClasses(reorderedTestClasses)
         .setDryRun(options.isDryRun())
-        .setTestSelectorList(options.getTestSelectorList())
+        .setTestSelectorList(testSelectorList)
         .build();
 
     return new JUnitStep(
         getProjectFilesystem(),
         nativeLibsEnvironment,
         testRuleTimeoutMs,
+        javaRuntimeLauncher,
         args);
   }
 
@@ -404,7 +416,10 @@ public class JavaTest
   /**
    * @return a test case result, named "main", signifying a failure of the entire test class.
    */
-  private TestCaseSummary getTestClassFailedSummary(String testClass, String message) {
+  private TestCaseSummary getTestClassFailedSummary(
+      String testClass,
+      String message,
+      long time) {
     return new TestCaseSummary(
         testClass,
         ImmutableList.of(
@@ -412,7 +427,7 @@ public class JavaTest
                 testClass,
                 "main",
                 ResultType.FAILURE,
-                0L,
+                time,
                 message,
                 "",
                 "",
@@ -462,7 +477,8 @@ public class JavaTest
             summaries.add(
                 getTestClassFailedSummary(
                     testClass,
-                    message));
+                    message,
+                    testRuleTimeoutMs.or(0L)));
           // Not having a test result file at all (which only happens when we are using test
           // selectors) is interpreted as meaning a test didn't run at all, so we'll completely
           // ignore it.  This is another result of the fact that JUnit is the only thing that can
@@ -543,13 +559,9 @@ public class JavaTest
 
       final Set<String> sourceClassNames = Sets.newHashSetWithExpectedSize(sources.size());
       for (Path path : sources) {
-        String source = path.toString();
-        int lastSlashIndex = source.lastIndexOf(File.separatorChar);
-        if (lastSlashIndex >= 0) {
-          source = source.substring(lastSlashIndex + 1);
-        }
-        source = source.substring(0, source.length() - ".java".length());
-        sourceClassNames.add(source);
+        // We support multiple languages in this rule - the file extension doesn't matter so long
+        // as the language supports filename == classname.
+        sourceClassNames.add(MorePaths.getNameWithoutExtension(path));
       }
 
       final ImmutableSet.Builder<String> testClassNames = ImmutableSet.builder();
@@ -566,7 +578,7 @@ public class JavaTest
           }
 
           // As a heuristic for case (2) as described in the Javadoc, make sure the name of the
-          // .class file matches the name of a .java file.
+          // .class file matches the name of a .java/.scala/.xxx file.
           String nameWithoutDotClass = name.substring(0, name.length() - ".class".length());
           if (!sourceClassNames.contains(nameWithoutDotClass)) {
             return;
@@ -586,7 +598,7 @@ public class JavaTest
         traversal.traverse();
       } catch (IOException e) {
         // There's nothing sane to do here. The jar file really should exist.
-        throw Throwables.propagate(e);
+        throw new RuntimeException(e);
       }
 
       return testClassNames.build();

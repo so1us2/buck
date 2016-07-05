@@ -20,7 +20,9 @@ import static com.facebook.buck.jvm.java.JavaCompilationConstants.DEFAULT_JAVAC_
 import static org.junit.Assert.assertEquals;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Config;
+import com.facebook.buck.config.Configs;
+import com.facebook.buck.config.RawConfig;
 import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.event.BuckEventBusFactory;
 import com.facebook.buck.io.ExecutableFinder;
@@ -40,6 +42,7 @@ import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TestDataHelper;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Architecture;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.collect.ImmutableMap;
@@ -65,9 +68,7 @@ public class JavaSymbolFinderIntegrationTest {
 
     ProjectFilesystem projectFilesystem = new ProjectFilesystem(temporaryFolder.getRootPath());
     ImmutableMap<String, String> environment = ImmutableMap.copyOf(System.getenv());
-    Config rawConfig = Config.createDefaultConfig(
-        projectFilesystem.getRootPath(),
-        ImmutableMap.<String, ImmutableMap<String, String>>of());
+    Config rawConfig = Configs.createDefaultConfig(projectFilesystem.getRootPath(), RawConfig.of());
     BuckConfig config = new BuckConfig(
         rawConfig,
         projectFilesystem,
@@ -99,7 +100,8 @@ public class JavaSymbolFinderIntegrationTest {
         projectFilesystem,
         srcRootsFinder,
         DEFAULT_JAVAC_OPTIONS,
-        new ConstructorArgMarshaller(new DefaultTypeCoercerFactory()),
+        new ConstructorArgMarshaller(new DefaultTypeCoercerFactory(
+            ObjectMappers.newDefaultInstance())),
         projectBuildFileParserFactory,
         config,
         buckEventBus,

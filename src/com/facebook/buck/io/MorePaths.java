@@ -20,9 +20,9 @@ import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -61,7 +61,11 @@ public class MorePaths {
   }
 
   public static String pathWithUnixSeparators(Path path) {
-    return path.toString().replace("\\", "/");
+    return path.toString().replace('\\', '/');
+  }
+
+  public static String pathWithWindowsSeparators(Path path) {
+    return path.toString().replace('/', '\\');
   }
 
   public static String pathWithPlatformSeparators(String path) {
@@ -70,7 +74,7 @@ public class MorePaths {
 
   public static String pathWithPlatformSeparators(Path path) {
     if (Platform.detect() == Platform.WINDOWS) {
-      return path.toString().replace("/", "\\");
+      return pathWithWindowsSeparators(path);
     } else {
       return pathWithUnixSeparators(path);
     }
@@ -250,8 +254,8 @@ public class MorePaths {
     if (!path.startsWith("~")) {
       return path;
     }
-    Path homePath = Paths.get(System.getProperty("user.home"));
-    if (path.equals(Paths.get("~"))) {
+    Path homePath = path.getFileSystem().getPath(System.getProperty("user.home"));
+    if (path.equals(path.getFileSystem().getPath("~"))) {
       return homePath;
     }
     return homePath.resolve(path.subpath(1, path.getNameCount()));
@@ -276,7 +280,7 @@ public class MorePaths {
       // If the file doesn't exist, we need to create it.
       return true;
     } catch (NoSuchAlgorithmException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -316,7 +320,7 @@ public class MorePaths {
   }
 
 
-  public static String stripPathPrefixAndExtension (Path fileName, String prefix) {
+  public static String stripPathPrefixAndExtension(Path fileName, String prefix) {
     String nameWithoutExtension = getNameWithoutExtension(fileName);
 
     if (!nameWithoutExtension.startsWith(prefix) ||
@@ -331,6 +335,18 @@ public class MorePaths {
     return nameWithoutExtension.substring(
         prefix.length(),
         nameWithoutExtension.length());
+  }
+
+  public static Optional<Path> stripPrefix(Path p, Path prefix) {
+    if (prefix.getNameCount() > p.getNameCount()) {
+      return Optional.absent();
+    }
+    for (int i = 0; i < prefix.getNameCount(); ++i) {
+      if (!prefix.getName(i).equals(p.getName(i))) {
+        return Optional.absent();
+      }
+    }
+    return Optional.of(p.subpath(prefix.getNameCount(), p.getNameCount()));
   }
 
   public static Function<String, Path> toPathFn(final FileSystem fileSystem) {

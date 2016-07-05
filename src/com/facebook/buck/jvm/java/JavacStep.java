@@ -24,13 +24,13 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.util.CapturingPrintStream;
+import com.facebook.buck.util.Verbosity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -51,13 +51,15 @@ public class JavacStep implements Step {
 
   private final Path outputDirectory;
 
+  private final Optional<Path> usedClassesFile;
+
   private final Optional<StandardJavaFileManagerFactory> fileManagerFactory;
 
   private final Optional<Path> workingDirectory;
 
   private final ImmutableSortedSet<Path> javaSourceFilePaths;
 
-  private final Optional<Path> pathToSrcsList;
+  private final Path pathToSrcsList;
 
   private final JavacOptions javacOptions;
 
@@ -101,10 +103,11 @@ public class JavacStep implements Step {
 
   public JavacStep(
       Path outputDirectory,
+      Optional<Path> usedClassesFile,
       Optional<StandardJavaFileManagerFactory> fileManagerFactory,
       Optional<Path> workingDirectory,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList,
+      Path pathToSrcsList,
       ImmutableSortedSet<Path> declaredClasspathEntries,
       Javac javac,
       JavacOptions javacOptions,
@@ -113,6 +116,7 @@ public class JavacStep implements Step {
       SourcePathResolver resolver,
       ProjectFilesystem filesystem) {
     this.outputDirectory = outputDirectory;
+    this.usedClassesFile = usedClassesFile;
     this.fileManagerFactory = fileManagerFactory;
     this.workingDirectory = workingDirectory;
     this.javaSourceFilePaths = javaSourceFilePaths;
@@ -133,10 +137,15 @@ public class JavacStep implements Step {
 
   private int tryBuildWithFirstOrderDeps(ExecutionContext context, ProjectFilesystem filesystem)
       throws InterruptedException, IOException {
+    Verbosity verbosity =
+        context.getVerbosity().isSilent() ? Verbosity.STANDARD_INFORMATION : context.getVerbosity();
     try (
         CapturingPrintStream stdout = new CapturingPrintStream();
         CapturingPrintStream stderr = new CapturingPrintStream();
-        ExecutionContext firstOrderContext = context.createSubContext(stdout, stderr)) {
+        ExecutionContext firstOrderContext = context.createSubContext(
+            stdout,
+            stderr,
+            Optional.of(verbosity))) {
 
       Javac javac = getJavac();
 
@@ -149,6 +158,7 @@ public class JavacStep implements Step {
           javaSourceFilePaths,
           pathToSrcsList,
           workingDirectory,
+          usedClassesFile,
           fileManagerFactory);
 
       String firstOrderStdout = stdout.getContentsAsString(Charsets.UTF_8);
@@ -160,9 +170,7 @@ public class JavacStep implements Step {
 
         if (suggestBuildRules.isPresent()) {
           ImmutableSet<String> failedImports = findFailedImports(firstOrderStderr);
-          ImmutableSet<String> suggestions = suggestBuildRules.get().suggest(
-              filesystem,
-              failedImports);
+          ImmutableSet<String> suggestions = suggestBuildRules.get().suggest(failedImports);
 
           if (!suggestions.isEmpty()) {
             String invoker = invokingRule.toString();
@@ -191,8 +199,10 @@ public class JavacStep implements Step {
           context.postEvent(evt);
         }
 
-        context.getStdOut().print(firstOrderStdout);
-        context.getStdErr().println(Joiner.on("\n").join(errorMessage.build()));
+        if (!context.getVerbosity().isSilent()) {
+          context.getStdOut().print(firstOrderStdout);
+          context.getStdErr().println(Joiner.on("\n").join(errorMessage.build()));
+        }
       }
 
       return declaredDepsResult;
@@ -260,7 +270,7 @@ public class JavacStep implements Step {
       ImmutableSortedSet<Path> buildClasspathEntries) {
     final ImmutableList.Builder<String> builder = ImmutableList.builder();
 
-    javacOptions.appendOptionsTo(new AbstractJavacOptions.OptionsConsumer() {
+    javacOptions.appendOptionsTo(new OptionsConsumer() {
       @Override
       public void addOptionValue(String option, String value) {
         builder.add("-" + option).add(value);
@@ -283,14 +293,12 @@ public class JavacStep implements Step {
     }
 
     // Specify the output directory.
-    Function<Path, Path> pathRelativizer = filesystem.getAbsolutifier();
-    builder.add("-d").add(pathRelativizer.apply(outputDirectory).toString());
+    Function<Path, Path> pathAbsolutifier = filesystem.getAbsolutifier();
+    builder.add("-d").add(pathAbsolutifier.apply(outputDirectory).toString());
 
     // Build up and set the classpath.
     if (!buildClasspathEntries.isEmpty()) {
-      String classpath = Joiner.on(File.pathSeparator).join(
-          FluentIterable.from(buildClasspathEntries)
-              .transform(pathRelativizer));
+      String classpath = Joiner.on(File.pathSeparator).join(buildClasspathEntries);
       builder.add("-classpath", classpath);
     } else {
       builder.add("-classpath", "''");

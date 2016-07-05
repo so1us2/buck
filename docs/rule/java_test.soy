@@ -48,7 +48,7 @@ A <code>java_test()</code> rule is used to define a set of
   {param name: 'resources' /}
   {param default : '[]' /}
   {param desc}
-  Same as <a href="java_library.html"><code>java_library()</code></a>. 
+  Same as <a href="java_library.html"><code>java_library()</code></a>.
   {/param}
 {/call}
 
@@ -91,7 +91,8 @@ A <code>java_test()</code> rule is used to define a set of
   {param desc}
   Same as <a href="java_library.html"><code>java_library()</code></a>.
   // org.junit.rules.Timeout was not introduced until 4.7.
-  Must include JUnit as a dependency (version 4.7 or later).
+  Must include JUnit (version 4.7 or later) as a dependency for JUnit tests.
+  Must include TestNG (version 6.2 or later) and hamcrest as a dependencies for TestNG tests.
   {/param}
 {/call}
 
@@ -126,13 +127,19 @@ A <code>java_test()</code> rule is used to define a set of
   {/param}
 {/call}
 
-{call buck.visibility_arg /}
-
 {call buck.arg}
   {param name: 'use_cxx_libraries' /}
   {param default: 'False' /}
   {param desc}
   Whether or not to build and link against {call buck.cxx_library /} dependencies when testing.
+  {/param}
+{/call}
+
+{call buck.arg}
+  {param name: 'vm_args' /}
+  {param default : '[]' /}
+  {param desc}
+  Runtime arguments to the JVM running the tests.
   {/param}
 {/call}
 

@@ -18,7 +18,7 @@ package com.facebook.buck.cxx;
 
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
@@ -31,6 +31,7 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.Arg;
 import com.facebook.buck.rules.args.StringArg;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -72,17 +73,19 @@ public class OmnibusTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraph.EMPTY,
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     ImmutableMap<String, SourcePath> libs =
-        Omnibus.getSharedLibraries(
-            new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
-            resolver,
-            pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM,
-            ImmutableList.of(root),
-            ImmutableList.<NativeLinkable>of())
-            .toSonameMap();
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.<NativeLinkable>of()));
     assertThat(
         libs.keySet(),
         Matchers.containsInAnyOrder(root.getBuildTarget().toString(), "libomnibus.so"));
@@ -131,17 +134,19 @@ public class OmnibusTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraph.EMPTY,
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     ImmutableMap<String, SourcePath> libs =
-        Omnibus.getSharedLibraries(
-            new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
-            resolver,
-            pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM,
-            ImmutableList.of(root),
-            ImmutableList.<NativeLinkable>of())
-            .toSonameMap();
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.<NativeLinkable>of()));
     assertThat(
         libs.keySet(),
         Matchers.containsInAnyOrder(
@@ -195,17 +200,19 @@ public class OmnibusTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraph.EMPTY,
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     ImmutableMap<String, SourcePath> libs =
-        Omnibus.getSharedLibraries(
-            new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
-            resolver,
-            pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM,
-            ImmutableList.of(root),
-            ImmutableList.<NativeLinkable>of())
-            .toSonameMap();
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.<NativeLinkable>of()));
     assertThat(
         libs.keySet(),
         Matchers.containsInAnyOrder(
@@ -263,17 +270,19 @@ public class OmnibusTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraph.EMPTY,
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     ImmutableMap<String, SourcePath> libs =
-        Omnibus.getSharedLibraries(
-            new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
-            resolver,
-            pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM,
-            ImmutableList.of(root),
-            ImmutableList.of(excludedRoot))
-            .toSonameMap();
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.of(excludedRoot)));
     assertThat(
         libs.keySet(),
         Matchers.containsInAnyOrder(
@@ -329,17 +338,19 @@ public class OmnibusTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraph.EMPTY,
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
     ImmutableMap<String, SourcePath> libs =
-        Omnibus.getSharedLibraries(
-            new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
-            resolver,
-            pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM,
-            ImmutableList.of(root),
-            ImmutableList.of(excludedRoot))
-            .toSonameMap();
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.of(excludedRoot)));
     assertThat(
         libs.keySet(),
         Matchers.containsInAnyOrder(
@@ -357,6 +368,72 @@ public class OmnibusTest {
         Matchers.not(Matchers.instanceOf(BuildTargetSourcePath.class)));
   }
 
+  @Test
+  public void unusedStaticDepsAreNotIncludedInBody() throws NoSuchBuildTargetException {
+    NativeLinkable a =
+        new Node(
+            "//:a",
+            ImmutableList.<NativeLinkable>of(),
+            ImmutableList.<NativeLinkable>of(),
+            NativeLinkable.Linkage.STATIC);
+    NativeLinkable b = new Node("//:b");
+    SharedNativeLinkTarget root = new Root("//:root", ImmutableList.of(a, b));
+
+    // Verify the spec.
+    Omnibus.OmnibusSpec spec =
+        Omnibus.buildSpec(
+            CxxPlatformUtils.DEFAULT_PLATFORM,
+            ImmutableList.of(root),
+            ImmutableList.<NativeLinkable>of());
+    assertThat(
+        spec.getGraph().getNodes(),
+        Matchers.containsInAnyOrder(b.getBuildTarget()));
+    assertThat(
+        spec.getBody().keySet(),
+        Matchers.containsInAnyOrder(b.getBuildTarget()));
+    assertThat(
+        spec.getRoots().keySet(),
+        Matchers.containsInAnyOrder(root.getBuildTarget()));
+    assertThat(
+        spec.getDeps().keySet(),
+        Matchers.<BuildTarget>empty());
+    assertThat(
+        spec.getExcluded().keySet(),
+        Matchers.<BuildTarget>empty());
+
+    // Verify the libs.
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(
+            TargetGraph.EMPTY,
+            new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(resolver);
+    ImmutableMap<String, SourcePath> libs =
+        toSonameMap(
+            Omnibus.getSharedLibraries(
+                new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:rule")).build(),
+                resolver,
+                pathResolver,
+                CxxPlatformUtils.DEFAULT_CONFIG,
+                CxxPlatformUtils.DEFAULT_PLATFORM,
+                ImmutableList.<Arg>of(),
+                ImmutableList.of(root),
+                ImmutableList.<NativeLinkable>of()));
+    assertThat(
+        libs.keySet(),
+        Matchers.containsInAnyOrder(root.getBuildTarget().toString(), "libomnibus.so"));
+    assertCxxLinkContainsNativeLinkableInput(
+        getCxxLinkRule(pathResolver, libs.get(root.getBuildTarget().toString())),
+        root.getSharedNativeLinkTargetInput(CxxPlatformUtils.DEFAULT_PLATFORM),
+        a.getNativeLinkableInput(
+            CxxPlatformUtils.DEFAULT_PLATFORM,
+            Linker.LinkableDepType.STATIC_PIC));
+    assertCxxLinkContainsNativeLinkableInput(
+        getCxxLinkRule(pathResolver, libs.get("libomnibus.so")),
+        b.getNativeLinkableInput(
+            CxxPlatformUtils.DEFAULT_PLATFORM,
+            Linker.LinkableDepType.STATIC_PIC));
+  }
+
   private CxxLink getCxxLinkRule(SourcePathResolver resolver, SourcePath path) {
     return ((CxxLink) resolver.getRule(path).get());
   }
@@ -366,7 +443,7 @@ public class OmnibusTest {
       NativeLinkableInput... inputs) {
     for (NativeLinkableInput input : inputs) {
       assertThat(
-          link.getArgs(),
+          Arg.stringify(link.getArgs()),
           Matchers.hasItems(Arg.stringify(input.getArgs()).toArray(new String[1])));
     }
   }
@@ -376,14 +453,24 @@ public class OmnibusTest {
     private final BuildTarget target;
     private final Iterable<? extends NativeLinkable> deps;
     private final Iterable<? extends NativeLinkable> exportedDeps;
+    private final Linkage linkage;
+
+    public Node(
+        String target,
+        Iterable<? extends NativeLinkable> deps,
+        Iterable<? extends NativeLinkable> exportedDeps,
+        Linkage linkage) {
+      this.target = BuildTargetFactory.newInstance(target);
+      this.deps = deps;
+      this.exportedDeps = exportedDeps;
+      this.linkage = linkage;
+    }
 
     public Node(
         String target,
         Iterable<? extends NativeLinkable> deps,
         Iterable<? extends NativeLinkable> exportedDeps) {
-      this.target = BuildTargetFactory.newInstance(target);
-      this.deps = deps;
-      this.exportedDeps = exportedDeps;
+      this(target, deps, exportedDeps, Linkage.ANY);
     }
 
     public Node(
@@ -423,7 +510,7 @@ public class OmnibusTest {
 
     @Override
     public Linkage getPreferredLinkage(CxxPlatform cxxPlatform) {
-      return Linkage.ANY;
+      return linkage;
     }
 
     @Override
@@ -482,8 +569,8 @@ public class OmnibusTest {
     }
 
     @Override
-    public String getSharedNativeLinkTargetLibraryName(CxxPlatform cxxPlatform) {
-      return getBuildTarget().toString();
+    public Optional<String> getSharedNativeLinkTargetLibraryName(CxxPlatform cxxPlatform) {
+      return Optional.of(getBuildTarget().toString());
     }
 
     @Override
@@ -493,6 +580,17 @@ public class OmnibusTest {
           .build();
     }
 
+  }
+
+  private ImmutableMap<String, SourcePath> toSonameMap(OmnibusLibraries libraries) {
+    ImmutableMap.Builder<String, SourcePath> map = ImmutableMap.builder();
+    for (OmnibusRoot root : libraries.getRoots().values()) {
+      map.put(root.getSoname().get(), root.getPath());
+    }
+    for (OmnibusLibrary library : libraries.getLibraries()) {
+      map.put(library.getSoname(), library.getPath());
+    }
+    return map.build();
   }
 
 }

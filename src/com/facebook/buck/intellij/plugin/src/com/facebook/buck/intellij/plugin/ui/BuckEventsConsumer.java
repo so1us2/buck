@@ -16,7 +16,8 @@
 
 package com.facebook.buck.intellij.plugin.ui;
 
-import com.facebook.buck.intellij.plugin.config.BuildRuleItem;
+import com.facebook.buck.intellij.plugin.actions.BuckInstallDebugAction;
+import com.facebook.buck.intellij.plugin.debugger.AndroidDebugger;
 import com.facebook.buck.intellij.plugin.ui.tree.BuckTreeNodeBuild;
 import com.facebook.buck.intellij.plugin.ui.tree.BuckTreeNodeDetail;
 import com.facebook.buck.intellij.plugin.ui.tree.BuckTreeNodeFileError;
@@ -25,43 +26,56 @@ import com.facebook.buck.intellij.plugin.ui.utils.CompilerErrorItem;
 import com.facebook.buck.intellij.plugin.ui.utils.ErrorExtractor;
 import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckBuildEndConsumer;
 import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckBuildStartConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckInternalBatchCommitConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckInternalBatchStartConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuildRuleEndConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuildRuleFailureConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuildRuleStartConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuildRuleSuspendedConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckConsoleEventConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckInstallFinishedConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckProjectGenerationFinishedConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckProjectGenerationProgressConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckProjectGenerationStartedConsumer;
 import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.CompilerErrorConsumer;
-import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.RulesParsingEndConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.BuckBuildProgressUpdateConsumer;
 import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.RulesParsingStartConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.RulesParsingEndConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.RulesParsingProgressUpdateConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.TestRunStartedConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.TestResultsAvailableConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.consumers.TestRunCompleteConsumer;
+import com.facebook.buck.intellij.plugin.ws.buckevents.parts.TestCaseSummary;
+import com.facebook.buck.intellij.plugin.ws.buckevents.parts.TestResults;
+import com.facebook.buck.intellij.plugin.ws.buckevents.parts.TestResultsSummary;
+import com.facebook.buck.util.HumanReadableException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.MessageBusConnection;
 
 import javax.swing.tree.DefaultTreeModel;
-import java.math.BigInteger;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.LinkedList;
 
 public class BuckEventsConsumer implements
-        BuckBuildStartConsumer,
-        BuckBuildEndConsumer,
-        BuildRuleStartConsumer,
-        BuildRuleEndConsumer,
-        BuildRuleFailureConsumer,
-        BuildRuleSuspendedConsumer,
-        CompilerErrorConsumer,
-        RulesParsingStartConsumer,
-        RulesParsingEndConsumer,
-
-        BuckInternalBatchStartConsumer,
-        BuckInternalBatchCommitConsumer {
+    BuckBuildStartConsumer,
+    BuckBuildEndConsumer,
+    BuckBuildProgressUpdateConsumer,
+    BuckProjectGenerationFinishedConsumer,
+    BuckProjectGenerationProgressConsumer,
+    BuckProjectGenerationStartedConsumer,
+    RulesParsingStartConsumer,
+    RulesParsingEndConsumer,
+    RulesParsingProgressUpdateConsumer,
+    TestRunStartedConsumer,
+    TestRunCompleteConsumer,
+    TestResultsAvailableConsumer,
+    BuckConsoleEventConsumer,
+    CompilerErrorConsumer,
+    BuckInstallFinishedConsumer {
 
     private Project mProject;
     public BuckEventsConsumer(Project project) {
@@ -70,20 +84,31 @@ public class BuckEventsConsumer implements
     private String mTarget = null;
     private MessageBusConnection mConnection;
     private DefaultTreeModel mTreeModel;
-    private Map<String, BuildRuleItem> mRules =
-            Collections.synchronizedMap(new HashMap<String, BuildRuleItem>());
     private Map<String, List<String>> mErrors =
             Collections.synchronizedMap(new HashMap<String, List<String>>());
-    private int mNumRules = 0;
-    private BigInteger mMainBuildStartTimestamp = BigInteger.ZERO;
-    private BigInteger mMainBuildEndTimestamp = BigInteger.ZERO;
+    private double mBuildProgressValue = 0;
+    private double mParseProgressValue = 0;
+    private double mProjectGenerationProgressValue = 0;
+
+    private long mMainBuildStartTimestamp = 0;
+    private long mMainBuildEndTimestamp = 0;
+
+    private long mParseFilesStartTimestamp = 0;
+    private long mParseFilesEndTimestamp = 0;
+    private long mTestingEndTimestamp = 0;
+    private long mTestingStartTimestamp = 0;
+    private List<TestResults> mTestResultsList =
+            Collections.synchronizedList(new LinkedList<TestResults>());
+
+
+    private long mProjectGenerationStartTimestamp = 0;
+    private long mProjectGenerationFinishedTimestamp = 0;
 
     BuckTreeNodeBuild mCurrentBuildRootElement;
-    BuckTreeNodeDetail mTotalTasks;
-    BuckTreeNodeDetail mRunningTasks;
-    BuckTreeNodeDetail mSuspendedTasks;
-    BuckTreeNodeDetail mFinishedTasks;
-
+    BuckTreeNodeDetail mBuildProgress;
+    BuckTreeNodeDetail mParseProgress;
+    BuckTreeNodeDetail mTestResults;
+    BuckTreeNodeDetail mProjectGenerationProgress;
 
     public void detach() {
         mConnection.disconnect();
@@ -91,12 +116,6 @@ public class BuckEventsConsumer implements
 
     public void detachWithMessage(String message) {
         detach();
-        BuckEventsConsumer.this.mTreeModel.setRoot(new BuckTreeNodeDetail(
-                null,
-                BuckTreeNodeDetail.DetailType.ERROR,
-                "Disconnected from buck: " + message
-        ));
-        BuckEventsConsumer.this.mTreeModel.reload();
     }
 
     public void attach(String target, DefaultTreeModel treeModel) {
@@ -104,137 +123,118 @@ public class BuckEventsConsumer implements
         mTarget = target;
         mCurrentBuildRootElement = new BuckTreeNodeBuild(mTarget);
 
-        mTotalTasks = new BuckTreeNodeDetail(
-                mCurrentBuildRootElement,
-                BuckTreeNodeDetail.DetailType.INFO,
-                "Total tasks: " + mNumRules);
-        mRunningTasks = new BuckTreeNodeDetail(
-                mCurrentBuildRootElement,
-                BuckTreeNodeDetail.DetailType.INFO,
-                "Running tasks: 0"
-        );
-        mSuspendedTasks = new BuckTreeNodeDetail(
-                mCurrentBuildRootElement,
-                BuckTreeNodeDetail.DetailType.INFO,
-                "Suspended tasks: 0"
-        );
-        mFinishedTasks = new BuckTreeNodeDetail(
-                mCurrentBuildRootElement,
-                BuckTreeNodeDetail.DetailType.INFO,
-                "Finished tasks: 0"
-        );
-        mCurrentBuildRootElement.addChild(mTotalTasks);
-        mCurrentBuildRootElement.addChild(mRunningTasks);
-        mCurrentBuildRootElement.addChild(mSuspendedTasks);
-        mCurrentBuildRootElement.addChild(mFinishedTasks);
-
         mTreeModel.setRoot(mCurrentBuildRootElement);
 
-        mMainBuildStartTimestamp = BigInteger.ZERO;
+        mMainBuildStartTimestamp = 0;
 
         mConnection = mProject.getMessageBus().connect();
 
+        mConnection.subscribe(
+            BuckProjectGenerationFinishedConsumer.PROJECT_GENERATION_FINISHED_CONSUMER, this);
+        mConnection.subscribe(
+            BuckProjectGenerationStartedConsumer.PROJECT_GENERATION_STARTED_CONSUMER, this);
+        mConnection.subscribe(
+            BuckProjectGenerationProgressConsumer.PROJECT_GENERATION_PROGRESS_CONSUMER, this);
+
         mConnection.subscribe(BuckBuildStartConsumer.BUCK_BUILD_START, this);
         mConnection.subscribe(BuckBuildEndConsumer.BUCK_BUILD_END, this);
-
-        mConnection.subscribe(BuildRuleStartConsumer.BUCK_BUILD_RULE_START, this);
-        mConnection.subscribe(BuildRuleEndConsumer.BUCK_BUILD_RULE_END, this);
-        mConnection.subscribe(BuildRuleSuspendedConsumer.BUCK_BUILD_RULE_SUSPENDED, this);
+        mConnection.subscribe(BuckBuildProgressUpdateConsumer.BUCK_BUILD_PROGRESS_UPDATE, this);
 
         mConnection.subscribe(RulesParsingStartConsumer.BUCK_PARSE_RULE_START, this);
         mConnection.subscribe(RulesParsingEndConsumer.BUCK_PARSE_RULE_END, this);
+        mConnection.subscribe(RulesParsingProgressUpdateConsumer.BUCK_PARSE_PROGRESS_UPDATE, this);
 
         mConnection.subscribe(CompilerErrorConsumer.COMPILER_ERROR_CONSUMER, this);
+        mConnection.subscribe(BuckConsoleEventConsumer.BUCK_CONSOLE_EVENT, this);
 
-        mConnection.subscribe(BuckInternalBatchStartConsumer.BUCK_INTERNAL_BATCH_START, this);
-        mConnection.subscribe(BuckInternalBatchCommitConsumer.BUCK_INTERNAL_BATCH_COMMIT, this);
+        mConnection.subscribe(TestRunStartedConsumer.BUCK_TEST_RUN_STARTED, this);
+        mConnection.subscribe(TestRunCompleteConsumer.BUCK_TEST_RUN_COMPLETE, this);
+        mConnection.subscribe(TestResultsAvailableConsumer.BUCK_TEST_RESULTS_AVAILABLE, this);
+
+        mConnection.subscribe(BuckInstallFinishedConsumer.INSTALL_FINISHED_CONSUMER, this);
     }
-
     @Override
-    public void consumeBuildRuleEnd(String build,
-                                    String ruleKeySafe,
-                                    String target,
-                                    BigInteger timestamp,
-                                    boolean mainRule, String status) {
-        if (mRules.containsKey(target)) {
-            BuildRuleItem bri = mRules.get(target);
-            bri.endTimestamp = timestamp;
-            if (bri.status == BuildRuleItem.Status.RUNNING) {
-                bri.status = BuildRuleItem.Status.FINISHED;
-                mRules.put(target, bri);
-            }
-            if (!mBatchMode) {
-                refreshTasksStatus();
-            }
+    public void consumeBuckBuildProgressUpdate(long timestamp,
+                                              double progressValue) {
+        if (mBuildProgress == null) {
+            consumeBuildStart(timestamp);
         }
+        mBuildProgressValue = progressValue;
+        final String message = "Current build progress: " +
+            Math.round(mBuildProgressValue * 100) + "%";
+
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+          @Override
+          public void run() {
+            BuckEventsConsumer.this.mBuildProgress.setDetail(message);
+            BuckEventsConsumer.this.mTreeModel.reload();
+          }
+        });
     }
 
     @Override
-    public void consumeBuildRuleStart(String build,
-                                      String ruleKeySafe,
-                                      String target,
-                                      BigInteger timestamp,
-                                      boolean mainRule) {
-        BuildRuleItem bri = new BuildRuleItem();
-        bri.name = target;
-        bri.startTimestamp = timestamp;
-        bri.status = BuildRuleItem.Status.RUNNING;
-        mRules.put(target, bri);
-        if (!mBatchMode) {
-            refreshTasksStatus();
-        }
-    }
+    public void consumeParseRuleStart(long timestamp) {
+        mParseFilesStartTimestamp = timestamp;
 
-    @Override
-    public void consumeBuildRuleFailure(String build,
-                                        String ruleKeySafe,
-                                        String target,
-                                        BigInteger timestamp,
-                                        String message) {
-        // TODO
-    }
-
-    @Override
-    public void consumeParseRuleEnd(String build, BigInteger timestamp, int numRules) {
-
-        mNumRules = numRules;
-        final String message = "Total tasks: " + numRules;
         ApplicationManager.getApplication().invokeLater(new Runnable() {
             @Override
             public void run() {
-                BuckEventsConsumer.this.mTotalTasks.setDetail(message);
+                // start may be called before of after progress update
+                if (BuckEventsConsumer.this.mParseProgress == null) {
+                    BuckEventsConsumer.this.mParseProgress = new BuckTreeNodeDetail(
+                        mCurrentBuildRootElement,
+                        BuckTreeNodeDetail.DetailType.INFO,
+                        "Current file parsing progress: " +
+                            Math.round(mParseProgressValue * 100) + "%");
+                    BuckEventsConsumer.this.mCurrentBuildRootElement.addChild(mParseProgress);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                }
+            }
+        });
+    }
+
+    @Override
+    public void consumeParseRuleEnd(long timestamp) {
+        consumeParseRuleProgressUpdate(timestamp, 1.0f);
+        mParseFilesEndTimestamp = timestamp;
+        float duration = (mParseFilesEndTimestamp - mParseFilesStartTimestamp) / 1000;
+        final String message = "File parsing ended, took " + duration + " seconds!";
+
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                BuckEventsConsumer.this.mParseProgress.setDetail(message);
                 BuckEventsConsumer.this.mTreeModel.reload();
             }
         });
     }
 
     @Override
-    public void consumeParseRuleStart(String build, BigInteger timestamp) {
-        //mParseFilesStartTimestamp = timestamp;
-    }
+    public void consumeParseRuleProgressUpdate(long timestamp,
+                                               double progressValue) {
+        if (mParseProgress == null) {
+            consumeParseRuleStart(timestamp);
+        }
+        if (mParseProgressValue != 1.0f) {
+            mParseProgressValue = progressValue;
+            final String message = "Current file parsing progress: " +
+                Math.round(mParseProgressValue * 100) + "%";
 
-    @Override
-    public void consumeBuildRuleSuspended(String build,
-                                          String ruleKeySafe,
-                                          String target,
-                                          BigInteger timestamp,
-                                          String buildRuleType) {
-        if (mRules.containsKey(target)) {
-            BuildRuleItem bri = mRules.get(target);
-            bri.status = BuildRuleItem.Status.SUSPENDED;
-            mRules.put(target, bri);
-            if (!mBatchMode) {
-                refreshTasksStatus();
-            }
+            ApplicationManager.getApplication().invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    BuckEventsConsumer.this.mParseProgress.setDetail(message);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                }
+            });
         }
     }
 
     @Override
-    public void consumeCompilerError(String build,
-                                     String target,
-                                     BigInteger timestamp,
+    public void consumeCompilerError(String target,
+                                     long timestamp,
                                      String error,
-                                     String[] suggestions) {
+                                     ImmutableSet<String> suggestions) {
         List<String> existingErrors;
         if (mErrors.containsKey(target)) {
             existingErrors = mErrors.get(target);
@@ -243,37 +243,6 @@ public class BuckEventsConsumer implements
         }
         existingErrors.add(error);
         mErrors.put(target, existingErrors);
-    }
-
-    private void refreshTasksStatus() {
-        int running = 0;
-        int suspended = 0;
-        int finished = 0;
-
-        for (String cTarget: mRules.keySet()) {
-            BuildRuleItem bri = mRules.get(cTarget);
-            if (bri.status == BuildRuleItem.Status.RUNNING) {
-                running++;
-            } else if (bri.status == BuildRuleItem.Status.SUSPENDED) {
-                suspended++;
-            } else if (bri.status == BuildRuleItem.Status.FINISHED ||
-                    bri.status == BuildRuleItem.Status.ERROR) {
-                finished++;
-            }
-        }
-        final String finishedMessage = "Finished tasks: " + finished;
-        final String runningMessage = "Running tasks: " + running;
-        final String suspendedMessage = "Suspended tasks: " + suspended;
-
-        ApplicationManager.getApplication().invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                BuckEventsConsumer.this.mFinishedTasks.setDetail(finishedMessage);
-                BuckEventsConsumer.this.mRunningTasks.setDetail(runningMessage);
-                BuckEventsConsumer.this.mSuspendedTasks.setDetail(suspendedMessage);
-                BuckEventsConsumer.this.mTreeModel.reload();
-            }
-        });
     }
 
     private void log(String message) {
@@ -331,11 +300,26 @@ public class BuckEventsConsumer implements
         }
     }
 
+    public void clearDisplay() {
+        if (mTestResults != null) {
+            mCurrentBuildRootElement.removeChild(mTestResults);
+        }
+        if (mParseProgress != null) {
+            mCurrentBuildRootElement.removeChild(mParseProgress);
+        }
+        if (mBuildProgress != null) {
+            mCurrentBuildRootElement.removeChild(mBuildProgress);
+        }
+
+        if (mProjectGenerationProgress != null) {
+            mCurrentBuildRootElement.removeChild(mProjectGenerationProgress);
+        }
+    }
+
     @Override
-    public void consumeBuildEnd(String build, BigInteger timestamp) {
+    public void consumeBuildEnd(final long timestamp) {
         mMainBuildEndTimestamp = timestamp;
-        float duration = mMainBuildEndTimestamp.
-                subtract(mMainBuildStartTimestamp).floatValue() / 1000;
+        float duration = (mMainBuildEndTimestamp - mMainBuildStartTimestamp) / 1000;
         final String message = "Build ended, took " + duration + " seconds!";
 
         int errors = 0;
@@ -378,22 +362,19 @@ public class BuckEventsConsumer implements
             @Override
             public void run() {
 
-                // Remove "progress" nodes
-                BuckEventsConsumer.this.mCurrentBuildRootElement.removeChild(mTotalTasks);
-                BuckEventsConsumer.this.mCurrentBuildRootElement.removeChild(mRunningTasks);
-                BuckEventsConsumer.this.mCurrentBuildRootElement.removeChild(mSuspendedTasks);
-                BuckEventsConsumer.this.mCurrentBuildRootElement.removeChild(mFinishedTasks);
+                //set progress to 100%
+                consumeBuckBuildProgressUpdate(timestamp, 1f);
 
-                BuckTreeNodeDetail finishNode = new BuckTreeNodeDetail(
-                        BuckEventsConsumer.this.mCurrentBuildRootElement,
-                        BuckTreeNodeDetail.DetailType.INFO,
-                        message
-                );
-                BuckEventsConsumer.this.mCurrentBuildRootElement.addChild(
-                        finishNode
-                );
+                ApplicationManager.getApplication().invokeLater(new Runnable() {
+                  @Override
+                  public void run() {
+                    BuckEventsConsumer.this.mBuildProgress.setDetail(message);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                  }
+                });
 
                 if (errorsMessageToUse.length() > 0) {
+                    clearDisplay();
                     BuckTreeNodeDetail errorsMessageNode = new BuckTreeNodeDetail(
                             BuckEventsConsumer.this.mCurrentBuildRootElement,
                             BuckTreeNodeDetail.DetailType.ERROR,
@@ -411,25 +392,207 @@ public class BuckEventsConsumer implements
             }
         });
 
-        mConnection.disconnect();
         log("Ending build\n");
     }
 
     @Override
-    public void consumeBuildStart(String build, BigInteger timestamp) {
+    public void consumeBuildStart(long timestamp) {
         log("Starting build\n");
         mMainBuildStartTimestamp = timestamp;
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                // start may be called before of after progress update
+                if (BuckEventsConsumer.this.mBuildProgress == null) {
+                    BuckEventsConsumer.this.mBuildProgress = new BuckTreeNodeDetail(
+                        BuckEventsConsumer.this.mCurrentBuildRootElement,
+                        BuckTreeNodeDetail.DetailType.INFO,
+                        "Current build progress: " + Math.round(mBuildProgressValue * 100) + "%");
+                    BuckEventsConsumer.this.mCurrentBuildRootElement.addChild(mBuildProgress);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                }
+            }
+        });
     }
 
-    private boolean mBatchMode = false;
     @Override
-    public void startBatch() {
-        mBatchMode = true;
+    public void consumeBuckProjectGenerationFinished(long timestamp) {
+        consumeBuckProjectGenerationProgress(timestamp, 1.0f);
+        mProjectGenerationFinishedTimestamp = timestamp;
+        float duration = (mProjectGenerationFinishedTimestamp -
+            mProjectGenerationStartTimestamp) / 1000;
+        final String message = "Project generation ended, took " + duration + " seconds!";
+
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                BuckEventsConsumer.this.mProjectGenerationProgress.setDetail(message);
+                BuckEventsConsumer.this.mTreeModel.reload();
+            }
+        });
+        // Get the Base Dir and refresh with the following parameters
+        // 'asynchronous' set to false and 'recursive' set to true
+        mProject.getBaseDir().refresh(false, true);
     }
 
     @Override
-    public void commitBatch() {
-        mBatchMode = false;
-        refreshTasksStatus();
+    public void consumeBuckProjectGenerationProgress(long timestamp, double progressValue) {
+        if (mProjectGenerationProgress == null) {
+            consumeBuckProjectGenerationStarted(timestamp);
+        }
+        if (mProjectGenerationProgressValue != 1.0f) {
+            mProjectGenerationProgressValue = progressValue;
+            final String message = "Current file parsing progress: " +
+                Math.round(mProjectGenerationProgressValue * 100) + "%";
+
+            ApplicationManager.getApplication().invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    BuckEventsConsumer.this.mProjectGenerationProgress.setDetail(message);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                }
+            });
+        }
+    }
+
+    @Override
+    public void consumeBuckProjectGenerationStarted(long timestamp) {
+        mProjectGenerationStartTimestamp = timestamp;
+
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                // start may be called before of after progress update
+                if (BuckEventsConsumer.this.mProjectGenerationProgress == null) {
+                    BuckEventsConsumer.this.mProjectGenerationProgress = new BuckTreeNodeDetail(
+                        BuckEventsConsumer.this.mCurrentBuildRootElement,
+                        BuckTreeNodeDetail.DetailType.INFO,
+                        "Current project generation progress: " +
+                            Math.round(BuckEventsConsumer.this
+                                .mProjectGenerationProgressValue * 100) + "%");
+                    BuckEventsConsumer.this.mCurrentBuildRootElement
+                        .addChild(mProjectGenerationProgress);
+                    BuckEventsConsumer.this.mTreeModel.reload();
+                }
+            }
+        });
+    }
+
+    public void showTestResults() {
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                float duration = (mTestingEndTimestamp - mTestingStartTimestamp) / 1000;
+
+                StringBuilder message = new StringBuilder(
+                        "Testing ended, took " + duration + " seconds!\n");
+
+                for (TestResults testResults : mTestResultsList) {
+                    for (TestCaseSummary testCaseSummary : testResults.getTestCases()) {
+                        long time = testCaseSummary.getTotalTime();
+                        String formattedTime;
+
+                        if (time >= 1000) {
+                            formattedTime = (time / 1000 + time % 1000) + "s";
+                        } else {
+                            formattedTime = time + "ms";
+                        }
+                        if (testCaseSummary.isSuccess() == true) {
+                            message.append("PASS  " + formattedTime + "  " +
+                                    testCaseSummary.getTestResults().size() +
+                                    " passed  " + testCaseSummary.getTestCaseName() + "\n");
+                        } else {
+                            int failureCount = 0;
+                            StringBuilder failureMessage = new StringBuilder();
+                            for (TestResultsSummary testResultSummary :
+                                    testCaseSummary.getTestResults()) {
+                                if (!testResultSummary.isSuccess()) {
+                                    failureMessage.append(testResultSummary.getStacktrace() + "\n");
+                                    failureCount++;
+                                }
+                            }
+
+                            message.append("FAILED  " + formattedTime + "  " +
+                                    (testCaseSummary.getTestResults().size() - failureCount) +
+                                    " passed  " + failureCount + " failed  " +
+                                    testCaseSummary.getTestCaseName() + "\n");
+                            message.append(failureMessage);
+                        }
+                    }
+                }
+                BuckEventsConsumer.this.mTestResults.setDetail(message.toString());
+                BuckEventsConsumer.this.mTreeModel.reload();
+                mTestResultsList.clear();
+            }
+        });
+    }
+
+    @Override
+    public void consumeTestResultsAvailable(long timestamp, final TestResults testResults) {
+        if (mTestResults == null) {
+            consumeTestRunStarted(timestamp);
+        }
+        mTestResultsList.add(testResults);
+    }
+
+    @Override
+    public void consumeTestRunComplete(long timestamp) {
+        if (mTestResults == null) {
+            consumeTestRunStarted(timestamp);
+        }
+        mTestingEndTimestamp = timestamp;
+        showTestResults();
+    }
+
+    @Override
+    public void consumeTestRunStarted(long timestamp) {
+        mTestingStartTimestamp = timestamp;
+        // start may be called before of after progress update
+        if (BuckEventsConsumer.this.mTestResults == null) {
+            BuckEventsConsumer.this.mTestResults = new BuckTreeNodeDetail(
+                mCurrentBuildRootElement,
+                BuckTreeNodeDetail.DetailType.INFO,
+                "Running tests");
+            BuckEventsConsumer.this.mCurrentBuildRootElement.addChild(mTestResults);
+            BuckEventsConsumer.this.mTreeModel.reload();
+        }
+    }
+
+    @Override
+    public void consumeConsoleEvent(final String message) {
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                mCurrentBuildRootElement.addChild(
+                    new BuckTreeNodeDetail(
+                        mCurrentBuildRootElement,
+                        BuckTreeNodeDetail.DetailType.ERROR,
+                        message));
+
+                BuckEventsConsumer.this.mTreeModel.reload();
+            }
+        });
+    }
+
+    @Override
+    public void consumeInstallFinished(long timestamp, final String packageName) {
+        if (BuckInstallDebugAction.shouldDebug()) {
+            ApplicationManager.getApplication().executeOnPooledThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        AndroidDebugger.init();
+                        AndroidDebugger.attachDebugger(packageName, mProject);
+                        BuckInstallDebugAction.setDebug(false);
+                    } catch (InterruptedException e) {
+                        // Display the error on our console
+                        consumeConsoleEvent(e.toString());
+                    } catch (HumanReadableException e) {
+                        // Display the error on our console
+                        consumeConsoleEvent(e.toString());
+                    }
+                }
+            });
+        }
     }
 }

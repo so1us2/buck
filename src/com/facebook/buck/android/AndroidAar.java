@@ -38,6 +38,7 @@ import com.facebook.buck.step.fs.CopyStep;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirStep;
 import com.facebook.buck.step.fs.RmStep;
+import com.facebook.buck.zip.ZipCompressionLevel;
 import com.facebook.buck.zip.ZipStep;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -51,6 +52,7 @@ import java.nio.file.Path;
 public class AndroidAar extends AbstractBuildRule implements HasClasspathEntries {
 
   private static final BuildableProperties PROPERTIES = new BuildableProperties(ANDROID, PACKAGING);
+  public static final String AAR_FORMAT = "%s.aar";
 
   private final Path pathToOutputFile;
   private final Path temp;
@@ -72,7 +74,7 @@ public class AndroidAar extends AbstractBuildRule implements HasClasspathEntries
       ImmutableSet<SourcePath> nativeLibAssetsDirectories) {
     super(params, resolver);
     BuildTarget buildTarget = params.getBuildTarget();
-    this.pathToOutputFile = BuildTargets.getGenPath(buildTarget, "%s.aar");
+    this.pathToOutputFile = BuildTargets.getGenPath(buildTarget, AAR_FORMAT);
     this.temp = BuildTargets.getScratchPath(buildTarget, "__temp__%s");
     this.manifest = manifest;
     this.androidResource = androidResource;
@@ -158,7 +160,7 @@ public class AndroidAar extends AbstractBuildRule implements HasClasspathEntries
             pathToOutputFile,
             ImmutableSet.<Path>of(),
             false,
-            ZipStep.DEFAULT_COMPRESSION_LEVEL,
+            ZipCompressionLevel.DEFAULT_COMPRESSION_LEVEL,
             temp));
 
     return commands.build();

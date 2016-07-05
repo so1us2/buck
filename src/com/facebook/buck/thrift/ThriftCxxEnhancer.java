@@ -33,7 +33,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.coercer.SourceList;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.util.HumanReadableException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -283,6 +283,7 @@ public class ThriftCxxEnhancer implements ThriftLanguageSpecificEnhancer {
     langArgs.srcs = Optional.of(ImmutableSortedSet.copyOf(srcs.values()));
     langArgs.exportedHeaders = Optional.of(SourceList.ofNamedSources(headers));
     langArgs.canBeAsset = Optional.absent();
+    langArgs.compilerFlags = cpp2 ? args.cpp2CompilerFlags : args.cppCompilerFlags;
 
     // Since thrift generated C/C++ code uses lots of templates, just use exported deps throughout.
     langArgs.exportedDeps =

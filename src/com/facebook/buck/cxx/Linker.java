@@ -45,6 +45,13 @@ public interface Linker extends Tool {
   Iterable<Arg> linkWhole(Arg input);
 
   /**
+   * @return the platform-specific way to generate a link-map file.
+   *
+   * @param output the path of the output binary
+   */
+  Iterable<Arg> linkerMap(Path output);
+
+  /**
    * @return the platform-specific way to specify that linker should use the given soname
    *     when linking a shared library.
    */
@@ -66,6 +73,22 @@ public interface Linker extends Tool {
    * @return the name of the environment variable for the shared library runtime search path.
    */
   String searchPathEnvVar();
+
+  /**
+   * @return the name of the environment variable for the shared library preload search path.
+   */
+  String preloadEnvVar();
+
+  /**
+   * @return arguments to pass to the linker to disable dropping runtime references to shared libs
+   *     which do not resolve symbols as link-time.
+   */
+  Iterable<String> getNoAsNeededSharedLibsFlags();
+
+  /**
+   * @return arguments to pass to the linker so that it ignores undefined symbols when linking.
+   */
+  Iterable<String> getIgnoreUndefinedSymbolsFlags();
 
   /**
    * Generate a necessary linker arguments to propagate undefined symbols to a link command.  May

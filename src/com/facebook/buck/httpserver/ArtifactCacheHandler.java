@@ -19,6 +19,8 @@ package com.facebook.buck.httpserver;
 import com.facebook.buck.artifact_cache.ArtifactCache;
 import com.facebook.buck.artifact_cache.CacheResult;
 import com.facebook.buck.artifact_cache.HttpArtifactCacheBinaryProtocol;
+import com.facebook.buck.io.BorrowablePath;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.artifact_cache.StoreResponseReadResult;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.log.Logger;
@@ -107,14 +109,7 @@ public class ArtifactCacheHandler extends AbstractHandler {
           BuckConstant.SCRATCH_PATH,
           "outgoing_rulekey",
           ".tmp");
-      CacheResult fetchResult;
-      try {
-        fetchResult = artifactCache.get().fetch(ruleKey, temp);
-      } catch (InterruptedException e) {
-        LOG.error(e, "Interrupted when fetching from local cache.");
-        e.printStackTrace(response.getWriter());
-        return HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-      }
+      CacheResult fetchResult = artifactCache.get().fetch(ruleKey, LazyPath.ofInstance(temp));
       if (!fetchResult.getType().isSuccess()) {
         return HttpServletResponse.SC_NOT_FOUND;
       }
@@ -167,11 +162,11 @@ public class ArtifactCacheHandler extends AbstractHandler {
         return HttpServletResponse.SC_NOT_ACCEPTABLE;
       }
 
-      artifactCache.get().store(storeRequest.getRuleKeys(), storeRequest.getMetadata(), temp);
+      artifactCache.get().store(
+          storeRequest.getRuleKeys(),
+          storeRequest.getMetadata(),
+          BorrowablePath.notBorrowablePath(temp));
       return HttpServletResponse.SC_ACCEPTED;
-    } catch (InterruptedException e) {
-      response.getWriter().write("Interrupted while serving request.");
-      return HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
     } finally {
       if (temp != null) {
         projectFilesystem.deleteFileAtPathIfExists(temp);

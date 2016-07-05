@@ -22,19 +22,17 @@ import com.facebook.buck.json.BuildFileParseException;
 import com.facebook.buck.log.Logger;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetException;
-import com.facebook.buck.model.Pair;
 import com.facebook.buck.parser.BuildFileSpec;
 import com.facebook.buck.parser.TargetNodePredicateSpec;
-import com.facebook.buck.rules.ActionGraph;
+import com.facebook.buck.rules.ActionGraphAndResolver;
 import com.facebook.buck.rules.BuildEngine;
 import com.facebook.buck.rules.BuildEvent;
-import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.CachingBuildEngine;
 import com.facebook.buck.rules.ExternalTestRunnerRule;
 import com.facebook.buck.rules.ExternalTestRunnerTestSpec;
 import com.facebook.buck.rules.Label;
 import com.facebook.buck.rules.TargetGraph;
-import com.facebook.buck.rules.TargetGraphToActionGraph;
+import com.facebook.buck.rules.TargetGraphAndBuildTargets;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.rules.TargetNodes;
 import com.facebook.buck.rules.TestRule;
@@ -332,6 +330,7 @@ public class TestCommand extends BuildCommand {
         ProcessExecutorParams.builder()
             .addAllCommand(command)
             .addAllCommand(withDashArguments)
+            .setEnvironment(params.getEnvironment())
             .addCommand("--buck-test-info", infoFile.toString())
             .setDirectory(params.getCell().getFilesystem().getRootPath().toFile())
             .build();
@@ -376,6 +375,7 @@ public class TestCommand extends BuildCommand {
 
         // If the user asked to run all of the tests, parse all of the build files looking for any
         // test rules.
+        boolean ignoreBuckAutodepsFiles = false;
         if (isRunAllTests()) {
           targetGraph = params.getParser().buildTargetGraphForTargetNodeSpecs(
               params.getBuckEventBus(),
@@ -390,14 +390,15 @@ public class TestCommand extends BuildCommand {
                           return input.getType().isTestRule();
                         }
                       },
-                      BuildFileSpec.fromRecursivePath(Paths.get(""))))).getSecond();
+                      BuildFileSpec.fromRecursivePath(Paths.get("")))),
+              ignoreBuckAutodepsFiles).getTargetGraph();
           explicitBuildTargets = ImmutableSet.of();
 
           // Otherwise, the user specified specific test targets to build and run, so build a graph
           // around these.
         } else {
           LOG.debug("Parsing graph for arguments %s", getArguments());
-          Pair<ImmutableSet<BuildTarget>, TargetGraph> result = params.getParser()
+          TargetGraphAndBuildTargets result = params.getParser()
               .buildTargetGraphForTargetNodeSpecs(
                   params.getBuckEventBus(),
                   params.getCell(),
@@ -405,9 +406,10 @@ public class TestCommand extends BuildCommand {
                   pool.getExecutor(),
                   parseArgumentsAsTargetNodeSpecs(
                       params.getBuckConfig(),
-                      getArguments()));
-          targetGraph = result.getSecond();
-          explicitBuildTargets = result.getFirst();
+                      getArguments()),
+                  ignoreBuckAutodepsFiles);
+          targetGraph = result.getTargetGraph();
+          explicitBuildTargets = result.getBuildTargets();
 
           LOG.debug("Got explicit build targets %s", explicitBuildTargets);
           ImmutableSet.Builder<BuildTarget> testTargetsBuilder = ImmutableSet.builder();
@@ -439,16 +441,13 @@ public class TestCommand extends BuildCommand {
         return 1;
       }
 
-      TargetGraphToActionGraph targetGraphToActionGraph =
-          new TargetGraphToActionGraph(
+      ActionGraphAndResolver actionGraphAndResolver = Preconditions.checkNotNull(
+          params.getActionGraphCache().getActionGraph(
               params.getBuckEventBus(),
-              new BuildTargetNodeToBuildRuleTransformer());
-      Pair<ActionGraph, BuildRuleResolver> actionGraphAndResolver =
-          Preconditions.checkNotNull(targetGraphToActionGraph.apply(targetGraph));
-
+              targetGraph));
       // Look up all of the test rules in the action graph.
       Iterable<TestRule> testRules = Iterables.filter(
-          actionGraphAndResolver.getFirst().getNodes(),
+          actionGraphAndResolver.getActionGraph().getNodes(),
           TestRule.class);
 
       // Unless the user requests that we build filtered tests, filter them out here, before
@@ -469,11 +468,11 @@ public class TestCommand extends BuildCommand {
               params.getBuckConfig().getDependencySchedulingOrder(),
               params.getBuckConfig().getBuildDepFiles(),
               params.getBuckConfig().getBuildMaxDepFileCacheEntries(),
-              actionGraphAndResolver.getSecond());
+              actionGraphAndResolver.getResolver());
       try (Build build = createBuild(
           params.getBuckConfig(),
-          actionGraphAndResolver.getFirst(),
-          actionGraphAndResolver.getSecond(),
+          actionGraphAndResolver.getActionGraph(),
+          actionGraphAndResolver.getResolver(),
           params.getAndroidPlatformTargetSupplier(),
           cachingBuildEngine,
           params.getArtifactCache(),
@@ -485,7 +484,8 @@ public class TestCommand extends BuildCommand {
           params.getObjectMapper(),
           params.getClock(),
           Optional.of(getAdbOptions(params.getBuckConfig())),
-          Optional.of(getTargetDeviceOptions()))) {
+          Optional.of(getTargetDeviceOptions()),
+          params.getExecutors())) {
 
         // Build all of the test rules.
         int exitCode = build.executeAndPrintFailuresToEventBus(

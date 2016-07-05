@@ -132,10 +132,7 @@ public class JavaLibraryDescription implements Description<JavaLibraryDescriptio
         args
     );
 
-    BuildTarget abiJarTarget =
-        BuildTarget.builder(params.getBuildTarget())
-            .addFlavors(CalculateAbi.FLAVOR)
-            .build();
+    BuildTarget abiJarTarget = params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR);
 
     ImmutableSortedSet<BuildRule> exportedDeps = resolver.getAllRules(args.exportedDeps.get());
     DefaultJavaLibrary defaultJavaLibrary =
@@ -249,6 +246,8 @@ public class JavaLibraryDescription implements Description<JavaLibraryDescriptio
     public Optional<Path> resourcesRoot;
     public Optional<String> mavenCoords;
 
+    public Optional<Boolean> autodeps;
+    public Optional<ImmutableSortedSet<String>> generatedSymbols;
     public Optional<ImmutableSortedSet<BuildTarget>> providedDeps;
     public Optional<ImmutableSortedSet<BuildTarget>> exportedDeps;
     public Optional<ImmutableSortedSet<BuildTarget>> deps;

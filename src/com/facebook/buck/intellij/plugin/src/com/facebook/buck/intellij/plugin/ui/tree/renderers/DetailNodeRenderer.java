@@ -17,6 +17,7 @@
 package com.facebook.buck.intellij.plugin.ui.tree.renderers;
 
 import com.facebook.buck.intellij.plugin.ui.tree.BuckTreeNodeDetail;
+import com.google.common.html.HtmlEscapers;
 import com.intellij.icons.AllIcons;
 import com.intellij.ui.components.JBLabel;
 import javax.swing.Icon;
@@ -35,8 +36,9 @@ public class DetailNodeRenderer implements BuildElementRenderer {
             icon = AllIcons.Ide.Warning_notifications;
         }
 
-        String[] lines = node.getDetail().split("\n");
-        String message = lines[0];
+        String message = "<html><pre style='margin:0px'>" +
+            HtmlEscapers.htmlEscaper().escape(node.getDetail()) +
+            "</pre></html>";
 
         JBLabel result = new JBLabel(
                 message,

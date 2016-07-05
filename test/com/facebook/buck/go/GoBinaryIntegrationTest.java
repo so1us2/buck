@@ -64,6 +64,17 @@ public class GoBinaryIntegrationTest {
   }
 
   @Test
+  public void binaryWithAsm() throws IOException, InterruptedException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this, "asm", tmp);
+    workspace.setUp();
+
+    ProjectWorkspace.ProcessResult result = workspace.runBuckCommand("run", "//src/asm_test:bin");
+    result.assertSuccess();
+    assertThat(result.getStdout(), Matchers.containsString("Sum is 6"));
+  }
+
+    @Test
   public void buildAfterChangeWorks() throws IOException, InterruptedException {
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "simple_binary", tmp);
@@ -88,6 +99,17 @@ public class GoBinaryIntegrationTest {
   }
 
   @Test
+  public void vendoredLibrary() throws IOException, InterruptedException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this, "vendored_library", tmp);
+    workspace.setUp();
+
+    assertThat(
+        workspace.runBuckCommand("run", "//:hello").assertSuccess().getStdout(),
+        Matchers.containsString("Hello, world!"));
+  }
+
+  @Test
   public void libraryWithPrefix() throws IOException, InterruptedException {
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "library_with_prefix", tmp);
@@ -96,6 +118,23 @@ public class GoBinaryIntegrationTest {
     assertThat(
         workspace.runBuckCommand("run", "//:hello").assertSuccess().getStdout(),
         Matchers.containsString("Hello, world!"));
+  }
+
+  @Test
+  public void libraryWithPrefixAfterChange() throws IOException, InterruptedException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this, "library_with_prefix", tmp);
+    workspace.setUp();
+
+    assertThat(
+        workspace.runBuckCommand("run", "//:hello").assertSuccess().getStdout(),
+        Matchers.containsString("Hello, world!"));
+    workspace.writeContentsToPath(
+        workspace.getFileContents("messenger/printer.go").replace('!', '?'),
+        "messenger/printer.go");
+    assertThat(
+        workspace.runBuckCommand("run", "//:hello").assertSuccess().getStdout(),
+        Matchers.containsString("Hello, world?"));
   }
 
   @Test

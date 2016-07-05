@@ -18,7 +18,7 @@ package com.facebook.buck.lua;
 
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.CommandTool;
@@ -33,7 +33,7 @@ public class LuaBinaryDescriptionTest {
   @Test
   public void mainModule() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     LuaBinary binary =
         (LuaBinary) new LuaBinaryBuilder(BuildTargetFactory.newInstance("//:rule"))
             .setMainModule("hello.world")
@@ -44,12 +44,13 @@ public class LuaBinaryDescriptionTest {
   @Test
   public void extensionOverride() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     LuaBinary binary =
         (LuaBinary) new LuaBinaryBuilder(
                 BuildTargetFactory.newInstance("//:rule"),
                 FakeLuaConfig.DEFAULT
                     .withExtension(".override"))
+            .setMainModule("main")
             .build(resolver);
     assertThat(binary.getBinPath().toString(), Matchers.endsWith(".override"));
   }
@@ -57,7 +58,7 @@ public class LuaBinaryDescriptionTest {
   @Test
   public void toolOverride() throws Exception {
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     Tool override = new CommandTool.Builder().addArg("override").build();
     LuaBinary binary =
         (LuaBinary) new LuaBinaryBuilder(
@@ -65,6 +66,7 @@ public class LuaBinaryDescriptionTest {
             FakeLuaConfig.DEFAULT
                 .withLua(override)
                 .withExtension(".override"))
+            .setMainModule("main")
             .build(resolver);
     assertThat(binary.getLua(), Matchers.is(override));
   }

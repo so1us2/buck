@@ -16,10 +16,15 @@
 
 package com.facebook.buck.d;
 
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxLink;
 import com.facebook.buck.cxx.CxxLinkableEnhancer;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.Linker;
+import com.facebook.buck.cxx.NativeLinkable;
+import com.facebook.buck.cxx.NativeLinkableInput;
+import com.facebook.buck.graph.AbstractBreadthFirstTraversal;
+import com.facebook.buck.io.MorePaths;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.model.Flavor;
@@ -31,19 +36,31 @@ import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
-import com.facebook.buck.rules.args.Arg;
+import com.facebook.buck.rules.SymlinkTree;
+import com.facebook.buck.rules.Tool;
 import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.rules.args.StringArg;
-import com.facebook.buck.rules.coercer.FrameworkPath;
+import com.facebook.buck.rules.coercer.SourceList;
+import com.facebook.buck.util.MoreMaps;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Utility functions for use in D Descriptions.
  */
 abstract class DDescriptionUtils {
+
+  public static final Flavor SOURCE_LINK_TREE = ImmutableFlavor.of("source-link-tree");
+
   /**
    * Creates a BuildTarget, based on an existing build target, but flavored with a CxxPlatform
    * and an additional flavor created by combining a prefix and an output file name.
@@ -76,12 +93,12 @@ abstract class DDescriptionUtils {
    */
   public static BuildTarget createDCompileBuildTarget(
       BuildTarget existingTarget,
-      SourcePath src,
+      String src,
       CxxPlatform cxxPlatform) {
     return createBuildTargetForFile(
         existingTarget,
         "compile-",
-        DCompileStep.getObjectNameForSourceName(src.toString()),
+        DCompileStep.getObjectNameForSourceName(src),
         cxxPlatform);
   }
 
@@ -99,50 +116,101 @@ abstract class DDescriptionUtils {
    */
   public static CxxLink createNativeLinkable(
       BuildRuleParams params,
-      Iterable<SourcePath> sources,
-      ImmutableList<String> compilerFlags,
       BuildRuleResolver buildRuleResolver,
       CxxPlatform cxxPlatform,
-      DBuckConfig dBuckConfig) throws NoSuchBuildTargetException {
+      DBuckConfig dBuckConfig,
+      CxxBuckConfig cxxBuckConfig,
+      ImmutableList<String> compilerFlags,
+      SourceList sources,
+      DIncludes includes)
+      throws NoSuchBuildTargetException {
 
     BuildTarget buildTarget = params.getBuildTarget();
     SourcePathResolver sourcePathResolver = new SourcePathResolver(buildRuleResolver);
 
-    ImmutableList<SourcePath> sourcePaths = sourcePathsForCompiledSources(
-        sources,
-        compilerFlags,
-        params,
-        buildRuleResolver,
-        sourcePathResolver,
-        cxxPlatform,
-        dBuckConfig);
+    ImmutableList<SourcePath> sourcePaths =
+        sourcePathsForCompiledSources(
+            params,
+            buildRuleResolver,
+            sourcePathResolver,
+            cxxPlatform,
+            dBuckConfig,
+            compilerFlags,
+            sources,
+            includes);
 
     // Return a rule to link the .o for the binary together with its
     // dependencies.
     return CxxLinkableEnhancer.createCxxLinkableBuildRule(
+        cxxBuckConfig,
         cxxPlatform,
         params,
+        buildRuleResolver,
         sourcePathResolver,
         buildTarget,
         Linker.LinkType.EXECUTABLE,
         Optional.<String>absent(),
         BuildTargets.getGenPath(buildTarget, "%s/" + buildTarget.getShortName()),
-        ImmutableList.<Arg>builder()
-            .addAll(StringArg.from(dBuckConfig.getLinkerFlagsForBinary()))
-            .addAll(SourcePathArg.from(sourcePathResolver, sourcePaths))
-            .build(),
         Linker.LinkableDepType.STATIC,
-        params.getDeps(),
+        FluentIterable.from(params.getDeps())
+            .filter(NativeLinkable.class),
         /* cxxRuntimeType */ Optional.<Linker.CxxRuntimeType>absent(),
         /* bundleLoader */ Optional.<SourcePath>absent(),
         ImmutableSet.<BuildTarget>of(),
-        ImmutableSet.<FrameworkPath>of());
+        NativeLinkableInput.builder()
+            .addAllArgs(StringArg.from(dBuckConfig.getLinkerFlags()))
+            .addAllArgs(SourcePathArg.from(sourcePathResolver, sourcePaths))
+            .build());
+  }
+
+  public static BuildTarget getSymlinkTreeTarget(BuildTarget baseTarget) {
+    return BuildTarget.builder(baseTarget)
+        .addFlavors(SOURCE_LINK_TREE)
+        .build();
+  }
+
+  public static SymlinkTree createSourceSymlinkTree(
+      BuildTarget target,
+      BuildRuleParams baseParams,
+      SourcePathResolver pathResolver,
+      SourceList sources) {
+    Preconditions.checkState(target.getFlavors().contains(SOURCE_LINK_TREE));
+    return new SymlinkTree(
+        baseParams.copyWithChanges(
+            target,
+            Suppliers.ofInstance(ImmutableSortedSet.<BuildRule>of()),
+            Suppliers.ofInstance(ImmutableSortedSet.<BuildRule>of())),
+        pathResolver,
+        baseParams.getProjectFilesystem().resolve(
+            BuildTargets.getGenPath(baseParams.getBuildTarget(), "%s")),
+        MoreMaps.transformKeys(
+            sources.toNameMap(
+                baseParams.getBuildTarget(),
+                pathResolver,
+                "srcs"),
+            MorePaths.toPathFn(baseParams.getProjectFilesystem().getRootPath().getFileSystem())));
+  }
+
+  private static ImmutableMap<BuildTarget, DLibrary> getTransitiveDLibraryRules(
+      Iterable<? extends BuildRule> inputs) {
+    final ImmutableMap.Builder<BuildTarget, DLibrary> libraries = ImmutableMap.builder();
+    new AbstractBreadthFirstTraversal<BuildRule>(inputs) {
+      @Override
+      public ImmutableSet<BuildRule> visit(BuildRule rule) {
+        if (rule instanceof DLibrary) {
+          libraries.put(rule.getBuildTarget(), (DLibrary) rule);
+          return rule.getDeps();
+        }
+        return ImmutableSet.of();
+      }
+    }.start();
+    return libraries.build();
   }
 
   /**
    * Ensures that a DCompileBuildRule exists for the given target, creating a DCompileBuildRule
    * if neccesary.
-   * @param params build parameters for the rule
+   * @param baseParams build parameters for the rule
    * @param buildRuleResolver BuildRuleResolver the rule should be in
    * @param sourcePathResolver used to resolve source paths
    * @param src the source file to be compiled
@@ -152,29 +220,52 @@ abstract class DDescriptionUtils {
    * @return the build rule
    */
   public static DCompileBuildRule requireBuildRule(
-      BuildRuleParams params,
+      BuildTarget compileTarget,
+      BuildRuleParams baseParams,
       BuildRuleResolver buildRuleResolver,
       SourcePathResolver sourcePathResolver,
-      SourcePath src,
+      DBuckConfig dBuckConfig,
       ImmutableList<String> compilerFlags,
-      BuildTarget compileTarget,
-      DBuckConfig dBuckConfig) {
+      String name,
+      SourcePath src,
+      DIncludes includes)
+      throws NoSuchBuildTargetException {
     Optional<BuildRule> existingRule = buildRuleResolver.getRuleOptional(compileTarget);
     if (existingRule.isPresent()) {
       return (DCompileBuildRule) existingRule.get();
     } else {
-      ImmutableList<String> flags = ImmutableList.<String>builder()
-          .addAll(compilerFlags)
-          .add("-c")
-          .build();
-      DCompileBuildRule rule = new DCompileBuildRule(
-          params.copyWithBuildTarget(compileTarget),
-          sourcePathResolver,
-          ImmutableSortedSet.of(src),
-          flags,
-          dBuckConfig.getDCompiler());
-      buildRuleResolver.addToIndex(rule);
-      return rule;
+      Tool compiler = dBuckConfig.getDCompiler();
+
+      Map<BuildTarget, DIncludes> transitiveIncludes = new TreeMap<>();
+      transitiveIncludes.put(baseParams.getBuildTarget(), includes);
+      for (Map.Entry<BuildTarget, DLibrary> library :
+           getTransitiveDLibraryRules(baseParams.getDeps()).entrySet()) {
+        transitiveIncludes.put(library.getKey(), library.getValue().getIncludes());
+      }
+
+      ImmutableSortedSet.Builder<BuildRule> depsBuilder = ImmutableSortedSet.naturalOrder();
+      depsBuilder.addAll(compiler.getDeps(sourcePathResolver));
+      depsBuilder.addAll(sourcePathResolver.filterBuildRuleInputs(src));
+      for (DIncludes dIncludes : transitiveIncludes.values()) {
+        depsBuilder.addAll(dIncludes.getDeps(sourcePathResolver));
+      }
+      ImmutableSortedSet<BuildRule> deps = depsBuilder.build();
+
+      return buildRuleResolver.addToIndex(
+          new DCompileBuildRule(
+              baseParams.copyWithChanges(
+                  compileTarget,
+                  Suppliers.ofInstance(deps),
+                  Suppliers.ofInstance(ImmutableSortedSet.<BuildRule>of())),
+              sourcePathResolver,
+              compiler,
+              ImmutableList.<String>builder()
+                  .addAll(dBuckConfig.getBaseCompilerFlags())
+                  .addAll(compilerFlags)
+                  .build(),
+              name,
+              ImmutableSortedSet.of(src),
+              ImmutableList.copyOf(transitiveIncludes.values())));
     }
   }
 
@@ -183,7 +274,7 @@ abstract class DDescriptionUtils {
    * returns a list of SourcePaths referring to the generated object files.
    * @param sources source files to compile
    * @param compilerFlags flags to pass to the compiler
-   * @param params build parameters for the compilation
+   * @param baseParams build parameters for the compilation
    * @param buildRuleResolver resolver for build rules
    * @param sourcePathResolver resolver for source paths
    * @param cxxPlatform the C++ platform to compile for
@@ -191,22 +282,36 @@ abstract class DDescriptionUtils {
    * @return SourcePaths of the generated object files
    */
   public static ImmutableList<SourcePath> sourcePathsForCompiledSources(
-      Iterable<SourcePath> sources,
-      ImmutableList<String> compilerFlags,
-      BuildRuleParams params,
+      BuildRuleParams baseParams,
       BuildRuleResolver buildRuleResolver,
       SourcePathResolver sourcePathResolver,
       CxxPlatform cxxPlatform,
-      DBuckConfig dBuckConfig) {
+      DBuckConfig dBuckConfig,
+      ImmutableList<String> compilerFlags,
+      SourceList sources,
+      DIncludes includes)
+      throws NoSuchBuildTargetException {
     ImmutableList.Builder<SourcePath> sourcePaths = ImmutableList.builder();
-    for (SourcePath source : sources) {
-      BuildTarget compileTarget = createDCompileBuildTarget(
-          params.getBuildTarget(), source, cxxPlatform);
+    for (Map.Entry<String, SourcePath> source :
+         sources.toNameMap(baseParams.getBuildTarget(), sourcePathResolver, "srcs").entrySet()) {
+      BuildTarget compileTarget =
+          createDCompileBuildTarget(
+              baseParams.getBuildTarget(),
+              source.getKey(),
+              cxxPlatform);
       requireBuildRule(
-          params, buildRuleResolver, sourcePathResolver, source,
-          compilerFlags, compileTarget, dBuckConfig);
+          compileTarget,
+          baseParams,
+          buildRuleResolver,
+          sourcePathResolver,
+          dBuckConfig,
+          compilerFlags,
+          source.getKey(),
+          source.getValue(),
+          includes);
       sourcePaths.add(new BuildTargetSourcePath(compileTarget));
     }
     return sourcePaths.build();
   }
+
 }

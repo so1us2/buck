@@ -22,7 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
@@ -44,6 +44,7 @@ import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -72,7 +73,7 @@ public class JvmLibraryArgInterpreterTest {
     populateWithDefaultValues(arg);
 
     ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     resolver = new SourcePathResolver(ruleResolver);
   }
 
@@ -240,7 +241,8 @@ public class JvmLibraryArgInterpreterTest {
             BuildTargetFactory.newInstance("//example:target"));
 
     try {
-      new ConstructorArgMarshaller(new DefaultTypeCoercerFactory()).populate(
+      new ConstructorArgMarshaller(
+          new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance())).populate(
           createCellRoots(factoryParams.getProjectFilesystem()),
           factoryParams.getProjectFilesystem(),
           factoryParams,

@@ -18,7 +18,7 @@ package com.facebook.buck.android;
 
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cxx.CxxLibrary;
 import com.facebook.buck.cxx.CxxLibraryBuilder;
 import com.facebook.buck.cxx.CxxLibraryDescription;
@@ -34,7 +34,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TargetNode;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.TargetGraphFactory;
 import com.google.common.base.Function;
@@ -55,7 +55,7 @@ public class AndroidNativeLibsPackageableGraphEnhancerTest {
   @Test
   public void testNdkLibrary() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver sourcePathResolver = new SourcePathResolver(ruleResolver);
 
     NdkLibrary ndkLibrary = (NdkLibrary) new NdkLibraryBuilder(
@@ -73,7 +73,9 @@ public class AndroidNativeLibsPackageableGraphEnhancerTest {
             ruleResolver,
             originalParams,
             ImmutableMap.<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform>of(),
-            ImmutableSet.<NdkCxxPlatforms.TargetCpuType>of()
+            ImmutableSet.<NdkCxxPlatforms.TargetCpuType>of(),
+            CxxPlatformUtils.DEFAULT_CONFIG,
+            AndroidBinary.RelinkerMode.DISABLED
         );
 
     AndroidPackageableCollector collector = new AndroidPackageableCollector(
@@ -123,7 +125,7 @@ public class AndroidNativeLibsPackageableGraphEnhancerTest {
     TargetNode<CxxLibraryDescription.Arg> cxxLibraryDescription = cxxLibraryBuilder.build();
     TargetGraph targetGraph = TargetGraphFactory.newInstance(cxxLibraryDescription);
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(targetGraph, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(targetGraph, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver sourcePathResolver = new SourcePathResolver(ruleResolver);
     CxxLibrary cxxLibrary = (CxxLibrary) cxxLibraryBuilder.build(
         ruleResolver,
@@ -142,7 +144,9 @@ public class AndroidNativeLibsPackageableGraphEnhancerTest {
             ruleResolver,
             originalParams,
             nativePlatforms,
-            ImmutableSet.of(NdkCxxPlatforms.TargetCpuType.ARMV7)
+            ImmutableSet.of(NdkCxxPlatforms.TargetCpuType.ARMV7),
+            CxxPlatformUtils.DEFAULT_CONFIG,
+            AndroidBinary.RelinkerMode.DISABLED
         );
 
     AndroidPackageableCollector collector = new AndroidPackageableCollector(

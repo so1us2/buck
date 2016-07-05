@@ -25,6 +25,7 @@ import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.HashCode;
 import com.google.common.io.Files;
 
@@ -51,9 +52,7 @@ public class WatchedFileHashCacheTest {
     WatchedFileHashCache cache = new WatchedFileHashCache(
         new FakeProjectFilesystem());
     Path path = new File("SomeClass.java").toPath();
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
     cache.onFileSystemChange(createOverflowEvent());
     assertFalse("Cache should not contain path", cache.willGet(path));
@@ -64,9 +63,7 @@ public class WatchedFileHashCacheTest {
     WatchedFileHashCache cache = new WatchedFileHashCache(
         new FakeProjectFilesystem());
     Path path = Paths.get("SomeClass.java");
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
     cache.onFileSystemChange(createPathEvent(path, StandardWatchEventKinds.ENTRY_CREATE));
     assertFalse("Cache should not contain path", cache.willGet(path));
@@ -77,9 +74,7 @@ public class WatchedFileHashCacheTest {
     WatchedFileHashCache cache =
         new WatchedFileHashCache(new FakeProjectFilesystem());
     Path path = Paths.get("SomeClass.java");
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
     cache.onFileSystemChange(createPathEvent(path, StandardWatchEventKinds.ENTRY_MODIFY));
     assertFalse("Cache should not contain path", cache.willGet(path));
@@ -90,9 +85,7 @@ public class WatchedFileHashCacheTest {
     WatchedFileHashCache cache =
         new WatchedFileHashCache(new FakeProjectFilesystem());
     Path path = Paths.get("SomeClass.java");
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
     cache.onFileSystemChange(createPathEvent(path, StandardWatchEventKinds.ENTRY_DELETE));
     assertFalse("Cache should not contain path", cache.willGet(path));
@@ -100,22 +93,20 @@ public class WatchedFileHashCacheTest {
 
   @Test
   public void directoryHashChangesWhenFileInsideDirectoryChanges() throws IOException {
-    WatchedFileHashCache cache =
-        new WatchedFileHashCache(
-            new ProjectFilesystem(
-                tmp.getRoot().toPath()));
+    ProjectFilesystem filesystem = new ProjectFilesystem(tmp.getRootPath());
+    WatchedFileHashCache cache = new WatchedFileHashCache(filesystem);
     tmp.newFolder("foo", "bar");
     File inputFile = tmp.newFile("foo/bar/baz");
     Files.write("Hello world".getBytes(Charsets.UTF_8), inputFile);
 
     Path dir = Paths.get("foo/bar");
-    HashCode dirHash = cache.get(dir);
+    HashCode dirHash = cache.get(filesystem.resolve(dir));
     Files.write("Goodbye world".getBytes(Charsets.UTF_8), inputFile);
     cache.onFileSystemChange(
         createPathEvent(
             dir.resolve("baz"),
             StandardWatchEventKinds.ENTRY_MODIFY));
-    HashCode dirHash2 = cache.get(dir);
+    HashCode dirHash2 = cache.get(filesystem.resolve(dir));
     assertNotEquals(dirHash, dirHash2);
   }
 
@@ -124,9 +115,8 @@ public class WatchedFileHashCacheTest {
     WatchedFileHashCache cache =
         new WatchedFileHashCache(new FakeProjectFilesystem());
     Path dir = Paths.get("foo/bar/baz");
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.DIRECTORY);
+    HashCodeAndFileType value =
+        HashCodeAndFileType.ofDirectory(HashCode.fromInt(42), ImmutableSet.<Path>of());
     cache.loadingCache.put(dir, value);
     cache.onFileSystemChange(
         createPathEvent(

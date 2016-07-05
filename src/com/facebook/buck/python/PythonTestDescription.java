@@ -16,6 +16,7 @@
 
 package com.facebook.buck.python;
 
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.file.WriteFile;
 import com.facebook.buck.model.BuildTarget;
@@ -24,6 +25,7 @@ import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.FlavorDomain;
 import com.facebook.buck.model.HasSourceUnderTest;
 import com.facebook.buck.model.ImmutableFlavor;
+import com.facebook.buck.model.Pair;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
@@ -36,15 +38,18 @@ import com.facebook.buck.rules.Label;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.rules.args.MacroArg;
 import com.facebook.buck.rules.macros.LocationMacroExpander;
 import com.facebook.buck.rules.macros.MacroExpander;
 import com.facebook.buck.rules.macros.MacroHandler;
+import com.facebook.buck.util.HumanReadableException;
 import com.facebook.infer.annotation.SuppressFieldNotInitialized;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -71,6 +76,7 @@ public class PythonTestDescription implements
   private final PythonBinaryDescription binaryDescription;
   private final PythonBuckConfig pythonBuckConfig;
   private final FlavorDomain<PythonPlatform> pythonPlatforms;
+  private final CxxBuckConfig cxxBuckConfig;
   private final CxxPlatform defaultCxxPlatform;
   private final Optional<Long> defaultTestRuleTimeoutMs;
   private final FlavorDomain<CxxPlatform> cxxPlatforms;
@@ -79,12 +85,14 @@ public class PythonTestDescription implements
       PythonBinaryDescription binaryDescription,
       PythonBuckConfig pythonBuckConfig,
       FlavorDomain<PythonPlatform> pythonPlatforms,
+      CxxBuckConfig cxxBuckConfig,
       CxxPlatform defaultCxxPlatform,
       Optional<Long> defaultTestRuleTimeoutMs,
       FlavorDomain<CxxPlatform> cxxPlatforms) {
     this.binaryDescription = binaryDescription;
     this.pythonBuckConfig = pythonBuckConfig;
     this.pythonPlatforms = pythonPlatforms;
+    this.cxxBuckConfig = cxxBuckConfig;
     this.defaultCxxPlatform = defaultCxxPlatform;
     this.defaultTestRuleTimeoutMs = defaultTestRuleTimeoutMs;
     this.cxxPlatforms = cxxPlatforms;
@@ -168,7 +176,7 @@ public class PythonTestDescription implements
       TargetGraph targetGraph,
       final BuildRuleParams params,
       final BuildRuleResolver resolver,
-      final A args) throws NoSuchBuildTargetException {
+      final A args) throws HumanReadableException, NoSuchBuildTargetException {
 
     PythonPlatform pythonPlatform = pythonPlatforms
         .getValue(params.getBuildTarget())
@@ -235,6 +243,13 @@ public class PythonTestDescription implements
         testModules);
     resolver.addToIndex(testModulesBuildRule);
 
+    String mainModule;
+    if (args.mainModule.isPresent()) {
+      mainModule = args.mainModule.get();
+    } else {
+      mainModule = PythonUtil.toModuleName(params.getBuildTarget(), getTestMainName().toString());
+    }
+
     // Build up the list of everything going into the python test.
     PythonPackageComponents testComponents = PythonPackageComponents.of(
         ImmutableMap
@@ -258,7 +273,16 @@ public class PythonTestDescription implements
             pathResolver,
             testComponents,
             pythonPlatform,
+            cxxBuckConfig,
             cxxPlatform,
+            FluentIterable.from(args.linkerFlags.get())
+                .transform(
+                    MacroArg.toMacroArgFunction(
+                        PythonUtil.MACRO_HANDLER,
+                        params.getBuildTarget(),
+                        params.getCellRoots(),
+                        resolver))
+                .toList(),
             pythonBuckConfig.getNativeLinkStrategy());
 
     // Build the PEX using a python binary rule with the minimum dependencies.
@@ -273,10 +297,48 @@ public class PythonTestDescription implements
             pathResolver,
             pythonPlatform,
             cxxPlatform,
-            PythonUtil.toModuleName(params.getBuildTarget(), getTestMainName().toString()),
+            mainModule,
             allComponents,
-            args.buildArgs.or(ImmutableList.<String>of()));
+            args.buildArgs.or(ImmutableList.<String>of()),
+            args.packageStyle.or(pythonBuckConfig.getPackageStyle()),
+            PythonUtil.getPreloadNames(
+                resolver,
+                cxxPlatform,
+                args.preloadDeps.get()));
     resolver.addToIndex(binary);
+
+    ImmutableList.Builder<Pair<Float, ImmutableSet<Path>>> neededCoverageBuilder =
+        ImmutableList.builder();
+    for (NeededCoverageSpec coverageSpec : args.neededCoverage.get()) {
+        BuildRule buildRule = resolver.getRule(coverageSpec.getBuildTarget());
+        if (params.getDeps().contains(buildRule) &&
+            buildRule instanceof PythonLibrary) {
+          PythonLibrary pythonLibrary = (PythonLibrary) buildRule;
+          ImmutableSortedSet<Path> paths;
+          if (coverageSpec.getPathName().isPresent()) {
+            Path path = coverageSpec.getBuildTarget().getBasePath().resolve(
+                coverageSpec.getPathName().get());
+            if (!pythonLibrary.getSrcs(pythonPlatform).keySet().contains(path)) {
+              throw new HumanReadableException(
+                  "%s: path %s specified in needed_coverage not found in target %s",
+                  params.getBuildTarget(),
+                  path,
+                  buildRule.getBuildTarget());
+            }
+            paths = ImmutableSortedSet.of(path);
+          } else {
+            paths = ImmutableSortedSet.copyOf(pythonLibrary.getSrcs(pythonPlatform).keySet());
+          }
+          neededCoverageBuilder.add(
+              new Pair<Float, ImmutableSet<Path>>(
+                  coverageSpec.getNeededCoverageRatio(),
+                  paths));
+        } else {
+            throw new HumanReadableException(
+                    "%s: needed_coverage requires a python library dependency. Found %s instead",
+                    params.getBuildTarget(), buildRule);
+        }
+    }
 
     // Supplier which expands macros in the passed in test environment.
     Supplier<ImmutableMap<String, String>> testEnv =
@@ -308,6 +370,7 @@ public class PythonTestDescription implements
         ImmutableSortedSet.copyOf(Sets.difference(params.getDeps(), binaryParams.getDeps())),
         resolver.getAllRules(args.sourceUnderTest.or(ImmutableSortedSet.<BuildTarget>of())),
         args.labels.or(ImmutableSet.<Label>of()),
+        neededCoverageBuilder.build(),
         args.testRuleTimeoutMs.or(defaultTestRuleTimeoutMs),
         args.contacts.or(ImmutableSet.<String>of()));
   }
@@ -319,8 +382,14 @@ public class PythonTestDescription implements
       Arg constructorArg) {
     ImmutableList.Builder<BuildTarget> targets = ImmutableList.builder();
 
+    // We need to use the C/C++ linker for native libs handling, so add in the C/C++ linker to
+    // parse time deps.
+    targets.addAll(
+        cxxPlatforms.getValue(buildTarget).or(defaultCxxPlatform).getLd().getParseTimeDeps());
+
     if (pythonBuckConfig.getPackageStyle() == PythonBuckConfig.PackageStyle.STANDALONE) {
       targets.addAll(pythonBuckConfig.getPexTarget().asSet());
+      targets.addAll(pythonBuckConfig.getPexExecutorTarget().asSet());
     }
 
     return targets.build();
@@ -328,10 +397,15 @@ public class PythonTestDescription implements
 
   @SuppressFieldNotInitialized
   public static class Arg extends PythonLibraryDescription.Arg implements HasSourceUnderTest {
+    public Optional<String> mainModule;
     public Optional<ImmutableSet<String>> contacts;
     public Optional<ImmutableSet<Label>> labels;
     public Optional<ImmutableSortedSet<BuildTarget>> sourceUnderTest;
     public Optional<String> platform;
+    public Optional<PythonBuckConfig.PackageStyle> packageStyle;
+    public Optional<ImmutableSet<BuildTarget>> preloadDeps;
+    public Optional<ImmutableList<String>> linkerFlags;
+    public Optional<ImmutableList<NeededCoverageSpec>> neededCoverage;
 
     public Optional<ImmutableList<String>> buildArgs;
 

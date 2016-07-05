@@ -24,7 +24,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.dalvik.EstimateLinearAllocStep;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.FakeJavaLibrary;
@@ -32,6 +32,7 @@ import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.jvm.java.JavaLibraryBuilder;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.BuildContext;
 import com.facebook.buck.rules.BuildOutputInitializer;
 import com.facebook.buck.rules.BuildRuleParams;
@@ -48,6 +49,7 @@ import com.facebook.buck.step.Step;
 import com.facebook.buck.step.TestExecutionContext;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.MoreAsserts;
+import com.facebook.buck.util.ObjectMappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -70,9 +72,9 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
 
   @Test
   public void testGetBuildStepsWhenThereAreClassesToDex() throws IOException, InterruptedException {
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver pathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     FakeJavaLibrary javaLibraryRule = new FakeJavaLibrary(
         BuildTargetFactory.newInstance("//foo:bar"), pathResolver) {
       @Override
@@ -80,18 +82,23 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
         return ImmutableSortedMap.of("com/example/Foo", HashCode.fromString("cafebabe"));
       }
     };
-    javaLibraryRule.setOutputFile("buck-out/gen/foo/bar.jar");
+    Path jarOutput = BuildTargets.getGenPath(javaLibraryRule.getBuildTarget(), "%s.jar");
+    javaLibraryRule.setOutputFile(jarOutput.toString());
 
     BuildContext context = createMock(BuildContext.class);
     FakeBuildableContext buildableContext = new FakeBuildableContext();
 
     replayAll();
 
-    ProjectFilesystem filesystem = FakeProjectFilesystem.createJavaOnlyFilesystem("/home/user");
+    String rootPath = "/home/user";
+    ProjectFilesystem filesystem = FakeProjectFilesystem.createJavaOnlyFilesystem(rootPath);
+    Path dexOutput = BuildTargets.getGenPath(
+        javaLibraryRule.getBuildTarget().withFlavors(AndroidBinaryGraphEnhancer.DEX_FLAVOR),
+        "%s.dex.jar");
     createFiles(
         filesystem,
-        "buck-out/gen/foo/bar#dex.dex.jar",
-        "buck-out/gen/foo/bar.jar");
+        dexOutput.toString(),
+        jarOutput.toString());
 
     BuildTarget buildTarget = BuildTargetFactory.newInstance("//foo:bar#dex");
     BuildRuleParams params = new FakeBuildRuleParamsBuilder(buildTarget)
@@ -117,15 +124,15 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
     String expectedDxCommand = String.format(
         "%s --dex --no-optimize --force-jumbo --output %s %s",
         Paths.get("/usr/bin/dx"),
-        Paths.get("/home/user/buck-out/gen/foo/bar#dex.dex.jar"),
-        Paths.get("/home/user/buck-out/gen/foo/bar.jar"));
+        Paths.get(rootPath).resolve(dexOutput),
+        Paths.get(rootPath).resolve(jarOutput));
     MoreAsserts.assertSteps("Generate bar.dex.jar.",
         ImmutableList.of(
-            String.format("rm -f %s", Paths.get("/home/user/buck-out/gen/foo/bar#dex.dex.jar")),
-            String.format("mkdir -p %s", Paths.get("/home/user/buck-out/gen/foo")),
+            String.format("rm -f %s", Paths.get(rootPath).resolve(dexOutput)),
+            String.format("mkdir -p %s", Paths.get(rootPath).resolve(dexOutput).getParent()),
             "estimate_linear_alloc",
             "(cd /home/user && " + expectedDxCommand + ")",
-            "zip-scrub buck-out/gen/foo/bar#dex.dex.jar",
+            String.format("zip-scrub %s", dexOutput),
             "record_dx_success"),
         steps,
         executionContext);
@@ -140,7 +147,7 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
     int exitCode = recordArtifactAndMetadataStep.execute(executionContext);
     assertEquals(0, exitCode);
     assertEquals("The generated .dex.jar file should be in the set of recorded artifacts.",
-        ImmutableSet.of(Paths.get("buck-out/gen/foo/bar#dex.dex.jar")),
+        ImmutableSet.of(BuildTargets.getGenPath(buildTarget, "%s.dex.jar")),
         buildableContext.getRecordedArtifacts());
 
     buildableContext.assertContainsMetadataMapping(
@@ -181,17 +188,18 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
             new SourcePathResolver(
                 new BuildRuleResolver(
                     TargetGraph.EMPTY,
-                    new BuildTargetNodeToBuildRuleTransformer())),
+                    new DefaultTargetNodeToBuildRuleTransformer())),
             javaLibrary);
     List<Step> steps = preDex.getBuildSteps(context, buildableContext);
 
     verifyAll();
     resetAll();
 
-    expect(projectFilesystem.resolve(Paths.get("buck-out/gen/foo")))
-        .andReturn(Paths.get("/home/user/buck-out/gen/foo"));
-    expect(projectFilesystem.resolve(Paths.get("buck-out/gen/foo/bar.dex.jar")))
-        .andReturn(Paths.get("/home/user/buck-out/gen/foo/bar.dex.jar"));
+    Path dexOutput = BuildTargets.getGenPath(buildTarget, "%s.dex.jar");
+    expect(projectFilesystem.resolve(dexOutput.getParent()))
+        .andReturn(Paths.get("/home/user/").resolve(dexOutput.getParent()));
+    expect(projectFilesystem.resolve(dexOutput))
+        .andReturn(Paths.get("/home/user/").resolve(dexOutput));
     replayAll();
 
     ExecutionContext executionContext = TestExecutionContext
@@ -200,8 +208,8 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
 
     MoreAsserts.assertSteps("Do not generate a .dex.jar file.",
         ImmutableList.of(
-          String.format("rm -f %s", Paths.get("/home/user/buck-out/gen/foo/bar.dex.jar")),
-          String.format("mkdir -p %s", Paths.get("/home/user/buck-out/gen/foo")),
+          String.format("rm -f %s", Paths.get("/home/user/").resolve(dexOutput)),
+          String.format("mkdir -p %s", Paths.get("/home/user/").resolve(dexOutput.getParent())),
           "record_empty_dx"),
         steps,
         executionContext);
@@ -236,10 +244,12 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
             new SourcePathResolver(
                 new BuildRuleResolver(
                     TargetGraph.EMPTY,
-                    new BuildTargetNodeToBuildRuleTransformer())),
+                    new DefaultTargetNodeToBuildRuleTransformer())),
             accumulateClassNames);
     assertNull(preDexWithClasses.getPathToOutput());
-    assertEquals(Paths.get("buck-out/gen/foo/bar.dex.jar"), preDexWithClasses.getPathToDex());
+    assertEquals(
+        BuildTargets.getGenPath(buildTarget, "%s.dex.jar"),
+        preDexWithClasses.getPathToDex());
 
     verifyAll();
   }
@@ -256,7 +266,7 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
   @Test
   public void getOutputDoesNotAccessWrappedJavaLibrary() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     JavaLibrary javaLibrary =
@@ -269,7 +279,7 @@ public class DexProducedFromJavaLibraryThatContainsClassFilesTest extends EasyMo
     DexProducedFromJavaLibrary dexProducedFromJavaLibrary =
         new DexProducedFromJavaLibrary(params, pathResolver, javaLibrary);
 
-    ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = ObjectMappers.newDefaultInstance();
     FakeOnDiskBuildInfo onDiskBuildInfo =
         new FakeOnDiskBuildInfo()
             .putMetadata(

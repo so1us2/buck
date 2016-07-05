@@ -30,6 +30,7 @@ import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -37,8 +38,12 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.concurrent.Future;
 
 public class ProvisioningProfileCopyStepTest {
@@ -48,6 +53,7 @@ public class ProvisioningProfileCopyStepTest {
   private Path xcentFile;
   private ProjectFilesystem projectFilesystem;
   private ExecutionContext executionContext;
+  private CodeSignIdentityStore codeSignIdentityStore;
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -56,12 +62,27 @@ public class ProvisioningProfileCopyStepTest {
   public void setUp() throws IOException {
     testdataDir = TestDataHelper.getTestDataDirectory(this).resolve("provisioning_profiles");
     projectFilesystem = new FakeProjectFilesystem(testdataDir.toFile());
+    Files.walkFileTree(
+        testdataDir,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            projectFilesystem.writeBytesToPath(
+                Files.readAllBytes(file),
+                projectFilesystem.resolve(file));
+            return FileVisitResult.CONTINUE;
+          }
+        });
     DebuggableTemporaryFolder tmp = new DebuggableTemporaryFolder();
     tmp.create();
     tempOutputDir = tmp.getRootPath();
     outputFile = tempOutputDir.resolve("embedded.mobileprovision");
     xcentFile = Paths.get("test.xcent");
     executionContext = TestExecutionContext.newInstance();
+    codeSignIdentityStore =
+        CodeSignIdentityStore.fromIdentities(ImmutableList.<CodeSignIdentity>of());
+
   }
 
   @Test
@@ -77,7 +98,8 @@ public class ProvisioningProfileCopyStepTest {
         Optional.<Path>of(testdataDir.resolve("Invalid.plist")),
         ProvisioningProfileStore.fromSearchPath(testdataDir),
         outputFile,
-        xcentFile
+        xcentFile,
+        codeSignIdentityStore
     );
 
     step.execute(executionContext);
@@ -96,7 +118,8 @@ public class ProvisioningProfileCopyStepTest {
         Optional.<Path>absent(),
         ProvisioningProfileStore.fromSearchPath(testdataDir),
         outputFile,
-        xcentFile
+        xcentFile,
+        codeSignIdentityStore
     );
 
     step.execute(executionContext);
@@ -119,7 +142,8 @@ public class ProvisioningProfileCopyStepTest {
         Optional.<Path>absent(),
         ProvisioningProfileStore.fromSearchPath(emptyDir),
         outputFile,
-        xcentFile
+        xcentFile,
+        codeSignIdentityStore
     );
 
     step.execute(executionContext);
@@ -135,7 +159,9 @@ public class ProvisioningProfileCopyStepTest {
         Optional.<Path>absent(),
         ProvisioningProfileStore.fromSearchPath(testdataDir),
         outputFile,
-        xcentFile);
+        xcentFile,
+        codeSignIdentityStore
+    );
 
     Future<ProvisioningProfileMetadata> profileFuture = step.getSelectedProvisioningProfileFuture();
     step.execute(executionContext);

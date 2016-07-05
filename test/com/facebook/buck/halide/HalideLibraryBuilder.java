@@ -21,7 +21,6 @@ import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.cxx.AbstractCxxSourceBuilder;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.CxxPlatformUtils;
-import com.facebook.buck.cxx.CxxPreprocessMode;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.Flavor;
@@ -36,25 +35,25 @@ import java.nio.file.Paths;
 public class HalideLibraryBuilder extends
     AbstractCxxSourceBuilder<HalideLibraryDescription.Arg, HalideLibraryBuilder> {
   public HalideLibraryBuilder(
-    BuildTarget target,
-    HalideBuckConfig halideBuckConfig,
-    CxxPlatform defaultCxxPlatform,
-    FlavorDomain<CxxPlatform> cxxPlatforms) {
+      BuildTarget target,
+      HalideBuckConfig halideBuckConfig,
+      CxxPlatform defaultCxxPlatform,
+      FlavorDomain<CxxPlatform> cxxPlatforms) {
     super(
-      new HalideLibraryDescription(
-        defaultCxxPlatform,
-        cxxPlatforms,
-        CxxPreprocessMode.SEPARATE,
-        halideBuckConfig),
-      target);
+        new HalideLibraryDescription(
+            CxxPlatformUtils.DEFAULT_CONFIG,
+            defaultCxxPlatform,
+            cxxPlatforms,
+            halideBuckConfig),
+        target);
   }
 
   public HalideLibraryBuilder(BuildTarget target) throws IOException {
     this(
-      target,
-      createDefaultHalideConfig(new FakeProjectFilesystem()),
-      createDefaultPlatform(),
-      createDefaultPlatforms());
+        target,
+        createDefaultHalideConfig(new FakeProjectFilesystem()),
+        createDefaultPlatform(),
+        createDefaultPlatforms());
   }
 
   public static HalideBuckConfig createDefaultHalideConfig(
@@ -62,14 +61,14 @@ public class HalideLibraryBuilder extends
     Path path = Paths.get("fake_compile_script.sh");
     filesystem.touch(path);
     BuckConfig buckConfig = FakeBuckConfig.builder()
-      .setSections(
-        ImmutableMap.of(
-          HalideBuckConfig.HALIDE_SECTION_NAME,
-          ImmutableMap.of(
-            HalideBuckConfig.HALIDE_XCODE_COMPILE_SCRIPT_KEY,
-            path.toString())))
-      .setFilesystem(filesystem)
-      .build();
+        .setSections(
+            ImmutableMap.of(
+                HalideBuckConfig.HALIDE_SECTION_NAME,
+                ImmutableMap.of(
+                    HalideBuckConfig.HALIDE_XCODE_COMPILE_SCRIPT_KEY, path.toString(),
+                    "target_platform", "halide-target")))
+        .setFilesystem(filesystem)
+        .build();
     return new HalideBuckConfig(buckConfig);
   }
 
@@ -84,9 +83,9 @@ public class HalideLibraryBuilder extends
     return new FlavorDomain<>(
         "C/C++ Platform",
         ImmutableMap.<Flavor, CxxPlatform>builder()
-          .put(defaultFlavor, cxxPlatform)
-          .put(cxxPlatform.getFlavor(), cxxPlatform)
-          .build());
+            .put(defaultFlavor, cxxPlatform)
+            .put(cxxPlatform.getFlavor(), cxxPlatform)
+            .build());
   }
 
   @Override

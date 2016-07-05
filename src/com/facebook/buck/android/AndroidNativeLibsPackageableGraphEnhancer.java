@@ -16,6 +16,9 @@
 
 package com.facebook.buck.android;
 
+import com.facebook.buck.android.AndroidBinary.RelinkerMode;
+import com.facebook.buck.android.relinker.NativeRelinker;
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.cxx.NativeLinkable;
 import com.facebook.buck.model.BuildTarget;
@@ -27,10 +30,10 @@ import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildRules;
+import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.PathSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
-import com.facebook.buck.rules.SourcePaths;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
@@ -51,6 +54,8 @@ public class AndroidNativeLibsPackageableGraphEnhancer {
   private final BuildRuleResolver ruleResolver;
   private final SourcePathResolver pathResolver;
   private final ImmutableSet<NdkCxxPlatforms.TargetCpuType> cpuFilters;
+  private final CxxBuckConfig cxxBuckConfig;
+  private final RelinkerMode relinkerMode;
 
   /**
    * Maps a {@link NdkCxxPlatforms.TargetCpuType} to the {@link CxxPlatform} we need to use to build C/C++
@@ -62,13 +67,17 @@ public class AndroidNativeLibsPackageableGraphEnhancer {
       BuildRuleResolver ruleResolver,
       BuildRuleParams originalParams,
       ImmutableMap<NdkCxxPlatforms.TargetCpuType, NdkCxxPlatform> nativePlatforms,
-      ImmutableSet<NdkCxxPlatforms.TargetCpuType> cpuFilters) {
+      ImmutableSet<NdkCxxPlatforms.TargetCpuType> cpuFilters,
+      CxxBuckConfig cxxBuckConfig,
+      RelinkerMode relinkerMode) {
     this.originalBuildTarget = originalParams.getBuildTarget();
     this.pathResolver = new SourcePathResolver(ruleResolver);
     this.buildRuleParams = originalParams;
     this.ruleResolver = ruleResolver;
     this.nativePlatforms = nativePlatforms;
     this.cpuFilters = cpuFilters;
+    this.cxxBuckConfig = cxxBuckConfig;
+    this.relinkerMode = relinkerMode;
   }
 
   // Populates an immutable map builder with all given linkables set to the given cpu type.
@@ -153,8 +162,32 @@ public class AndroidNativeLibsPackageableGraphEnhancer {
       return Optional.absent();
     }
 
-    ImmutableMap<StripLinkable, StrippedObjectDescription> strippedLibsMap = generateStripRules(
-        nativeLinkableLibs);
+    if (relinkerMode == RelinkerMode.ENABLED &&
+        (!nativeLinkableLibs.isEmpty() || !nativeLinkableLibsAssets.isEmpty())) {
+      NativeRelinker relinker =
+          new NativeRelinker(
+              buildRuleParams.copyWithExtraDeps(
+                  Suppliers.ofInstance(
+                      ImmutableSortedSet.<BuildRule>naturalOrder()
+                          .addAll(pathResolver.filterBuildRuleInputs(nativeLinkableLibs.values()))
+                          .addAll(
+                              pathResolver.filterBuildRuleInputs(nativeLinkableLibsAssets.values()))
+                          .build())),
+              pathResolver,
+              cxxBuckConfig,
+              nativePlatforms,
+              nativeLinkableLibs,
+              nativeLinkableLibsAssets);
+
+      nativeLinkableLibs = relinker.getRelinkedLibs();
+      nativeLinkableLibsAssets = relinker.getRelinkedLibsAssets();
+      for (BuildRule rule : relinker.getRules()) {
+        ruleResolver.addToIndex(rule);
+      }
+    }
+
+    ImmutableMap<StripLinkable, StrippedObjectDescription> strippedLibsMap =
+        generateStripRules(nativeLinkableLibs);
     ImmutableMap<StripLinkable, StrippedObjectDescription> strippedLibsAssetsMap =
         generateStripRules(nativeLinkableLibsAssets);
 
@@ -230,7 +263,7 @@ public class AndroidNativeLibsPackageableGraphEnhancer {
       result.put(
           stripLinkable,
           StrippedObjectDescription.builder()
-              .setSourcePath(SourcePaths.getToBuildTargetSourcePath().apply(stripLinkable))
+              .setSourcePath(new BuildTargetSourcePath(stripLinkable.getBuildTarget()))
               .setStrippedObjectName(sharedLibrarySoName)
               .setTargetCpuType(targetCpuType)
               .build());

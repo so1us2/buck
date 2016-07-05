@@ -20,6 +20,7 @@ import com.facebook.buck.android.aapt.MiniAapt;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.Pair;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -123,7 +124,8 @@ public class AndroidResourceDescription implements Description<AndroidResourceDe
         assetsInputsAndKey.getFirst(),
         assetsInputsAndKey.getSecond(),
         args.manifest.orNull(),
-        args.hasWhitelistedStrings.or(false));
+        args.hasWhitelistedStrings.or(false),
+        args.resourceUnion.or(false));
   }
 
   private Pair<ImmutableSortedSet<SourcePath>, Optional<SourcePath>> collectInputFilesAndKey(
@@ -204,7 +206,7 @@ public class AndroidResourceDescription implements Description<AndroidResourceDe
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     public Optional<SourcePath> res;
     public Optional<SourcePath> assets;
     public Optional<Boolean> hasWhitelistedStrings;
@@ -213,5 +215,6 @@ public class AndroidResourceDescription implements Description<AndroidResourceDe
     public Optional<SourcePath> manifest;
 
     public Optional<ImmutableSortedSet<BuildTarget>> deps;
+    public Optional<Boolean> resourceUnion;
   }
 }

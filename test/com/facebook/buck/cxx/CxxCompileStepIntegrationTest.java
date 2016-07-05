@@ -20,17 +20,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.rules.BuildRuleResolver;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.TestExecutionContext;
 import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
@@ -56,15 +55,18 @@ public class CxxCompileStepIntegrationTest {
         new CxxBuckConfig(FakeBuckConfig.builder().build()));
 
     // Build up the paths to various files the archive step will use.
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
-    ImmutableList<String> compiler = platform.getCc().getCommandPrefix(resolver);
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(resolver);
+    ImmutableList<String> compiler =
+        platform.getCc().resolve(resolver).getCommandPrefix(pathResolver);
     Path output = filesystem.resolve(Paths.get("output.o"));
     Path depFile = filesystem.resolve(Paths.get("output.dep"));
     Path relativeInput = Paths.get("input.c");
     Path input = filesystem.resolve(relativeInput);
     filesystem.writeContentsToPath("int main() {}", relativeInput);
+    Path scratchDir = filesystem.getRootPath().getFileSystem().getPath("scratchDir");
+    filesystem.mkdirs(scratchDir);
 
     ImmutableList.Builder<String> preprocessorCommand = ImmutableList.builder();
     preprocessorCommand.addAll(compiler);
@@ -80,20 +82,28 @@ public class CxxCompileStepIntegrationTest {
         ImmutableBiMap.<Path, Path>of());
 
     // Build an archive step.
-    CxxPreprocessAndCompileStep step = new CxxPreprocessAndCompileStep(
-        filesystem,
-        CxxPreprocessAndCompileStep.Operation.COMPILE_MUNGE_DEBUGINFO,
-        output,
-        depFile,
-        relativeInput,
-        CxxSource.Type.C,
-        Optional.<ImmutableMap<String, String>>absent(),
-        Optional.of(preprocessorCommand.build()),
-        Optional.<ImmutableMap<String, String>>absent(),
-        Optional.of(compilerCommand.build()),
-        ImmutableMap.<Path, Path>of(),
-        sanitizer,
-        Optional.<Function<String, Iterable<String>>>absent());
+    CxxPreprocessAndCompileStep step =
+        new CxxPreprocessAndCompileStep(
+            filesystem,
+            CxxPreprocessAndCompileStep.Operation.COMPILE_MUNGE_DEBUGINFO,
+            output,
+            depFile,
+            relativeInput,
+            CxxSource.Type.C,
+            Optional.of(
+                new CxxPreprocessAndCompileStep.ToolCommand(
+                    preprocessorCommand.build(),
+                    ImmutableMap.<String, String>of(),
+                    Optional.<ImmutableList<String>>absent())),
+            Optional.of(
+                new CxxPreprocessAndCompileStep.ToolCommand(
+                    compilerCommand.build(),
+                    ImmutableMap.<String, String>of(),
+                    Optional.<ImmutableList<String>>absent())),
+            HeaderPathNormalizer.empty(pathResolver),
+            sanitizer,
+            CxxPlatformUtils.DEFAULT_CONFIG.getHeaderVerification(),
+            scratchDir);
 
     // Execute the archive step and verify it ran successfully.
     ExecutionContext executionContext = TestExecutionContext.newInstance();

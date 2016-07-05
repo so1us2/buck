@@ -26,47 +26,35 @@ import com.facebook.buck.rules.RuleKeyAppendable;
 import com.facebook.buck.rules.RuleKeyBuilder;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
-import com.facebook.buck.rules.args.RuleKeyAppendableFunction;
-import com.facebook.buck.rules.coercer.FrameworkPath;
+import com.facebook.buck.rules.keys.SupportsDependencyFileRuleKey;
 import com.facebook.buck.shell.DefaultShellStep;
+import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MkdirStep;
-import com.facebook.buck.util.MoreIterables;
-import com.google.common.base.Functions;
-import com.google.common.base.Optional;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.ImmutableMap;
 
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.LinkedHashSet;
 
 /**
  * Generate the CFG for a source file
  */
-public class CxxInferCapture extends AbstractBuildRule implements RuleKeyAppendable {
+public class CxxInferCapture
+    extends AbstractBuildRule
+    implements RuleKeyAppendable, SupportsDependencyFileRuleKey {
 
   @AddToRuleKey
-  private final CxxInferTools inferTools;
-  private final Optional<ImmutableList<String>> platformPreprocessorFlags;
-  private final Optional<ImmutableList<String>> rulePreprocessorFlags;
-  private final Optional<ImmutableList<String>> platformCompilerFlags;
-  private final Optional<ImmutableList<String>> ruleCompilerFlags;
+  private final InferBuckConfig inferConfig;
+  private final CxxToolFlags preprocessorFlags;
+  private final CxxToolFlags compilerFlags;
   @AddToRuleKey
   private final SourcePath input;
   private final CxxSource.Type inputType;
   @AddToRuleKey(stringify = true)
   private final Path output;
-  private final ImmutableSet<Path> includeRoots;
-  private final ImmutableSet<Path> systemIncludeRoots;
-  private final ImmutableSet<Path> headerMaps;
   @AddToRuleKey
-  private final ImmutableSet<FrameworkPath> frameworkRoots;
-  @AddToRuleKey
-  private final RuleKeyAppendableFunction<FrameworkPath, Path> frameworkPathSearchPathFunction;
-  @AddToRuleKey
-  private final Optional<SourcePath> prefixHeader;
+  private final PreprocessorDelegate preprocessorDelegate;
 
   private final Path resultsDir;
   private final DebugPathSanitizer sanitizer;
@@ -74,103 +62,44 @@ public class CxxInferCapture extends AbstractBuildRule implements RuleKeyAppenda
   CxxInferCapture(
       BuildRuleParams buildRuleParams,
       SourcePathResolver pathResolver,
-      Optional<ImmutableList<String>> platformPreprocessorFlags,
-      Optional<ImmutableList<String>> rulePreprocessorFlags,
-      Optional<ImmutableList<String>> platformCompilerFlags,
-      Optional<ImmutableList<String>> ruleCompilerFlags,
+      CxxToolFlags preprocessorFlags,
+      CxxToolFlags compilerFlags,
       SourcePath input,
       AbstractCxxSource.Type inputType,
       Path output,
-      ImmutableSet<Path> includeRoots,
-      ImmutableSet<Path> systemIncludeRoots,
-      ImmutableSet<Path> headerMaps,
-      ImmutableSet<FrameworkPath> frameworkRoots,
-      RuleKeyAppendableFunction<FrameworkPath, Path> frameworkPathSearchPathFunction,
-      Optional<SourcePath> prefixHeader,
-      CxxInferTools inferTools,
+      PreprocessorDelegate preprocessorDelegate,
+      InferBuckConfig inferConfig,
       DebugPathSanitizer sanitizer) {
     super(buildRuleParams, pathResolver);
-    this.platformPreprocessorFlags = platformPreprocessorFlags;
-    this.rulePreprocessorFlags = rulePreprocessorFlags;
-    this.platformCompilerFlags = platformCompilerFlags;
-    this.ruleCompilerFlags = ruleCompilerFlags;
+    this.preprocessorFlags = preprocessorFlags;
+    this.compilerFlags = compilerFlags;
     this.input = input;
     this.inputType = inputType;
     this.output = output;
-    this.includeRoots = includeRoots;
-    this.systemIncludeRoots = systemIncludeRoots;
-    this.headerMaps = headerMaps;
-    this.frameworkRoots = frameworkRoots;
-    this.frameworkPathSearchPathFunction = frameworkPathSearchPathFunction;
-    this.prefixHeader = prefixHeader;
-    this.inferTools = inferTools;
+    this.preprocessorDelegate = preprocessorDelegate;
+    this.inferConfig = inferConfig;
     this.resultsDir = BuildTargets.getGenPath(this.getBuildTarget(), "infer-out-%s");
     this.sanitizer = sanitizer;
   }
 
-  private ImmutableList<String> getPreprocessorPlatformPrefix() {
-    return platformPreprocessorFlags.get();
-  }
-
-  private ImmutableList<String> getCompilerPlatformPrefix() {
-    ImmutableList.Builder<String> flags = ImmutableList.builder();
-    flags.addAll(getPreprocessorPlatformPrefix());
-    flags.addAll(platformCompilerFlags.get());
-    return flags.build();
-  }
-
-  private ImmutableList<String> getCompilerSuffix() {
-    ImmutableList.Builder<String> suffix = ImmutableList.builder();
-    suffix.addAll(getPreprocessorSuffix());
-    suffix.addAll(ruleCompilerFlags.get());
-    return suffix.build();
-  }
-
-  private ImmutableList<String> getPreprocessorSuffix() {
-    return ImmutableList.<String>builder()
-        .addAll(new LinkedHashSet<>(rulePreprocessorFlags.get()))
-        .addAll(
-            MoreIterables.zipAndConcat(
-                Iterables.cycle("-include"),
-                FluentIterable.from(prefixHeader.asSet())
-                    .transform(getResolver().deprecatedPathFunction())
-                    .transform(Functions.toStringFunction())))
-        .addAll(
-            MoreIterables.zipAndConcat(
-                Iterables.cycle("-I"),
-                Iterables.transform(headerMaps, Functions.toStringFunction())))
-        .addAll(
-            MoreIterables.zipAndConcat(
-                Iterables.cycle("-I"),
-                Iterables.transform(includeRoots, Functions.toStringFunction())))
-        .addAll(
-            MoreIterables.zipAndConcat(
-                Iterables.cycle("-isystem"),
-                Iterables.transform(systemIncludeRoots, Functions.toStringFunction())))
-        .addAll(
-            MoreIterables.zipAndConcat(
-                Iterables.cycle("-F"),
-                FluentIterable.from(frameworkRoots)
-                    .transform(
-                        Functions.compose(
-                            Functions.toStringFunction(),
-                            frameworkPathSearchPathFunction))
-                    .toSet()))
-        .build();
+  private CxxToolFlags getSearchPathFlags() {
+    return preprocessorDelegate.getFlagsWithSearchPaths();
   }
 
   private ImmutableList<String> getFrontendCommand() {
     // TODO(martinoluca): Add support for extra arguments (and add them to the rulekey)
     ImmutableList.Builder<String> commandBuilder = ImmutableList.builder();
     return commandBuilder
-        .addAll(this.inferTools.topLevel.getCommandPrefix(getResolver()))
+        .add(this.inferConfig.getInferTopLevel().toString())
         .add("-a", "capture")
         .add("--project_root", getProjectFilesystem().getRootPath().toString())
         .add("--out", resultsDir.toString())
         .add("--")
         .add("clang")
-        .addAll(getCompilerPlatformPrefix())
-        .addAll(getCompilerSuffix())
+        .add("-MD", "-MF", getTempDepFilePath().toString())
+        .addAll(
+            CxxToolFlags.concat(preprocessorFlags, getSearchPathFlags(), compilerFlags)
+                .getAllFlags())
         .add("-x", inputType.getLanguage())
         .add("-o", output.toString()) // TODO(martinoluca): Use -fsyntax-only for better perf
         .add("-c")
@@ -187,10 +116,12 @@ public class CxxInferCapture extends AbstractBuildRule implements RuleKeyAppenda
     return ImmutableList.<Step>builder()
         .add(new MkdirStep(getProjectFilesystem(), resultsDir))
         .add(new MkdirStep(getProjectFilesystem(), output.getParent()))
-        .add(new DefaultShellStep(
+        .add(
+            new DefaultShellStep(
                 getProjectFilesystem().getRootPath(),
                 frontendCommand,
-                inferTools.topLevel.getEnvironment(getResolver())))
+                ImmutableMap.<String, String>of()))
+        .add(new ParseAndWriteBuckCompatibleDepfileStep(getTempDepFilePath(), getDepFilePath()))
         .build();
   }
 
@@ -203,19 +134,85 @@ public class CxxInferCapture extends AbstractBuildRule implements RuleKeyAppenda
   public RuleKeyBuilder appendToRuleKey(RuleKeyBuilder builder) {
     // Sanitize any relevant paths in the flags we pass to the preprocessor, to prevent them
     // from contributing to the rule key.
-    builder.setReflectively(
-        "platformPreprocessorFlags",
-        sanitizer.sanitizeFlags(platformPreprocessorFlags));
-    builder.setReflectively(
-        "rulePreprocessorFlags",
-        sanitizer.sanitizeFlags(rulePreprocessorFlags));
-    builder.setReflectively(
-        "platformCompilerFlags",
-        sanitizer.sanitizeFlags(platformCompilerFlags));
-    builder.setReflectively(
-        "ruleCompilerFlags",
-        sanitizer.sanitizeFlags(ruleCompilerFlags));
-
-    return builder;
+    return builder
+        .setReflectively(
+            "platformPreprocessorFlags",
+            sanitizer.sanitizeFlags(preprocessorFlags.getPlatformFlags()))
+        .setReflectively(
+            "rulePreprocessorFlags",
+            sanitizer.sanitizeFlags(preprocessorFlags.getRuleFlags()))
+        .setReflectively(
+            "platformCompilerFlags",
+            sanitizer.sanitizeFlags(compilerFlags.getPlatformFlags()))
+        .setReflectively(
+            "ruleCompilerFlags",
+            sanitizer.sanitizeFlags(compilerFlags.getRuleFlags()));
   }
+
+  @Override
+  public boolean useDependencyFileRuleKeys() {
+    return true;
+  }
+
+  @Override
+  public ImmutableList<SourcePath> getInputsAfterBuildingLocally() throws IOException {
+    ImmutableList.Builder<SourcePath> inputs = ImmutableList.builder();
+
+    // include all inputs coming from the preprocessor tool.
+    inputs.addAll(preprocessorDelegate.getInputsAfterBuildingLocally(readDepFileLines()));
+
+    // Add the input.
+    inputs.add(input);
+
+    return inputs.build();
+  }
+
+  private Path getDepFilePath() {
+    return output.getFileSystem().getPath(output.toString() + ".dep");
+  }
+
+  private Path getTempDepFilePath() {
+    return output.getFileSystem().getPath(getDepFilePath().toString() + ".tmp.dep");
+  }
+
+  private ImmutableList<String> readDepFileLines() throws IOException {
+    return ImmutableList.copyOf(getProjectFilesystem().readLines(getDepFilePath()));
+  }
+
+
+  private class ParseAndWriteBuckCompatibleDepfileStep implements Step {
+
+    private Path sourceDepfile;
+    private Path destDepfile;
+
+    public ParseAndWriteBuckCompatibleDepfileStep(Path sourceDepfile, Path destDepfile) {
+      this.sourceDepfile = sourceDepfile;
+      this.destDepfile = destDepfile;
+    }
+
+    @Override
+    public int execute(ExecutionContext context) throws IOException, InterruptedException {
+      Depfiles.parseAndWriteBuckCompatibleDepfile(
+          context,
+          getProjectFilesystem(),
+          preprocessorDelegate.getHeaderPathNormalizer(),
+          preprocessorDelegate.getHeaderVerification(),
+          sourceDepfile,
+          destDepfile,
+          getResolver().deprecatedGetPath(input),
+          output);
+      return 0;
+    }
+
+    @Override
+    public String getShortName() {
+      return "depfile-parse";
+    }
+
+    @Override
+    public String getDescription(ExecutionContext context) {
+      return "Parse depfiles and write them in a Buck compatible format";
+    }
+  }
+
 }

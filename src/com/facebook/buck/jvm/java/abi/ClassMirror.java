@@ -28,10 +28,7 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
-import java.io.IOException;
 import java.util.SortedSet;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
 
 import javax.annotation.Nullable;
 
@@ -153,11 +150,7 @@ class ClassMirror extends ClassVisitor implements Comparable<ClassMirror> {
     return fileName.compareTo(o.fileName);
   }
 
-  public void writeTo(JarOutputStream jar) throws IOException {
-    JarEntry entry = new JarEntry(fileName);
-    entry.setTime(0);
-
-    jar.putNextEntry(entry);
+  public ByteSource getStubClassBytes() {
     ClassWriter writer = new ClassWriter(0);
     writer.visit(version, access, name, signature, superName, interfaces);
 
@@ -181,8 +174,7 @@ class ClassMirror extends ClassVisitor implements Comparable<ClassMirror> {
       method.appendTo(writer);
     }
     writer.visitEnd();
-    ByteSource.wrap(writer.toByteArray()).copyTo(jar);
-    jar.closeEntry();
+    return ByteSource.wrap(writer.toByteArray());
   }
 
   private static class InnerClass implements Comparable<InnerClass> {

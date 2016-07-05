@@ -16,38 +16,51 @@
 
 package com.facebook.buck.d;
 
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.CxxPlatform;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildRuleType;
+import com.facebook.buck.rules.BuildTargetSourcePath;
 import com.facebook.buck.rules.Description;
+import com.facebook.buck.rules.ImplicitDepsInferringDescription;
 import com.facebook.buck.rules.Label;
-import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
+import com.facebook.buck.rules.SymlinkTree;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.rules.coercer.SourceList;
 import com.facebook.infer.annotation.SuppressFieldNotInitialized;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 
-public class DTestDescription implements Description<DTestDescription.Arg> {
+import java.nio.file.Path;
+
+public class DTestDescription implements
+    Description<DTestDescription.Arg>,
+    ImplicitDepsInferringDescription<DTestDescription.Arg> {
 
   private static final BuildRuleType TYPE = BuildRuleType.of("d_test");
 
   private final DBuckConfig dBuckConfig;
+  private final CxxBuckConfig cxxBuckConfig;
   private final CxxPlatform cxxPlatform;
   private final Optional<Long> defaultTestRuleTimeoutMs;
 
   public DTestDescription(
       DBuckConfig dBuckConfig,
-      Optional<Long> defaultTestRuleTimeoutMs,
-      CxxPlatform cxxPlatform) {
+      CxxBuckConfig cxxBuckConfig,
+      CxxPlatform cxxPlatform,
+      Optional<Long> defaultTestRuleTimeoutMs) {
     this.dBuckConfig = dBuckConfig;
-    this.defaultTestRuleTimeoutMs = defaultTestRuleTimeoutMs;
+    this.cxxBuckConfig = cxxBuckConfig;
     this.cxxPlatform = cxxPlatform;
+    this.defaultTestRuleTimeoutMs = defaultTestRuleTimeoutMs;
   }
 
   @Override
@@ -65,29 +78,48 @@ public class DTestDescription implements Description<DTestDescription.Arg> {
       TargetGraph targetGraph,
       BuildRuleParams params,
       BuildRuleResolver buildRuleResolver,
-      A args) throws NoSuchBuildTargetException {
+      A args)
+      throws NoSuchBuildTargetException {
 
     BuildTarget target = params.getBuildTarget();
 
+    SourcePathResolver pathResolver = new SourcePathResolver(buildRuleResolver);
+
+    SymlinkTree sourceTree =
+        buildRuleResolver.addToIndex(
+            DDescriptionUtils.createSourceSymlinkTree(
+                DDescriptionUtils.getSymlinkTreeTarget(params.getBuildTarget()),
+                params,
+                pathResolver,
+                args.srcs));
+
     // Create a helper rule to build the test binary.
     // The rule needs its own target so that we can depend on it without creating cycles.
-    BuildTarget binaryTarget = DDescriptionUtils.createBuildTargetForFile(
-        target,
-        "build-",
-        target.getFullyQualifiedName(),
-        cxxPlatform);
-    BuildRule binaryRule = DDescriptionUtils.createNativeLinkable(
-        params.copyWithBuildTarget(binaryTarget),
-        args.srcs,
-        ImmutableList.of("-unittest"),
-        buildRuleResolver,
-        cxxPlatform,
-        dBuckConfig);
+    BuildTarget binaryTarget =
+        DDescriptionUtils.createBuildTargetForFile(
+            target,
+            "build-",
+            target.getFullyQualifiedName(),
+            cxxPlatform);
+
+    BuildRule binaryRule =
+        DDescriptionUtils.createNativeLinkable(
+            params.copyWithBuildTarget(binaryTarget),
+            buildRuleResolver,
+            cxxPlatform,
+            dBuckConfig,
+            cxxBuckConfig,
+            ImmutableList.of("-unittest"),
+            args.srcs,
+            DIncludes.builder()
+                .setLinkTree(new BuildTargetSourcePath(sourceTree.getBuildTarget()))
+                .addAllSources(args.srcs.getPaths())
+                .build());
 
     return new DTest(
         params.appendExtraDeps(ImmutableList.of(binaryRule)),
         new SourcePathResolver(buildRuleResolver),
-        binaryRule.getPathToOutput(),
+        binaryRule,
         args.contacts.get(),
         args.labels.get(),
         args.testRuleTimeoutMs.or(defaultTestRuleTimeoutMs),
@@ -95,9 +127,17 @@ public class DTestDescription implements Description<DTestDescription.Arg> {
             args.sourceUnderTest.or(ImmutableSortedSet.<BuildTarget>of())));
   }
 
+  @Override
+  public Iterable<BuildTarget> findDepsForTargetFromConstructorArgs(
+      BuildTarget buildTarget,
+      Function<Optional<String>, Path> cellRoots,
+      Arg constructorArg) {
+    return cxxPlatform.getLd().getParseTimeDeps();
+  }
+
   @SuppressFieldNotInitialized
-  public static class Arg {
-    public ImmutableSortedSet<SourcePath> srcs;
+  public static class Arg extends AbstractDescriptionArg {
+    public SourceList srcs;
     public Optional<ImmutableSortedSet<String>> contacts;
     public Optional<ImmutableSortedSet<Label>> labels;
     public Optional<ImmutableSortedSet<BuildTarget>> sourceUnderTest;

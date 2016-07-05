@@ -18,6 +18,7 @@ package com.facebook.buck.util.cache;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.io.ProjectFilesystem;
@@ -45,57 +46,55 @@ public class DefaultFileHashCacheTest {
 
   @Test
   public void whenPathIsPutCacheContainsPath() {
-    DefaultFileHashCache cache =
-        new DefaultFileHashCache(new FakeProjectFilesystem());
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
     Path path = new File("SomeClass.java").toPath();
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
-    assertTrue("Cache should contain path", cache.willGet(path));
+    assertTrue("Cache should contain path", cache.willGet(filesystem.resolve(path)));
   }
 
   @Test
   public void whenPathIsPutPathGetReturnsHash() throws IOException {
-    DefaultFileHashCache cache =
-        new DefaultFileHashCache(new FakeProjectFilesystem());
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
     Path path = new File("SomeClass.java").toPath();
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
-    assertEquals("Cache should contain hash", value.getHashCode(), cache.get(path));
+    assertEquals(
+        "Cache should contain hash",
+        value.getHashCode(),
+        cache.get(filesystem.resolve(path)));
   }
 
   @Test
   public void whenPathIsPutThenInvalidatedCacheDoesNotContainPath() {
-    DefaultFileHashCache cache =
-        new DefaultFileHashCache(new FakeProjectFilesystem());
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
     Path path = new File("SomeClass.java").toPath();
-    HashCodeAndFileType value = HashCodeAndFileType.of(
-        HashCode.fromInt(42),
-        HashCodeAndFileType.Type.FILE);
+    HashCodeAndFileType value = HashCodeAndFileType.ofFile(HashCode.fromInt(42));
     cache.loadingCache.put(path, value);
-    assertTrue("Cache should contain path", cache.willGet(path));
-    cache.invalidate(path);
-    assertFalse("Cache should not contain pain", cache.willGet(path));
+    assertTrue("Cache should contain path", cache.willGet(filesystem.resolve(path)));
+    cache.invalidate(filesystem.resolve(path));
+    assertFalse("Cache should not contain pain", cache.willGet(filesystem.resolve(path)));
   }
 
   @Test
   public void invalidatingNonExistentEntryDoesNotThrow() {
-    DefaultFileHashCache cache =
-        new DefaultFileHashCache(new FakeProjectFilesystem());
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
     Path path = new File("SomeClass.java").toPath();
-    assertFalse("Cache should not contain pain", cache.willGet(path));
-    cache.invalidate(path);
-    assertFalse("Cache should not contain pain", cache.willGet(path));
+    assertFalse("Cache should not contain pain", cache.willGet(filesystem.resolve(path)));
+    cache.invalidate(filesystem.resolve(path));
+    assertFalse("Cache should not contain pain", cache.willGet(filesystem.resolve(path)));
   }
 
   @Test
   public void missingEntryThrowsNoSuchFileException() throws IOException {
-    DefaultFileHashCache cache = new DefaultFileHashCache(new FakeProjectFilesystem());
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
     expectedException.expect(NoSuchFileException.class);
-    cache.get(Paths.get("hello.java"));
+    cache.get(filesystem.resolve(Paths.get("hello.java")));
   }
 
   @Test
@@ -105,13 +104,13 @@ public class DefaultFileHashCacheTest {
 
     Path path1 = Paths.get("path1");
     filesystem.writeContentsToPath("contenst1", path1);
-    cache.get(path1);
-    assertTrue(cache.willGet(path1));
+    cache.get(filesystem.resolve(path1));
+    assertTrue(cache.willGet(filesystem.resolve(path1)));
 
     Path path2 = Paths.get("path2");
     filesystem.writeContentsToPath("contenst2", path2);
-    cache.get(path2);
-    assertTrue(cache.willGet(path2));
+    cache.get(filesystem.resolve(path2));
+    assertTrue(cache.willGet(filesystem.resolve(path2)));
 
     // Verify that `invalidateAll` clears everything from the cache.
     assertFalse(cache.loadingCache.asMap().isEmpty());
@@ -119,4 +118,29 @@ public class DefaultFileHashCacheTest {
 
     assertTrue(cache.loadingCache.asMap().isEmpty());
   }
+
+  @Test
+  public void whenDirectoryIsPutThenInvalidatedCacheDoesNotContainPathOrChildren()
+      throws IOException {
+    ProjectFilesystem filesystem = new FakeProjectFilesystem();
+    DefaultFileHashCache cache = new DefaultFileHashCache(filesystem);
+
+    Path dir = filesystem.getRootPath().getFileSystem().getPath("dir");
+    filesystem.mkdirs(dir);
+    Path child1 = dir.resolve("child1");
+    filesystem.touch(child1);
+    Path child2 = dir.resolve("child2");
+    filesystem.touch(child2);
+
+    cache.get(filesystem.resolve(dir));
+    assertTrue(cache.willGet(filesystem.resolve(dir)));
+    assertTrue(cache.willGet(filesystem.resolve(child1)));
+    assertTrue(cache.willGet(filesystem.resolve(child2)));
+
+    cache.invalidate(filesystem.resolve(dir));
+    assertNull(cache.loadingCache.getIfPresent(dir));
+    assertNull(cache.loadingCache.getIfPresent(child1));
+    assertNull(cache.loadingCache.getIfPresent(child2));
+  }
+
 }

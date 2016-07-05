@@ -17,12 +17,15 @@
 package com.facebook.buck.apple;
 
 import com.facebook.buck.cxx.CxxPlatform;
+import com.facebook.buck.model.Flavor;
+import com.facebook.buck.model.FlavorConvertible;
 import com.facebook.buck.rules.Tool;
 import com.facebook.buck.util.immutables.BuckStyleImmutable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
 import java.nio.file.Path;
+import java.util.Set;
 
 import org.immutables.value.Value;
 
@@ -31,7 +34,7 @@ import org.immutables.value.Value;
  */
 @Value.Immutable
 @BuckStyleImmutable
-abstract class AbstractAppleCxxPlatform {
+abstract class AbstractAppleCxxPlatform implements FlavorConvertible {
 
   public static final Function<AppleCxxPlatform, AppleSdkPaths> TO_APPLE_SDK_PATHS =
       new Function<AppleCxxPlatform, AppleSdkPaths>() {
@@ -58,4 +61,19 @@ abstract class AbstractAppleCxxPlatform {
   public abstract Optional<Path> getStubBinary();
   public abstract Tool getLldb();
   public abstract Optional<Tool> getCodesignAllocate();
+  public abstract Optional<Tool> getSwift();
+  public abstract Optional<Tool> getSwiftStdlibTool();
+  public abstract Set<Path> getSwiftRuntimePaths();
+  public abstract Set<Path> getSwiftStaticRuntimePaths();
+
+  // Short Xcode version code, e.g. 0721
+  public abstract Optional<String> getXcodeVersion();
+
+  // Xcode build identifier, e.g. 7C1002
+  public abstract Optional<String> getXcodeBuildVersion();
+
+  @Override
+  public Flavor getFlavor() {
+    return getCxxPlatform().getFlavor();
+  }
 }

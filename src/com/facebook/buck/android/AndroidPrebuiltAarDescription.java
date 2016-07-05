@@ -24,6 +24,7 @@ import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.model.UnflavoredBuildTarget;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -57,7 +58,7 @@ public class AndroidPrebuiltAarDescription
   public static final BuildRuleType TYPE = BuildRuleType.of("android_prebuilt_aar");
 
   private static final Flavor AAR_PREBUILT_JAR_FLAVOR = ImmutableFlavor.of("aar_prebuilt_jar");
-  private static final Flavor AAR_UNZIP_FLAVOR = ImmutableFlavor.of("aar_unzip");
+  public static final Flavor AAR_UNZIP_FLAVOR = ImmutableFlavor.of("aar_unzip");
 
   private final JavacOptions javacOptions;
 
@@ -99,16 +100,11 @@ public class AndroidPrebuiltAarDescription
               }
             }));
 
-    BuildTarget abiJarTarget =
-        BuildTarget.builder(params.getBuildTarget())
-            .addFlavors(CalculateAbi.FLAVOR)
-            .build();
+    BuildTarget abiJarTarget = params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR);
     SourcePath abiJar = new BuildTargetSourcePath(abiJarTarget);
     buildRuleResolver.addToIndex(
         CalculateAbi.of(
-            BuildTarget.builder(params.getBuildTarget())
-                .addFlavors(CalculateAbi.FLAVOR)
-                .build(),
+            params.getBuildTarget().withAppendedFlavor(CalculateAbi.FLAVOR),
             pathResolver,
             params,
             new BuildTargetSourcePath(
@@ -186,12 +182,13 @@ public class AndroidPrebuiltAarDescription
         /* sourceJar */ Optional.<SourcePath>absent(),
         /* gwtJar */ Optional.<SourcePath>absent(),
         /* javadocUrl */ Optional.<String>absent(),
-        /* mavenCoords */ Optional.<String>absent());
+        /* mavenCoords */ Optional.<String>absent(),
+        /* provided */ false);
 
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     public SourcePath aar;
     public Optional<ImmutableSortedSet<BuildTarget>> deps;
   }

@@ -18,13 +18,14 @@ package com.facebook.buck.android;
 
 import static org.junit.Assert.assertEquals;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.JavaLibraryBuilder;
 import com.facebook.buck.jvm.java.KeystoreBuilder;
 import com.facebook.buck.jvm.java.PrebuiltJarBuilder;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.FakeSourcePath;
@@ -33,7 +34,6 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
-import com.facebook.buck.util.BuckConstant;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -53,7 +53,7 @@ public class AndroidPackageableCollectorTest {
   @Test
   public void testFindTransitiveDependencies() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
     ProjectFilesystem projectFilesystem = new FakeProjectFilesystem();
     Path prebuiltNativeLibraryPath = Paths.get("java/com/facebook/prebuilt_native_library/libs");
@@ -135,9 +135,9 @@ public class AndroidPackageableCollectorTest {
     assertEquals(
         "Because guava was passed to no_dx, it should not be in the classpathEntriesToDex list",
         ImmutableSet.of(
-            Paths.get("buck-out/gen/third_party/jsr-305/jsr-305.jar"),
-            BuckConstant.GEN_PATH.resolve(
-                "java/src/com/facebook/lib__example__output/example.jar")),
+            BuildTargets.getGenPath(jsr305Target, "%s.jar"),
+            BuildTargets.getGenPath(libraryRuleTarget, "lib__%s__output/")
+                .resolve(libraryRuleTarget.getShortNameAndFlavorPostfix() + ".jar")),
         FluentIterable.from(packageableCollection.getClasspathEntriesToDex())
             .transform(pathResolver.deprecatedPathFunction())
             .toSet());
@@ -150,7 +150,7 @@ public class AndroidPackageableCollectorTest {
             "longer. Specifically, this was observed to take over one second longer to load " +
             "the resource in fb4a. Because the resource was loaded on startup, this introduced a " +
             "substantial regression in the startup time for the fb4a app.",
-        ImmutableSet.of(Paths.get("buck-out/gen/third_party/jsr-305/jsr-305.jar")),
+        ImmutableSet.of(BuildTargets.getGenPath(jsr305Target, "%s.jar")),
         FluentIterable.from(packageableCollection.getPathsToThirdPartyJars())
             .transform(pathResolver.deprecatedPathFunction())
             .toSet());
@@ -202,7 +202,7 @@ public class AndroidPackageableCollectorTest {
   @Test
   public void testGetAndroidResourceDeps() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
     BuildRule c = ruleResolver.addToIndex(
         AndroidResourceRuleBuilder.newBuilder()
@@ -287,7 +287,7 @@ public class AndroidPackageableCollectorTest {
   @Test
   public void testGraphForAndroidBinaryExcludesKeystoreDeps() throws Exception {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     BuildTarget androidLibraryKeystoreTarget =
@@ -324,7 +324,8 @@ public class AndroidPackageableCollectorTest {
     assertEquals(
         "Classpath entries should include facebook/base but not keystore/base.",
         ImmutableSet.of(
-            BuckConstant.GEN_PATH.resolve("java/com/facebook/base/lib__base__output/base.jar")),
+            BuildTargets.getGenPath(androidLibraryTarget, "lib__%s__output/")
+                .resolve(androidLibraryTarget.getShortNameAndFlavorPostfix() + ".jar")),
         FluentIterable.from(packageableCollection.getClasspathEntriesToDex())
             .transform(pathResolver.deprecatedPathFunction())
             .toSet());

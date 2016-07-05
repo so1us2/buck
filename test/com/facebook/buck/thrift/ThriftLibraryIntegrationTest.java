@@ -20,7 +20,6 @@ import static org.junit.Assert.assertThat;
 
 import com.facebook.buck.android.FakeAndroidDirectoryResolver;
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.event.BuckEventBusFactory;
@@ -30,10 +29,10 @@ import com.facebook.buck.io.Watchman;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.ImmutableFlavor;
-import com.facebook.buck.model.Pair;
 import com.facebook.buck.parser.Parser;
 import com.facebook.buck.parser.ParserConfig;
-import com.facebook.buck.rules.ActionGraph;
+import com.facebook.buck.rules.ActionGraphAndResolver;
+import com.facebook.buck.rules.ActionGraphCache;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.Cell;
@@ -41,8 +40,6 @@ import com.facebook.buck.rules.ConstructorArgMarshaller;
 import com.facebook.buck.rules.KnownBuildRuleTypesFactory;
 import com.facebook.buck.rules.NoopBuildRule;
 import com.facebook.buck.rules.TargetGraph;
-import com.facebook.buck.rules.TargetGraphToActionGraph;
-import com.facebook.buck.rules.TargetNodeToBuildRuleTransformer;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.rules.coercer.TypeCoercerFactory;
 import com.facebook.buck.testutil.TestConsole;
@@ -50,6 +47,7 @@ import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.timing.DefaultClock;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.ProcessExecutor;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -57,6 +55,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.hamcrest.Matchers;
 import org.junit.Rule;
@@ -92,7 +91,8 @@ public class ThriftLibraryIntegrationTest {
             "cpp_reflection_library = //thrift:fake")
         .build();
 
-    TypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory();
+    TypeCoercerFactory typeCoercerFactory = new DefaultTypeCoercerFactory(
+        ObjectMappers.newDefaultInstance());
     Parser parser = new Parser(
         new ParserConfig(config),
         typeCoercerFactory,
@@ -114,22 +114,19 @@ public class ThriftLibraryIntegrationTest {
         eventBus,
         cell,
         false,
-        Executors.newSingleThreadExecutor(),
+        MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor()),
         ImmutableSet.of(target));
-
-    TargetNodeToBuildRuleTransformer transformer = new BuildTargetNodeToBuildRuleTransformer();
 
     // There was a case where the cxx library being generated wouldn't put the header into the tree
     // with the right flavour. This catches this case without us needing to stick a working thrift
     // compiler into buck's own source.
-    Pair<ActionGraph, BuildRuleResolver> actionGraphAndResolver =
-        new TargetGraphToActionGraph(eventBus, transformer)
-        .apply(targetGraph);
+    ActionGraphAndResolver actionGraphAndResolver = ActionGraphCache.getFreshActionGraph(
+        eventBus, targetGraph);
 
     // This is to cover the case where we weren't passing flavors around correctly, which ended
     // making the binary depend 'placeholder' BuildRules instead of real ones. This is the
     // regression test for that case.
-    BuildRuleResolver ruleResolver = actionGraphAndResolver.getSecond();
+    BuildRuleResolver ruleResolver = actionGraphAndResolver.getResolver();
     BuildTarget binaryFlavor = target.withFlavors(ImmutableFlavor.of("binary"));
     ImmutableSortedSet<BuildRule> deps = ruleResolver.getRule(binaryFlavor).getDeps();
     assertThat(

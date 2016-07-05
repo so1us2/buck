@@ -19,13 +19,15 @@ package com.facebook.buck.cxx;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
+import com.facebook.buck.rules.BuildRuleResolver;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.FakeSourcePath;
+import com.facebook.buck.rules.SourcePathResolver;
+import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.util.Escaper;
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
+import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableBiMap;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 
 import org.junit.Test;
 
@@ -36,10 +38,17 @@ import java.nio.file.Paths;
 public class CxxPreprocessorOutputTransformerFactoryTest {
   @Test
   public void shouldRewriteLineMarkers() {
+    BuildRuleResolver ruleResolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
+
     Path original = Paths.get("buck-out/foo#bar/world.h");
-    ImmutableMap<Path, Path> replacementPaths =
-        ImmutableMap.of(original, Paths.get("hello/////world.h"));
     Path finalPath = Paths.get("SANITIZED/world.h");
+
+    HeaderPathNormalizer.Builder normalizerBuilder =
+        new HeaderPathNormalizer.Builder(pathResolver, Functions.<Path>identity());
+    normalizerBuilder.addHeader(new FakeSourcePath("hello/////world.h"), original);
+    HeaderPathNormalizer normalizer = normalizerBuilder.build();
 
     DebugPathSanitizer sanitizer = new DebugPathSanitizer(
         9,
@@ -51,28 +60,25 @@ public class CxxPreprocessorOutputTransformerFactoryTest {
     CxxPreprocessorOutputTransformerFactory transformer =
         new CxxPreprocessorOutputTransformerFactory(
             fakeProjectFilesystem.getRootPath(),
-            replacementPaths,
-            sanitizer,
-            Optional.<Function<String, Iterable<String>>>absent());
+            normalizer,
+            sanitizer);
 
     // Fixup line marker lines properly.
     assertThat(
-        ImmutableList.of(
-            String.format("# 12 \"%s\"", Escaper.escapePathForCIncludeString(finalPath))),
+        String.format("# 12 \"%s\"", Escaper.escapePathForCIncludeString(finalPath)),
         equalTo(transformer.transformLine(String.format("# 12 \"%s\"", original))));
     assertThat(
-        ImmutableList.of(
-            String.format("# 12 \"%s\" 2 1", Escaper.escapePathForCIncludeString(finalPath))),
+        String.format("# 12 \"%s\" 2 1", Escaper.escapePathForCIncludeString(finalPath)),
         equalTo(transformer.transformLine(String.format("# 12 \"%s\" 2 1", original))));
 
     // test.h isn't in the replacement map, so shouldn't be replaced.
     assertThat(
-        ImmutableList.of("# 4 \"test.h\""),
+        "# 4 \"test.h\"",
         equalTo(transformer.transformLine("# 4 \"test.h\"")));
 
     // Don't modify non-line-marker lines.
     assertThat(
-        ImmutableList.of("int main() {"),
+        "int main() {",
         equalTo(transformer.transformLine("int main() {")));
   }
 }

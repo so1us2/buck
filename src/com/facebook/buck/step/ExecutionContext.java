@@ -23,6 +23,7 @@ import com.facebook.buck.event.BuckEventBus;
 import com.facebook.buck.event.ThrowableConsoleEvent;
 import com.facebook.buck.jvm.core.JavaPackageFinder;
 import com.facebook.buck.model.BuildId;
+import com.facebook.buck.shell.WorkerProcess;
 import com.facebook.buck.util.Ansi;
 import com.facebook.buck.util.ClassLoaderCache;
 import com.facebook.buck.util.Console;
@@ -36,12 +37,16 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.immutables.value.Value;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import javax.annotation.Nullable;
 
@@ -49,6 +54,10 @@ import javax.annotation.Nullable;
 @DeprecatedBuckStyleImmutable
 @SuppressWarnings("deprecation")
 public abstract class ExecutionContext implements Closeable {
+
+  public enum ExecutorPool {
+    CPU,
+  }
 
   @Value.Parameter
   public abstract Console getConsole();
@@ -111,13 +120,29 @@ public abstract class ExecutionContext implements Closeable {
     return getConsole().getVerbosity();
   }
 
+  @Value.Parameter
+  public abstract Map<ExecutorPool, ListeningExecutorService> getExecutors();
+
+  @Value.Derived
+  public ListeningExecutorService getExecutorService(ExecutorPool p) {
+    ListeningExecutorService executorService = getExecutors().get(p);
+    Preconditions.checkNotNull(executorService);
+    return executorService;
+  }
+
+  @Value.Parameter
+  public abstract ConcurrentMap<String, WorkerProcess> getWorkerProcesses();
+
   /**
    * @return A clone of this {@link ExecutionContext} with {@code stdout} and {@code stderr}
    *    redirected to the provided {@link PrintStream}s.
    */
-  public ExecutionContext createSubContext(PrintStream newStdout, PrintStream newStderr) {
+  public ExecutionContext createSubContext(
+      PrintStream newStdout,
+      PrintStream newStderr,
+      Optional<Verbosity> verbosityOverride) {
     Console console = new Console(
-        this.getConsole().getVerbosity(),
+        verbosityOverride.or(this.getConsole().getVerbosity()),
         newStdout,
         newStderr,
         this.getConsole().getAnsi());
@@ -125,7 +150,8 @@ public abstract class ExecutionContext implements Closeable {
     return ImmutableExecutionContext.copyOf(this)
         .withConsole(console)
         .withProcessExecutor(new ProcessExecutor(console))
-        .withClassLoaderCache(getClassLoaderCache().addRef());
+        .withClassLoaderCache(getClassLoaderCache().addRef())
+        .withWorkerProcesses(new ConcurrentHashMap<String, WorkerProcess>());
   }
 
   public void logError(Throwable error, String msg, Object... formatArgs) {
@@ -173,6 +199,13 @@ public abstract class ExecutionContext implements Closeable {
   @Override
   public void close() throws IOException {
     getClassLoaderCache().close();
+    try {
+      for (WorkerProcess process : getWorkerProcesses().values()) {
+        process.close();
+      }
+    } finally {
+      getWorkerProcesses().clear();
+    }
   }
 
   public BuildId getBuildId() {
@@ -202,6 +235,8 @@ public abstract class ExecutionContext implements Closeable {
             /* loadLimit */ Double.POSITIVE_INFINITY);
     private Optional<AdbOptions> adbOptions = Optional.absent();
     private Optional<TargetDeviceOptions> targetDeviceOptions = Optional.absent();
+    private Map<ExecutorPool, ListeningExecutorService> executors;
+    private ConcurrentMap<String, WorkerProcess> workerProcesses = new ConcurrentHashMap<>();
 
     private Builder() {}
 
@@ -223,7 +258,9 @@ public abstract class ExecutionContext implements Closeable {
           Preconditions.checkNotNull(classLoaderCache),
           Preconditions.checkNotNull(concurrencyLimit),
           adbOptions,
-          targetDeviceOptions);
+          targetDeviceOptions,
+          executors,
+          workerProcesses);
     }
 
     public Builder setExecutionContext(ExecutionContext executionContext) {
@@ -335,6 +372,18 @@ public abstract class ExecutionContext implements Closeable {
 
     public Builder setTargetDeviceOptions(Optional<TargetDeviceOptions> targetDeviceOptions) {
       this.targetDeviceOptions = targetDeviceOptions;
+      return this;
+    }
+
+    public Builder setExecutors(
+        Map<ExecutionContext.ExecutorPool, ListeningExecutorService> executors) {
+      this.executors = executors;
+      return this;
+    }
+
+    public Builder setWorkerProcesses(
+        ConcurrentMap<String, WorkerProcess> workerProcesses) {
+      this.workerProcesses = workerProcesses;
       return this;
     }
   }

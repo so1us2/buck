@@ -29,7 +29,7 @@ import static org.junit.Assume.assumeTrue;
 import com.facebook.buck.artifact_cache.ArtifactCacheConnectEvent;
 import com.facebook.buck.artifact_cache.CacheResult;
 import com.facebook.buck.artifact_cache.HttpArtifactCacheEvent;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.CommandEvent;
 import com.facebook.buck.event.ArtifactCompressionEvent;
 import com.facebook.buck.event.BuckEventBus;
@@ -62,6 +62,7 @@ import com.facebook.buck.timing.FakeClock;
 import com.facebook.buck.timing.IncrementingFakeClock;
 import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
@@ -123,7 +124,7 @@ public class ChromeTraceBuildListenerTest {
         projectFilesystem,
         buildId,
         new FakeClock(1409702151000000000L),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Locale.US,
         TimeZone.getTimeZone("America/Los_Angeles"),
         /* tracesToKeep */ 3,
@@ -153,7 +154,7 @@ public class ChromeTraceBuildListenerTest {
   public void testBuildJson() throws IOException {
     ProjectFilesystem projectFilesystem = new ProjectFilesystem(tmpDir.getRoot().toPath());
 
-    ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = ObjectMappers.newDefaultInstance();
 
     BuildId buildId = new BuildId("ChromeTraceBuildListenerTestBuildId");
     ChromeTraceBuildListener listener = new ChromeTraceBuildListener(
@@ -171,7 +172,10 @@ public class ChromeTraceBuildListenerTest {
     FakeBuildRule rule = new FakeBuildRule(
         target,
         new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer())),
+            new BuildRuleResolver(
+              TargetGraph.EMPTY,
+              new DefaultTargetNodeToBuildRuleTransformer())
+        ),
         ImmutableSortedSet.<BuildRule>of());
     RuleKey ruleKey = new RuleKey("abc123");
     String stepShortName = "fakeStep";
@@ -503,7 +507,7 @@ public class ChromeTraceBuildListenerTest {
           projectFilesystem,
           buildId,
           new FakeClock(1409702151000000000L),
-          new ObjectMapper(),
+          ObjectMappers.newDefaultInstance(),
           Locale.US,
           TimeZone.getTimeZone("America/Los_Angeles"),
         /* tracesToKeep */ 3,
@@ -529,7 +533,7 @@ public class ChromeTraceBuildListenerTest {
         projectFilesystem,
         buildId,
         new FakeClock(1409702151000000000L),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Locale.US,
         TimeZone.getTimeZone("America/Los_Angeles"),
         /* tracesToKeep */ 1,
@@ -549,7 +553,7 @@ public class ChromeTraceBuildListenerTest {
         projectFilesystem,
         buildId,
         new FakeClock(1409702151000000000L),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Locale.US,
         TimeZone.getTimeZone("America/Los_Angeles"),
         /* tracesToKeep */ 1,

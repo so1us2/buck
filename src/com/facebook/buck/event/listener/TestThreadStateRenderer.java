@@ -18,6 +18,7 @@ package com.facebook.buck.event.listener;
 
 import com.facebook.buck.event.LeafEvent;
 import com.facebook.buck.model.BuildTarget;
+import com.facebook.buck.rules.TestStatusMessageEvent;
 import com.facebook.buck.rules.TestSummaryEvent;
 import com.facebook.buck.test.TestRuleEvent;
 import com.facebook.buck.util.Ansi;
@@ -29,9 +30,11 @@ import com.google.common.collect.ImmutableMap;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 public class TestThreadStateRenderer implements ThreadStateRenderer {
 
+  private static final Level MIN_LOG_LEVEL = Level.INFO;
   private final CommonThreadStateRenderer commonThreadStateRenderer;
   private final ImmutableMap<Long, ThreadRenderingInformation> threadInformationMap;
 
@@ -41,25 +44,28 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
       long currentTimeMs,
       Map<Long, Optional<? extends TestRuleEvent>> testEventsByThread,
       Map<Long, Optional<? extends TestSummaryEvent>> testSummariesByThread,
+      Map<Long, Optional<? extends TestStatusMessageEvent>> testStatusMessagesByThread,
       Map<Long, Optional<? extends LeafEvent>> runningStepsByThread,
       Map<BuildTarget, AtomicLong> accumulatedTimesByRule) {
-    this.commonThreadStateRenderer = new CommonThreadStateRenderer(
-        ansi,
-        formatTimeFunction,
-        currentTimeMs,
-        testEventsByThread.keySet());
     this.threadInformationMap = getThreadInformationMap(
         currentTimeMs,
         testEventsByThread,
         testSummariesByThread,
+        testStatusMessagesByThread,
         runningStepsByThread,
         accumulatedTimesByRule);
+    this.commonThreadStateRenderer = new CommonThreadStateRenderer(
+        ansi,
+        formatTimeFunction,
+        currentTimeMs,
+        threadInformationMap);
   }
 
   private static ImmutableMap<Long, ThreadRenderingInformation> getThreadInformationMap(
       long currentTimeMs,
       Map<Long, Optional<? extends TestRuleEvent>> testEventsByThread,
       Map<Long, Optional<? extends TestSummaryEvent>> testSummariesByThread,
+      Map<Long, Optional<? extends TestStatusMessageEvent>> testStatusMessagesByThread,
       Map<Long, Optional<? extends LeafEvent>> runningStepsByThread,
       Map<BuildTarget, AtomicLong> accumulatedTimesByRule) {
     ImmutableMap.Builder<Long, ThreadRenderingInformation> threadInformationMapBuilder =
@@ -77,6 +83,11 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
       Optional<? extends TestSummaryEvent> testSummary = testSummariesByThread.get(threadId);
       if (testSummary == null) {
         testSummary = Optional.absent();
+      }
+      Optional<? extends TestStatusMessageEvent> testStatusMessage = testStatusMessagesByThread.get(
+          threadId);
+      if (testStatusMessage == null) {
+        testStatusMessage = Optional.absent();
       }
       AtomicLong accumulatedTime = null;
       if (buildTarget.isPresent()) {
@@ -100,6 +111,7 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
               buildTarget,
               testRuleEvent,
               testSummary,
+              testStatusMessage,
               runningStep,
               elapsedTimeMs));
     }
@@ -107,8 +119,13 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
   }
 
   @Override
-  public ImmutableList<Long> getSortedThreadIds() {
-    return commonThreadStateRenderer.getSortedThreadIds();
+  public int getThreadCount() {
+    return commonThreadStateRenderer.getThreadCount();
+  }
+
+  @Override
+  public ImmutableList<Long> getSortedThreadIds(boolean sortByTime) {
+    return commonThreadStateRenderer.getSortedThreadIds(sortByTime);
   }
 
   @Override
@@ -117,7 +134,13 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
         threadInformationMap.get(threadId));
     Optional<String> stepCategory = Optional.absent();
     Optional<? extends LeafEvent> runningStep = Optional.absent();
-    if (threadInformation.getTestSummary().isPresent()) {
+    if (threadInformation.getTestStatusMessage().isPresent() &&
+        threadInformation.getTestStatusMessage().get()
+            .getTestStatusMessage().getLevel().intValue() >= MIN_LOG_LEVEL.intValue()) {
+      stepCategory = Optional.of(
+          threadInformation.getTestStatusMessage().get().getTestStatusMessage().getMessage());
+      runningStep = threadInformation.getTestStatusMessage();
+    } else if (threadInformation.getTestSummary().isPresent()) {
       stepCategory = Optional.of(threadInformation.getTestSummary().get().getTestName());
       runningStep = threadInformation.getTestSummary();
     } else if (threadInformation.getRunningStep().isPresent()) {
@@ -132,5 +155,15 @@ public class TestThreadStateRenderer implements ThreadStateRenderer {
         Optional.<String>absent(),
         threadInformation.getElapsedTimeMs(),
         lineBuilder);
+  }
+
+  @Override
+  public String renderShortStatus(long threadId) {
+    ThreadRenderingInformation threadInformation = Preconditions.checkNotNull(
+        threadInformationMap.get(threadId));
+    return commonThreadStateRenderer.renderShortStatus(
+        threadInformation.getBuildTarget().isPresent(),
+        /* renderSubtle = */ false,
+        threadInformation.getElapsedTimeMs());
   }
 }

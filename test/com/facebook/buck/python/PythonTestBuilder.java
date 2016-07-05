@@ -31,7 +31,7 @@ import com.google.common.collect.ImmutableSortedSet;
 
 public class PythonTestBuilder extends AbstractNodeBuilder<PythonTestDescription.Arg> {
 
-  private PythonTestBuilder(
+  protected PythonTestBuilder(
       BuildTarget target,
       PythonBuckConfig pythonBuckConfig,
       FlavorDomain<PythonPlatform> pythonPlatforms,
@@ -42,10 +42,12 @@ public class PythonTestBuilder extends AbstractNodeBuilder<PythonTestDescription
             new PythonBinaryDescription(
                 pythonBuckConfig,
                 pythonPlatforms,
+                CxxPlatformUtils.DEFAULT_CONFIG,
                 defaultCxxPlatform,
                 cxxPlatforms),
             pythonBuckConfig,
             pythonPlatforms,
+            CxxPlatformUtils.DEFAULT_CONFIG,
             defaultCxxPlatform,
             Optional.<Long>absent(),
             cxxPlatforms),
@@ -112,6 +114,11 @@ public class PythonTestBuilder extends AbstractNodeBuilder<PythonTestDescription
 
   public PythonTestBuilder setPlatform(String platform) {
     arg.platform = Optional.of(platform);
+    return this;
+  }
+
+  public PythonTestBuilder setPackageStyle(PythonBuckConfig.PackageStyle packageStyle) {
+    arg.packageStyle = Optional.of(packageStyle);
     return this;
   }
 

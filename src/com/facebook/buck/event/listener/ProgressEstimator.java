@@ -52,7 +52,7 @@ public class ProgressEstimator {
   @Nullable
   private String command;
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper;
 
   private BuckEventBus buckEventBus;
 
@@ -69,15 +69,17 @@ public class ProgressEstimator {
 
   private final AtomicInteger numberOfRules = new AtomicInteger(0);
   private final AtomicInteger numberOfStartedRules = new AtomicInteger(0);
-  private final AtomicInteger numberOfResumedRules = new AtomicInteger(0);
-  private final AtomicInteger numberOfSuspendedRules = new AtomicInteger(0);
   private final AtomicInteger numberOfFinishedRules = new AtomicInteger(0);
 
   private final AtomicDouble processingFilesProgress = new AtomicDouble(-1.0);
   private final AtomicDouble projectGenerationProgress = new AtomicDouble(-1.0);
   private final AtomicDouble buildProgress = new AtomicDouble(-1.0);
 
-  public ProgressEstimator(Path rootRepositoryPath, BuckEventBus buckEventBus) {
+  public ProgressEstimator(
+      Path rootRepositoryPath,
+      BuckEventBus buckEventBus,
+      ObjectMapper objectMapper) {
+    this.objectMapper = objectMapper;
     this.rootRepositoryPath = rootRepositoryPath;
     this.command = null;
     this.buckEventBus = buckEventBus;
@@ -131,12 +133,10 @@ public class ProgressEstimator {
   }
 
   public void didResumeRule() {
-    numberOfResumedRules.incrementAndGet();
     calculateBuildProgress();
   }
 
   public void didSuspendRule() {
-    numberOfSuspendedRules.incrementAndGet();
     calculateBuildProgress();
   }
 
@@ -148,8 +148,6 @@ public class ProgressEstimator {
   public void didStartBuild() {
     numberOfStartedRules.set(0);
     numberOfFinishedRules.set(0);
-    numberOfResumedRules.set(0);
-    numberOfSuspendedRules.set(0);
   }
 
   public void didFinishBuild() {
@@ -157,8 +155,6 @@ public class ProgressEstimator {
     if (rulesCount > 0) {
       numberOfStartedRules.set(rulesCount);
       numberOfFinishedRules.set(rulesCount);
-      numberOfSuspendedRules.set(rulesCount * 2);
-      numberOfResumedRules.set(rulesCount * 2);
       calculateBuildProgress();
     }
   }
@@ -203,7 +199,7 @@ public class ProgressEstimator {
       }
     }
     if (map == null) {
-      map = new HashMap<String, Map<String, Number>>();
+      map = new HashMap<>();
     }
     expectationsStorage = map;
   }
@@ -215,7 +211,7 @@ public class ProgressEstimator {
     }
     Map<String, Number> commandEstimations = expectationsStorage.get(aCommand);
     if (commandEstimations == null) {
-      commandEstimations = new HashMap<String, Number>();
+      commandEstimations = new HashMap<>();
       expectationsStorage.put(aCommand, commandEstimations);
     }
     return commandEstimations;
@@ -274,9 +270,9 @@ public class ProgressEstimator {
 
   private Optional<Double> wrapValueIntoOptional(double value) {
     if (value == -1.0) {
-      return Optional.<Double>absent();
+      return Optional.absent();
     } else {
-      return Optional.<Double>of(Double.valueOf(value));
+      return Optional.of(value);
     }
   }
 
@@ -344,9 +340,7 @@ public class ProgressEstimator {
     } else {
       // TODO(beefon): t8529466 compute progress in better way
       double cacheCheckProgress = numberOfStartedRules.get() / ruleCount;
-      double buildProgress = (numberOfFinishedRules.get() +
-          numberOfSuspendedRules.get() / 2.0 +
-          numberOfResumedRules.get() / 2.0) / 3.0 / ruleCount;
+      double buildProgress = numberOfFinishedRules.get() / ruleCount;
       // cache check takes approximately 10% of time on clean builds. If there will be nothing
       // to build after that, we will jump to 100%.
       double totalProgress = cacheCheckProgress * 0.1 + Math.pow(buildProgress, 2.0) * 0.9;

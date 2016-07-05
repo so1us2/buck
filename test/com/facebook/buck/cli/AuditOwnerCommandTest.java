@@ -35,6 +35,7 @@ import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.BuildTargetPattern;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleFactoryParams;
 import com.facebook.buck.rules.BuildRuleParams;
@@ -51,8 +52,8 @@ import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.testutil.TestConsole;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -96,7 +97,7 @@ public class AuditOwnerCommandTest {
       return new FakeBuildRule(params, new SourcePathResolver(resolver));
     }
 
-    public static class FakeArg {
+    public static class FakeArg extends AbstractDescriptionArg {
       public ImmutableSet<Path> inputs;
     }
   }
@@ -115,7 +116,7 @@ public class AuditOwnerCommandTest {
           Hashing.sha1().hashString(params.target.getFullyQualifiedName(), UTF_8),
           description,
           arg,
-          new DefaultTypeCoercerFactory(),
+          new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance()),
           params,
           ImmutableSet.<BuildTarget>of(),
           ImmutableSet.<BuildTargetPattern>of(),
@@ -215,7 +216,7 @@ public class AuditOwnerCommandTest {
         Platform.detect(),
         ImmutableMap.copyOf(System.getenv()),
         new FakeJavaPackageFinder(),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Optional.<WebServer>absent());
   }
 

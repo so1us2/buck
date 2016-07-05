@@ -41,6 +41,11 @@ public class ClangCompiler implements Compiler {
   }
 
   @Override
+  public Optional<ImmutableList<String>> getFlagsForColorDiagnostics() {
+    return Optional.of(ImmutableList.of("-fcolor-diagnostics"));
+  }
+
+  @Override
   public ImmutableCollection<BuildRule> getDeps(SourcePathResolver resolver) {
     return tool.getDeps(resolver);
   }

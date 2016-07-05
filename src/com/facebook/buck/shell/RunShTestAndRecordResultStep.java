@@ -27,7 +27,6 @@ import com.facebook.buck.util.environment.Platform;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -40,6 +39,7 @@ public class RunShTestAndRecordResultStep implements Step {
   private final ProjectFilesystem filesystem;
   private final Path pathToShellScript;
   private final ImmutableList<String> args;
+  private final ImmutableMap<String, String> env;
   private final Path pathToTestResultFile;
   private final Optional<Long> testRuleTimeoutMs;
   private final String testCaseName;
@@ -48,12 +48,14 @@ public class RunShTestAndRecordResultStep implements Step {
       ProjectFilesystem filesystem,
       Path pathToShellScript,
       ImmutableList<String> args,
+      ImmutableMap<String, String> env,
       Optional<Long> testRuleTimeoutMs,
       String testCaseName,
       Path pathToTestResultFile) {
     this.filesystem = filesystem;
     this.pathToShellScript = pathToShellScript;
     this.args = args;
+    this.env = env;
     this.testRuleTimeoutMs = testRuleTimeoutMs;
     this.testCaseName = testCaseName;
     this.pathToTestResultFile = pathToTestResultFile;
@@ -103,7 +105,10 @@ public class RunShTestAndRecordResultStep implements Step {
 
         @Override
         public ImmutableMap<String, String> getEnvironmentVariables(ExecutionContext context) {
-          return ImmutableMap.of("NO_BUCKD", "1");
+          return ImmutableMap.<String, String>builder()
+              .put("NO_BUCKD", "1")
+              .putAll(env)
+              .build();
         }
 
         @Override
@@ -161,11 +166,11 @@ public class RunShTestAndRecordResultStep implements Step {
           test.getStderr());
     }
 
-    ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = context.getObjectMapper();
     try (OutputStream outputStream = filesystem.newFileOutputStream(pathToTestResultFile)) {
       mapper.writeValue(outputStream, summary);
     } catch (IOException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     // Even though the test may have failed, this command executed successfully, so its exit code

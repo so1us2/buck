@@ -16,6 +16,7 @@
 
 package com.facebook.buck.intellij.plugin.config;
 
+import com.facebook.buck.util.HumanReadableException;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.components.ExportableApplicationComponent;
@@ -23,6 +24,7 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.components.StoragePathMacros;
+import com.intellij.openapi.diagnostic.Logger;
 
 import java.io.File;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ public class BuckSettingsProvider implements PersistentStateComponent<BuckSettin
     ExportableApplicationComponent {
 
   private State state = new State();
+  private static final Logger LOG = Logger.getInstance(BuckSettingsProvider.class);
 
   public static BuckSettingsProvider getInstance() {
     return ApplicationManager.getApplication().getComponent(BuckSettingsProvider.class);
@@ -49,6 +52,16 @@ public class BuckSettingsProvider implements PersistentStateComponent<BuckSettin
 
   @Override
   public State getState() {
+    if (state.buckExecutable == null || state.buckExecutable.isEmpty()) {
+      try {
+        state.buckExecutable = BuckExecutableDetector.getBuckExecutable();
+      } catch (HumanReadableException e) {
+        // let the user insert the path to the executable
+        state.buckExecutable = "";
+        LOG.error(e.getHumanReadableErrorMessage() + ". You can specify the buck path from " +
+            "Tools > Buck > Buck Executable Path");
+      }
+    }
     return state;
   }
 
@@ -93,9 +106,14 @@ public class BuckSettingsProvider implements PersistentStateComponent<BuckSettin
     /**
      * Path to buck executable.
      *
-     * TODO(t7982097): Use Buck's ExecutableFinder class.
      */
-    public String buckExecutable = BuckExecutableDetector.detect();
+    public String buckExecutable;
+
+    /**
+     * Enable the debug window for the plugin.
+     *
+     */
+    public boolean showDebug = false;
 
     /**
      * "-r" parameter for "buck install"

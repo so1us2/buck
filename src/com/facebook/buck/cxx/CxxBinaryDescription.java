@@ -27,6 +27,7 @@ import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildRuleType;
 import com.facebook.buck.rules.Description;
 import com.facebook.buck.rules.ImplicitDepsInferringDescription;
+import com.facebook.buck.rules.MetadataProvidingDescription;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.macros.MacroException;
@@ -45,24 +46,25 @@ import java.util.Set;
 public class CxxBinaryDescription implements
     Description<CxxBinaryDescription.Arg>,
     Flavored,
-    ImplicitDepsInferringDescription<CxxBinaryDescription.Arg> {
+    ImplicitDepsInferringDescription<CxxBinaryDescription.Arg>,
+    MetadataProvidingDescription<CxxBinaryDescription.Arg> {
 
   public static final BuildRuleType TYPE = BuildRuleType.of("cxx_binary");
 
+  private final CxxBuckConfig cxxBuckConfig;
   private final InferBuckConfig inferBuckConfig;
   private final CxxPlatform defaultCxxPlatform;
   private final FlavorDomain<CxxPlatform> cxxPlatforms;
-  private final CxxPreprocessMode preprocessMode;
 
   public CxxBinaryDescription(
+      CxxBuckConfig cxxBuckConfig,
       InferBuckConfig inferBuckConfig,
       CxxPlatform defaultCxxPlatform,
-      FlavorDomain<CxxPlatform> cxxPlatforms,
-      CxxPreprocessMode preprocessMode) {
+      FlavorDomain<CxxPlatform> cxxPlatforms) {
+    this.cxxBuckConfig = cxxBuckConfig;
     this.inferBuckConfig = inferBuckConfig;
     this.defaultCxxPlatform = defaultCxxPlatform;
     this.cxxPlatforms = cxxPlatforms;
-    this.preprocessMode = preprocessMode;
   }
 
   /**
@@ -75,6 +77,7 @@ public class CxxBinaryDescription implements
       A args) {
     return CxxDescriptionEnhancer.createHeaderSymlinkTree(
         params,
+        resolver,
         new SourcePathResolver(resolver),
         cxxPlatform,
         CxxDescriptionEnhancer.parseHeaders(
@@ -90,12 +93,19 @@ public class CxxBinaryDescription implements
     return new Arg();
   }
 
+  @SuppressWarnings("PMD.PrematureDeclaration")
   @Override
   public <A extends Arg> BuildRule createBuildRule(
       TargetGraph targetGraph,
       BuildRuleParams params,
       BuildRuleResolver resolver,
       A args) throws NoSuchBuildTargetException {
+
+    // We explicitly remove strip flavor from params to make sure rule
+    // has the same output regardless if we will strip or not.
+    Optional<StripStyle> flavoredStripStyle =
+        StripStyle.FLAVOR_DOMAIN.getValue(params.getBuildTarget());
+    params = CxxStrip.removeStripStyleFlavorInParams(params, flavoredStripStyle);
 
     // Extract the platform from the flavor, falling back to the default platform if none are
     // found.
@@ -128,41 +138,81 @@ public class CxxBinaryDescription implements
     SourcePathResolver pathResolver = new SourcePathResolver(resolver);
 
     if (flavors.contains(CxxCompilationDatabase.COMPILATION_DATABASE)) {
-      BuildRuleParams paramsWithoutCompilationDatabaseFlavor = CxxCompilationDatabase
-          .paramsWithoutCompilationDatabaseFlavor(params);
+      BuildRuleParams paramsWithoutFlavor =
+          params.withoutFlavor(CxxCompilationDatabase.COMPILATION_DATABASE);
       CxxLinkAndCompileRules cxxLinkAndCompileRules = CxxDescriptionEnhancer
           .createBuildRulesForCxxBinaryDescriptionArg(
-              paramsWithoutCompilationDatabaseFlavor,
+              paramsWithoutFlavor,
               resolver,
+              cxxBuckConfig,
               cxxPlatform,
               args,
-              preprocessMode);
+              flavoredStripStyle);
       return CxxCompilationDatabase.createCompilationDatabase(
           params,
           pathResolver,
-          preprocessMode,
-          cxxLinkAndCompileRules.compileRules);
+          cxxBuckConfig.getPreprocessMode(),
+          cxxLinkAndCompileRules.compileRules,
+          CxxDescriptionEnhancer.requireTransitiveCompilationDatabaseHeaderSymlinkTreeDeps(
+              paramsWithoutFlavor,
+              resolver,
+              pathResolver,
+              cxxPlatform,
+              args));
     }
 
-    if (flavors.contains(CxxInferEnhancer.INFER)) {
+    if (flavors.contains(CxxCompilationDatabase.UBER_COMPILATION_DATABASE)) {
+      return CxxDescriptionEnhancer.createUberCompilationDatabase(
+          cxxPlatforms.getValue(flavors).isPresent() ?
+              params :
+              params.withFlavor(defaultCxxPlatform.getFlavor()),
+          resolver);
+    }
+
+    if (flavors.contains(CxxInferEnhancer.InferFlavors.INFER.get())) {
       return CxxInferEnhancer.requireInferAnalyzeAndReportBuildRuleForCxxDescriptionArg(
           params,
           resolver,
           pathResolver,
+          cxxBuckConfig,
           cxxPlatform,
           args,
-          new CxxInferTools(inferBuckConfig),
+          inferBuckConfig,
           new CxxInferSourceFilter(inferBuckConfig));
     }
 
-    if (flavors.contains(CxxInferEnhancer.INFER_ANALYZE)) {
+    if (flavors.contains(CxxInferEnhancer.InferFlavors.INFER_ANALYZE.get())) {
       return CxxInferEnhancer.requireInferAnalyzeBuildRuleForCxxDescriptionArg(
           params,
           resolver,
           pathResolver,
+          cxxBuckConfig,
           cxxPlatform,
           args,
-          new CxxInferTools(inferBuckConfig),
+          inferBuckConfig,
+          new CxxInferSourceFilter(inferBuckConfig));
+    }
+
+    if (flavors.contains(CxxInferEnhancer.InferFlavors.INFER_CAPTURE_ALL.get())) {
+      return CxxInferEnhancer.requireAllTransitiveCaptureBuildRules(
+          params,
+          resolver,
+          cxxBuckConfig,
+          cxxPlatform,
+          inferBuckConfig,
+          new CxxInferSourceFilter(inferBuckConfig),
+          args);
+    }
+
+    if (flavors.contains(CxxInferEnhancer.InferFlavors.INFER_CAPTURE_ONLY.get())) {
+      return CxxInferEnhancer.requireInferCaptureAggregatorBuildRuleForCxxDescriptionArg(
+          params,
+          resolver,
+          pathResolver,
+          cxxBuckConfig,
+          cxxPlatform,
+          args,
+          inferBuckConfig,
           new CxxInferSourceFilter(inferBuckConfig));
     }
 
@@ -170,9 +220,10 @@ public class CxxBinaryDescription implements
         CxxDescriptionEnhancer.createBuildRulesForCxxBinaryDescriptionArg(
             params,
             resolver,
+            cxxBuckConfig,
             cxxPlatform,
             args,
-            preprocessMode);
+            flavoredStripStyle);
 
     // Return a CxxBinary rule as our representative in the action graph, rather than the CxxLink
     // rule above for a couple reasons:
@@ -184,15 +235,18 @@ public class CxxBinaryDescription implements
     //     have to wait for the dependency binary to link before we could link the dependent binary.
     //     By using another BuildRule, we can keep the original target graph dependency tree while
     //     preventing it from affecting link parallelism.
-    return new CxxBinary(
+
+    params = CxxStrip.restoreStripStyleFlavorInParams(params, flavoredStripStyle);
+    CxxBinary cxxBinary = new CxxBinary(
         params.appendExtraDeps(cxxLinkAndCompileRules.executable.getDeps(pathResolver)),
         resolver,
         pathResolver,
-        cxxLinkAndCompileRules.cxxLink.getOutput(),
-        cxxLinkAndCompileRules.cxxLink,
+        cxxLinkAndCompileRules.getBinaryRule(),
         cxxLinkAndCompileRules.executable,
         args.frameworks.get(),
         args.tests.get());
+    resolver.addToIndex(cxxBinary);
+    return cxxBinary;
   }
 
   @Override
@@ -206,6 +260,13 @@ public class CxxBinaryDescription implements
       Function<Optional<String>, Path> cellRoots,
       Arg constructorArg) {
     ImmutableSet.Builder<BuildTarget> deps = ImmutableSet.builder();
+
+    // Get any parse time deps from the C/C++ platforms.
+    deps.addAll(
+        CxxPlatforms.getParseTimeDeps(
+            cxxPlatforms
+                .getValue(buildTarget.getFlavors())
+                .or(defaultCxxPlatform)));
 
     Iterable<Iterable<String>> macroStrings =
         ImmutableList.<Iterable<String>>builder()
@@ -242,15 +303,49 @@ public class CxxBinaryDescription implements
         ImmutableSet.of(
             CxxDescriptionEnhancer.HEADER_SYMLINK_TREE_FLAVOR,
             CxxCompilationDatabase.COMPILATION_DATABASE,
-            CxxInferEnhancer.INFER,
-            CxxInferEnhancer.INFER_ANALYZE));
+            CxxCompilationDatabase.UBER_COMPILATION_DATABASE,
+            CxxInferEnhancer.InferFlavors.INFER.get(),
+            CxxInferEnhancer.InferFlavors.INFER_ANALYZE.get(),
+            CxxInferEnhancer.InferFlavors.INFER_CAPTURE_ALL.get(),
+            StripStyle.ALL_SYMBOLS.getFlavor(),
+            StripStyle.DEBUGGING_SYMBOLS.getFlavor(),
+            StripStyle.NON_GLOBAL_SYMBOLS.getFlavor()));
 
     return flavors.isEmpty();
+  }
+
+  public FlavorDomain<CxxPlatform> getCxxPlatforms() {
+    return cxxPlatforms;
+  }
+
+  public CxxPlatform getDefaultCxxPlatform() {
+    return defaultCxxPlatform;
+  }
+
+  @Override
+  public <A extends Arg, U> Optional<U> createMetadata(
+      BuildTarget buildTarget,
+      BuildRuleResolver resolver,
+      A args,
+      final Class<U> metadataClass) throws NoSuchBuildTargetException {
+    if (!metadataClass.isAssignableFrom(CxxCompilationDatabaseDependencies.class) ||
+        !buildTarget.getFlavors().contains(CxxCompilationDatabase.COMPILATION_DATABASE)) {
+      return Optional.absent();
+    }
+    return CxxDescriptionEnhancer
+        .createCompilationDatabaseDependencies(buildTarget, cxxPlatforms, resolver, args)
+        .transform(
+            new Function<CxxCompilationDatabaseDependencies, U>() {
+              @Override
+              public U apply(CxxCompilationDatabaseDependencies input) {
+                return metadataClass.cast(input);
+              }
+            }
+        );
   }
 
   @SuppressFieldNotInitialized
   public static class Arg extends LinkableCxxConstructorArg {
   }
 
-  public FlavorDomain<CxxPlatform> getCxxPlatforms() { return cxxPlatforms; }
 }

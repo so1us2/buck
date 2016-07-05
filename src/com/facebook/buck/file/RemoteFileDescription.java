@@ -16,6 +16,7 @@
 
 package com.facebook.buck.file;
 
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -23,6 +24,7 @@ import com.facebook.buck.rules.BuildRuleType;
 import com.facebook.buck.rules.Description;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.util.HumanReadableException;
 import com.facebook.infer.annotation.SuppressFieldNotInitialized;
 import com.google.common.base.Optional;
 import com.google.common.hash.HashCode;
@@ -54,7 +56,16 @@ public class RemoteFileDescription implements Description<RemoteFileDescription.
       BuildRuleParams params,
       BuildRuleResolver resolver,
       A args) {
-    HashCode sha1 = HashCode.fromString(args.sha1);
+    HashCode sha1;
+    try {
+      sha1 = HashCode.fromString(args.sha1);
+    } catch (IllegalArgumentException e) {
+      throw new HumanReadableException(
+          e,
+          "%s when parsing sha1 of %s",
+          e.getMessage(),
+          params.getBuildTarget().getUnflavoredBuildTarget().getFullyQualifiedName());
+    }
 
     String out = args.out.or(params.getBuildTarget().getShortNameAndFlavorPostfix());
 
@@ -68,7 +79,7 @@ public class RemoteFileDescription implements Description<RemoteFileDescription.
   }
 
   @SuppressFieldNotInitialized
-  public class Arg {
+  public class Arg extends AbstractDescriptionArg {
     public URI url;
     public String sha1;
     public Optional<String> out;

@@ -16,14 +16,14 @@
 
 package com.facebook.buck.artifact_cache;
 
+import com.facebook.buck.io.BorrowablePath;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.rules.RuleKey;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
-import java.nio.file.Path;
 
 import javax.annotation.Nullable;
 
@@ -37,7 +37,7 @@ public class DummyArtifactCache extends NoopArtifactCache {
   }
 
   @Override
-  public CacheResult fetch(RuleKey ruleKey, Path output) {
+  public CacheResult fetch(RuleKey ruleKey, LazyPath output) {
     return ruleKey.equals(storeKey) ? CacheResult.hit("cache") : CacheResult.miss();
   }
 
@@ -45,7 +45,7 @@ public class DummyArtifactCache extends NoopArtifactCache {
   public ListenableFuture<Void> store(
       ImmutableSet<RuleKey> ruleKeys,
       ImmutableMap<String, String> metadata,
-      Path output) {
+      BorrowablePath output) {
     storeKey = Iterables.getFirst(ruleKeys, null);
     return Futures.immediateFuture(null);
   }

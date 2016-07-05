@@ -18,17 +18,19 @@ package com.facebook.buck.d;
 
 import com.facebook.buck.cli.BuckConfig;
 import com.facebook.buck.io.ExecutableFinder;
+import com.facebook.buck.io.FileFinder;
 import com.facebook.buck.log.Logger;
 import com.facebook.buck.rules.HashedFileTool;
 import com.facebook.buck.rules.Tool;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.environment.Architecture;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -50,14 +52,28 @@ public class DBuckConfig {
   }
 
   /**
-   * @return a list of flags that must be passed to the linker to link D binaries
+   * @return a list of flags that must be passed to the compiler.
    */
-  ImmutableList<String> getLinkerFlagsForBinary() {
+  ImmutableList<String> getBaseCompilerFlags() {
+    // If flags are configured in buckconfig, return those.
+    // Else, return an empty list (no flags), as that should normally work.
+    return delegate.getOptionalListWithoutComments(
+        "d", "base_compiler_flags", ' ').or(ImmutableList.<String>of());
+  }
+
+  /**
+   * @return a list of flags that must be passed to the linker to link D binaries.
+   */
+  public ImmutableList<String> getLinkerFlags() {
     Optional<ImmutableList<String>> configuredFlags =
-        delegate.getOptionalListWithoutComments("d", "linker_flags_for_binary");
+      delegate.getOptionalListWithoutComments(
+          "d",
+          "linker_flags",
+          ' ');
     if (configuredFlags.isPresent()) {
       return configuredFlags.get();
     } else {
+      // No flags configured; generate them based on library paths.
       ImmutableList.Builder<String> builder = ImmutableList.builder();
       builder.addAll(
           FluentIterable
@@ -80,7 +96,7 @@ public class DBuckConfig {
    */
   private Iterable<Path> getBaseLibraryPaths() {
     Optional<ImmutableList<String>> configuredPaths =
-        delegate.getOptionalListWithoutComments("d", "library_path");
+        delegate.getOptionalListWithoutComments("d", "library_path", ':');
 
     if (configuredPaths.isPresent()) {
       return FluentIterable
@@ -109,37 +125,50 @@ public class DBuckConfig {
       LOG.debug("Could not resolve " + compilerPath +
               " to real path (likely cause: it does not exist)");
     }
+
     Path usrLib = Paths.get("/usr", "lib");
     Path usrLocalLib = Paths.get("/usr", "local", "lib");
-    String platformName = delegate.getArchitecture().toString() + "-" +
+    Architecture architecture = delegate.getArchitecture();
+    String platformName = architecture.toString() + "-" +
         delegate.getPlatform().getAutoconfName();
     String platformNameGnu = platformName + "-gnu";
-    for (Path libDir : ImmutableList.of(
-        compilerPath.getParent().resolve(Paths.get("..", "lib")).normalize(),
-        usrLocalLib,
-        usrLib,
-        usrLocalLib.resolve(platformName),
-        usrLocalLib.resolve(platformNameGnu),
-        usrLib.resolve(platformName),
-        usrLib.resolve(platformNameGnu))) {
-      for (String libName : ImmutableList.of("libphobos2.a", "libphobos2.so")) {
-        Path phobosPath = libDir.resolve(libName);
-        if (Files.exists(phobosPath)) {
-          LOG.debug("Detected path to Phobos: " + phobosPath);
-          return ImmutableList.of(libDir);
-        }
-      }
+
+    ImmutableSet<Path> searchPath = ImmutableSet.<Path>builder()
+        .add(compilerPath.getParent().resolve(Paths.get("..", "lib")).normalize())
+        .add(usrLocalLib)
+        .add(usrLib)
+        .add(usrLocalLib.resolve(platformName))
+        .add(usrLocalLib.resolve(platformNameGnu))
+        .add(usrLib.resolve(platformName))
+        .add(usrLib.resolve(platformNameGnu))
+        .build();
+
+    ImmutableSet<String> fileNames = FileFinder.combine(
+        ImmutableSet.of("lib"),
+        "phobos2",
+        ImmutableSet.of(".a", ".so"));
+
+    Optional<Path> phobosPath = FileFinder.getOptionalFile(
+        fileNames,
+        searchPath,
+        FileFinder.IS_REGULAR_FILE);
+
+    if (phobosPath.isPresent()) {
+      LOG.debug("Detected path to Phobos: " + phobosPath.get());
+    } else {
+      throw new HumanReadableException(
+          "Phobos not found, and not configured using d.library_path");
     }
 
-    throw new HumanReadableException(
-        "D standard library not found, and not configured using d.library_path");
+    return ImmutableList.of(phobosPath.get().getParent());
   }
 
   /**
    * @return the Path to the D compiler.
    */
   private Path getDCompilerPath() {
-    Path compilerPath = delegate.getPath("d", "compiler").or(DEFAULT_D_COMPILER);
+    Path compilerPath = delegate.getPath("d", "compiler", /*isCellRootRelative=*/false)
+      .or(DEFAULT_D_COMPILER);
 
     return new ExecutableFinder().getExecutable(compilerPath, delegate.getEnvironment());
   }

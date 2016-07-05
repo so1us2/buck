@@ -25,6 +25,8 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedSet;
 
+import java.util.Objects;
+
 /**
  * Abstract implementation of a {@link BuildRule} that can be cached. If its current {@link RuleKey}
  * matches the one on disk, then it has no work to do. It should also try to fetch its output from
@@ -86,7 +88,7 @@ public abstract class AbstractBuildRule implements BuildRule {
   }
 
   @Override
-  public final String getType() {
+  public String getType() {
     return typeSupplier.get();
   }
 
@@ -121,7 +123,8 @@ public abstract class AbstractBuildRule implements BuildRule {
       return false;
     }
     AbstractBuildRule that = (AbstractBuildRule) obj;
-    return this.buildTarget.equals(that.buildTarget);
+    return Objects.equals(this.buildTarget, that.buildTarget) &&
+        Objects.equals(this.getType(), that.getType());
   }
 
   @Override
@@ -132,6 +135,11 @@ public abstract class AbstractBuildRule implements BuildRule {
   @Override
   public final String toString() {
     return getFullyQualifiedName();
+  }
+
+  @Override
+  public boolean isCacheable() {
+    return true;
   }
 
 }

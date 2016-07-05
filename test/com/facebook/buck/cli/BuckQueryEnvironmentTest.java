@@ -36,12 +36,14 @@ import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.junit.After;
 import org.junit.Before;
@@ -50,7 +52,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class BuckQueryEnvironmentTest {
@@ -60,7 +61,7 @@ public class BuckQueryEnvironmentTest {
 
   private BuckQueryEnvironment buckQueryEnvironment;
   private Path cellRoot;
-  private ExecutorService executor;
+  private ListeningExecutorService executor;
 
   private QueryTarget createQueryBuildTarget(String baseName, String shortName) {
     return QueryBuildTarget.of(BuildTarget.builder(cellRoot, baseName, shortName).build());
@@ -88,12 +89,12 @@ public class BuckQueryEnvironmentTest {
         Platform.detect(),
         ImmutableMap.copyOf(System.getenv()),
         new FakeJavaPackageFinder(),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         Optional.<WebServer>absent());
 
     buckQueryEnvironment = new BuckQueryEnvironment(params, /* enableProfiling */ false);
     cellRoot = workspace.getDestPath();
-    executor = Executors.newSingleThreadExecutor();
+    executor = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
   }
 
   @After

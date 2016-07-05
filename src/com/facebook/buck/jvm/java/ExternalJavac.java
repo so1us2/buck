@@ -25,6 +25,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.util.Ansi;
+import com.facebook.buck.util.BgProcessKiller;
 import com.facebook.buck.util.Console;
 import com.facebook.buck.util.HumanReadableException;
 import com.facebook.buck.util.ProcessExecutor;
@@ -131,17 +132,12 @@ public class ExternalJavac implements Javac {
   public String getDescription(
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList) {
+      Path pathToSrcsList) {
     StringBuilder builder = new StringBuilder(pathToJavac.toString());
     builder.append(" ");
     Joiner.on(" ").appendTo(builder, options);
     builder.append(" ");
-
-    if (pathToSrcsList.isPresent()) {
-      builder.append("@").append(pathToSrcsList.get());
-    } else {
-      Joiner.on(" ").appendTo(builder, javaSourceFilePaths);
-    }
+    builder.append("@").append(pathToSrcsList);
 
     return builder.toString();
   }
@@ -173,8 +169,9 @@ public class ExternalJavac implements Javac {
       BuildTarget invokingRule,
       ImmutableList<String> options,
       ImmutableSortedSet<Path> javaSourceFilePaths,
-      Optional<Path> pathToSrcsList,
+      Path pathToSrcsList,
       Optional<Path> workingDirectory,
+      Optional<Path> usedClassesFile,
       Optional<StandardJavaFileManagerFactory> fileManagerFactory) throws InterruptedException {
     ImmutableList.Builder<String> command = ImmutableList.builder();
     command.add(pathToJavac.toString());
@@ -193,42 +190,33 @@ public class ExternalJavac implements Javac {
           invokingRule,
           workingDirectory);
     }
-    if (pathToSrcsList.isPresent()) {
-      try {
-        filesystem.writeLinesToPath(
-            FluentIterable.from(expandedSources)
-                .transform(Functions.toStringFunction())
-                .transform(ARGFILES_ESCAPER),
-            pathToSrcsList.get());
-        command.add("@" + pathToSrcsList.get());
-      } catch (IOException e) {
-        context.logError(
-            e,
-            "Cannot write list of .java files to compile to %s file! Terminating compilation.",
-            pathToSrcsList.get());
-        return 1;
-      }
-    } else {
-      for (Path source : expandedSources) {
-        command.add(source.toString());
-      }
+    try {
+      filesystem.writeLinesToPath(
+          FluentIterable.from(expandedSources)
+              .transform(Functions.toStringFunction())
+              .transform(ARGFILES_ESCAPER),
+          pathToSrcsList);
+      command.add("@" + pathToSrcsList);
+    } catch (IOException e) {
+      context.logError(
+          e,
+          "Cannot write list of .java files to compile to %s file! Terminating compilation.",
+          pathToSrcsList);
+      return 1;
     }
 
     ProcessBuilder processBuilder = new ProcessBuilder(command.build());
 
-    // Set environment to client environment and add additional information.
     Map<String, String> env = processBuilder.environment();
     env.clear();
     env.putAll(context.getEnvironment());
-    env.put("BUCK_INVOKING_RULE", invokingRule.toString());
-    env.put("BUCK_TARGET", invokingRule.toString());
-    env.put("BUCK_DIRECTORY_ROOT", filesystem.getRootPath().toAbsolutePath().toString());
 
     processBuilder.directory(filesystem.getRootPath().toAbsolutePath().toFile());
     // Run the command
     int exitCode = -1;
     try {
-      ProcessExecutor.Result result = context.getProcessExecutor().execute(processBuilder.start());
+      Process p = BgProcessKiller.startProcess(processBuilder);
+      ProcessExecutor.Result result = context.getProcessExecutor().execute(p);
       exitCode = result.getExitCode();
     } catch (IOException e) {
       e.printStackTrace(context.getStdErr());

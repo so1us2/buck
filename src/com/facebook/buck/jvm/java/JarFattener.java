@@ -29,14 +29,15 @@ import com.facebook.buck.rules.CommandTool;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.Tool;
+import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.facebook.buck.step.fs.MkdirStep;
 import com.facebook.buck.step.fs.SymlinkFileStep;
 import com.facebook.buck.step.fs.WriteFileStep;
+import com.facebook.buck.zip.ZipCompressionLevel;
 import com.facebook.buck.zip.ZipStep;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -53,6 +54,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
+
+import javax.xml.bind.JAXBException;
 
 /**
  * Build a fat JAR that packages an inner JAR along with any required native libraries.
@@ -75,6 +78,8 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
   private final SourcePath innerJar;
   @AddToRuleKey
   private final ImmutableMap<String, SourcePath> nativeLibraries;
+  @AddToRuleKey
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
   private final Path output;
 
   public JarFattener(
@@ -82,11 +87,13 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
       SourcePathResolver resolver,
       JavacOptions javacOptions,
       SourcePath innerJar,
-      ImmutableMap<String, SourcePath> nativeLibraries) {
+      ImmutableMap<String, SourcePath> nativeLibraries,
+      JavaRuntimeLauncher javaRuntimeLauncher) {
     super(params, resolver);
     this.javacOptions = javacOptions;
     this.innerJar = innerJar;
     this.nativeLibraries = nativeLibraries;
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.output = BuildTargets.getScratchPath(getBuildTarget(), "%s")
         .resolve(getBuildTarget().getShortName() + ".jar");
   }
@@ -153,9 +160,12 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
         getProjectFilesystem(),
         zipped,
         ImmutableSet.<Path>of(),
-            /* junkPaths */ false,
-            /* compressionLevel */ 0,
+        false,
+        ZipCompressionLevel.MIN_COMPRESSION_LEVEL,
         fatJarDir);
+
+    Path pathToSrcsList = BuildTargets.getGenPath(getBuildTarget(), "__%s__srcs");
+    steps.add(new MkdirStep(getProjectFilesystem(), pathToSrcsList.getParent()));
 
     CompileToJarStepFactory compileStepFactory =
         new JavacToJarStepFactory(javacOptions, JavacOptionsAmender.IDENTITY);
@@ -169,8 +179,9 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
         /* classpathEntries */ ImmutableSortedSet.<Path>of(),
         fatJarDir,
         /* workingDir */ Optional.<Path>absent(),
-        /* pathToSrcsList */ Optional.<Path>absent(),
+        pathToSrcsList,
         /* suggestBuildRule */ Optional.<SuggestBuildRules>absent(),
+        /* usedClassesFile */ Optional.<Path>absent(),
         steps,
         buildableContext);
 
@@ -201,8 +212,8 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try {
           fatJar.store(bytes);
-        } catch (Exception e) {
-          throw Throwables.propagate(e);
+        } catch (JAXBException e) {
+          throw new RuntimeException(e);
         }
         return new ByteArrayInputStream(bytes.toByteArray());
       }
@@ -238,9 +249,9 @@ public class JarFattener extends AbstractBuildRule implements BinaryBuildRule {
   @Override
   public Tool getExecutableCommand() {
     return new CommandTool.Builder()
-        .addArg("java")
+        .addArg(javaRuntimeLauncher.getCommand())
         .addArg("-jar")
-        .addArg(new BuildTargetSourcePath(getBuildTarget()))
+        .addArg(new SourcePathArg(getResolver(), new BuildTargetSourcePath(getBuildTarget())))
         .build();
   }
 

@@ -21,7 +21,6 @@ import static com.facebook.buck.apple.ProjectGeneratorTestUtils.assertHasSinglet
 import static com.facebook.buck.apple.ProjectGeneratorTestUtils.assertTargetExistsAndReturnTarget;
 import static com.facebook.buck.apple.ProjectGeneratorTestUtils.createDescriptionArgWithDefaults;
 import static com.facebook.buck.apple.ProjectGeneratorTestUtils.getSingletonPhaseByType;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
@@ -45,7 +44,7 @@ import com.facebook.buck.apple.xcode.xcodeproj.PBXResourcesBuildPhase;
 import com.facebook.buck.apple.xcode.xcodeproj.PBXShellScriptBuildPhase;
 import com.facebook.buck.apple.xcode.xcodeproj.ProductType;
 import com.facebook.buck.apple.xcode.xcodeproj.SourceTreePath;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.js.IosReactNativeLibraryBuilder;
@@ -61,7 +60,7 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.rules.coercer.FrameworkPath;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.testutil.AllExistingProjectFilesystem;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -86,9 +85,9 @@ public class NewNativeTargetProjectMutatorTest {
   @Before
   public void setUp() {
     generatedProject = new PBXProject("TestProject");
-    sourcePathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    sourcePathResolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     pathRelativizer = new PathRelativizer(
         Paths.get("_output"),
         sourcePathResolver.deprecatedPathFunction());
@@ -372,7 +371,7 @@ public class NewNativeTargetProjectMutatorTest {
             .setSections(
                 ImmutableMap.of(
                     "react-native",
-                    ImmutableMap.of("packager", "react-native/packager.sh")))
+                    ImmutableMap.of("packager_worker", "react-native/packager.sh")))
             .setFilesystem(filesystem)
             .build());
     TargetNode<?> reactNativeNode =
@@ -391,10 +390,9 @@ public class NewNativeTargetProjectMutatorTest {
     String shellScript = phase.getShellScript();
     assertThat(
         shellScript,
-        startsWith("BASE_DIR=${CONFIGURATION_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n" +
+        startsWith("BASE_DIR=${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n" +
             "JS_OUT=${BASE_DIR}/Apps/Foo/FooBundle.js\n" +
             "SOURCE_MAP=${TEMP_DIR}/rn_source_map/Apps/Foo/FooBundle.js.map\n"));
-    assertThat(shellScript, containsString("if false"));
   }
 
   private NewNativeTargetProjectMutator mutatorWithCommonDefaults() {

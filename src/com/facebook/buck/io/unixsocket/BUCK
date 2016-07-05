@@ -1,8 +1,1 @@
-java_library(
-  name='unixsocket',
-  srcs=glob(['*.java']),
-  deps = [
-    '//third-party/java/jna:jna',
-  ],
-  visibility = ['PUBLIC'],
-)
+standard_java_library()

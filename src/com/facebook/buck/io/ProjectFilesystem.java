@@ -16,7 +16,7 @@
 
 package com.facebook.buck.io;
 
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Config;
 import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.util.environment.Platform;
 import com.facebook.buck.zip.CustomZipEntry;
@@ -116,6 +116,13 @@ public class ProjectFilesystem {
       DIRECTORY_AND_CONTENTS,
   }
 
+  // Extended attribute bits for directories and symlinks; see:
+  // http://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute
+  @SuppressWarnings("PMD.AvoidUsingOctalValues")
+  public static final long S_IFDIR = 0040000;
+  @SuppressWarnings("PMD.AvoidUsingOctalValues")
+  public static final long S_IFLNK = 0120000;
+
   // A non-exhaustive list of characters that might indicate that we're about to deal with a glob.
   private static final Pattern GLOB_CHARS = Pattern.compile("[\\*\\?\\{\\[]");
 
@@ -173,7 +180,7 @@ public class ProjectFilesystem {
     Preconditions.checkArgument(Files.isDirectory(root));
     Preconditions.checkState(vfs.equals(root.getFileSystem()));
     Preconditions.checkArgument(root.isAbsolute());
-    this.projectRoot = root.normalize();
+    this.projectRoot = MorePaths.normalize(root);
     this.pathAbsolutifier = new Function<Path, Path>() {
       @Override
       public Path apply(Path path) {
@@ -216,11 +223,13 @@ public class ProjectFilesystem {
             return Iterables.getOnlyElement(filtered);
           }
         })
-        // So we claim to ignore this path to preserve existing behaviour
-        .append(root.getFileSystem().getPath(BuckConstant.BUCK_OUTPUT_DIRECTORY))
+        // TODO(#10068334) So we claim to ignore this path to preserve existing behaviour, but we
+        // really don't end up ignoring it in reality (see extractIgnorePaths).
+        .append(ImmutableSet.of(root.getFileSystem().getPath(BuckConstant.BUCK_OUTPUT_DIRECTORY)))
         // "Path" is Iterable, so avoid adding each segment.
         // We use the default value here because that's what we've always done.
         .append(ImmutableSet.of(getCacheDir(root, Optional.of(BuckConstant.DEFAULT_CACHE_DIR))))
+        .append(ImmutableSet.of(root.getFileSystem().getPath(BuckConstant.TRASH_DIR)))
         .toSortedSet(Ordering.<Path>natural());
   }
 
@@ -292,11 +301,11 @@ public class ProjectFilesystem {
    * @return the specified {@code path} resolved against {@link #getRootPath()} to an absolute path.
    */
   public Path resolve(Path path) {
-    return resolvePathFromOtherVfs(path).toAbsolutePath().normalize();
+    return MorePaths.normalize(resolvePathFromOtherVfs(path).toAbsolutePath());
   }
 
   public Path resolve(String path) {
-    return getRootPath().resolve(path).toAbsolutePath().normalize();
+    return MorePaths.normalize(getRootPath().resolve(path).toAbsolutePath());
   }
 
   /**
@@ -355,7 +364,7 @@ public class ProjectFilesystem {
    *         value is returned.
    */
   public Optional<Path> getPathRelativeToProjectRoot(Path path) {
-    path = path.normalize();
+    path = MorePaths.normalize(path);
     if (path.isAbsolute()) {
       if (path.startsWith(projectRoot)) {
         return Optional.of(MorePaths.relativize(projectRoot, path));
@@ -924,7 +933,7 @@ public class ProjectFilesystem {
       } else {
         // When sourcePath is relative, resolve it from the targetPath. We're creating a hard link
         // anyway.
-        realFile = symLink.getParent().resolve(realFile).normalize();
+        realFile = MorePaths.normalize(symLink.getParent().resolve(realFile));
         Files.createLink(symLink, realFile);
       }
     } else {
@@ -980,24 +989,12 @@ public class ProjectFilesystem {
     try (CustomZipOutputStream zip = ZipOutputStreams.newOutputStream(out)) {
       for (Path path : pathsToIncludeInZip) {
         boolean isDirectory = isDirectory(path);
-
-        String entryName = path.toString();
-        if (isDirectory) {
-          entryName += "/";
-        }
-        CustomZipEntry entry = new CustomZipEntry(entryName);
+        CustomZipEntry entry = new CustomZipEntry(path, isDirectory);
 
         // We want deterministic ZIPs, so avoid mtimes.
-        entry.setTime(0);
+        entry.setFakeTime();
 
-        // Support executable files.  If we detect this file is executable, store this
-        // information as 0100 in the field typically used in zip implementations for
-        // POSIX file permissions.  We'll use this information when unzipping.
-        if (isExecutable(path)) {
-          entry.setExternalAttributes(
-              MorePosixFilePermissions.toMode(
-                  EnumSet.of(PosixFilePermission.OWNER_EXECUTE)) << 16);
-        }
+        entry.setExternalAttributes(getFileAttributesForZipEntry(path));
 
         zip.putNextEntry(entry);
         if (!isDirectory) {
@@ -1009,9 +1006,9 @@ public class ProjectFilesystem {
       }
 
       for (Map.Entry<Path, String> fileContentsEntry : additionalFileContents.entrySet()) {
-        CustomZipEntry entry = new CustomZipEntry(fileContentsEntry.getKey().toString());
+        CustomZipEntry entry = new CustomZipEntry(fileContentsEntry.getKey());
         // We want deterministic ZIPs, so avoid mtimes.
-        entry.setTime(0);
+        entry.setFakeTime();
         zip.putNextEntry(entry);
         try (InputStream stream =
                  new ByteArrayInputStream(fileContentsEntry.getValue().getBytes(Charsets.UTF_8))) {
@@ -1020,6 +1017,31 @@ public class ProjectFilesystem {
         zip.closeEntry();
       }
     }
+  }
+
+  public long getFileAttributesForZipEntry(Path path) throws IOException {
+    long mode = 0;
+    // Support executable files.  If we detect this file is executable, store this
+    // information as 0100 in the field typically used in zip implementations for
+    // POSIX file permissions.  We'll use this information when unzipping.
+    if (isExecutable(path)) {
+      mode |=
+          MorePosixFilePermissions.toMode(
+              EnumSet.of(PosixFilePermission.OWNER_EXECUTE));
+    }
+
+    if (isDirectory(path)) {
+      mode |= S_IFDIR;
+    }
+
+    if (isSymLink(path)) {
+      mode |= S_IFLNK;
+    }
+
+    // Propagate any additional permissions
+    mode |= MorePosixFilePermissions.toMode(getPosixFilePermissions(path));
+
+    return mode << 16;
   }
 
   @Override

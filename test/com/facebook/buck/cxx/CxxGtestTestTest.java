@@ -18,7 +18,7 @@ package com.facebook.buck.cxx;
 
 import static org.junit.Assert.assertEquals;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
@@ -26,17 +26,19 @@ import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.CommandTool;
 import com.facebook.buck.rules.FakeBuildRuleParamsBuilder;
-import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.Label;
+import com.facebook.buck.rules.RuleScheduleInfo;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.args.Arg;
+import com.facebook.buck.rules.args.StringArg;
 import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.TestExecutionContext;
 import com.facebook.buck.test.TestResultSummary;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.TestDataHelper;
+import com.facebook.buck.util.ObjectMappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
@@ -55,7 +57,7 @@ import java.util.List;
 
 public class CxxGtestTestTest {
 
-  private static final ObjectMapper mapper = new ObjectMapper();
+  private static final ObjectMapper mapper = ObjectMappers.newDefaultInstance();
   private static final TypeReference<List<TestResultSummary>> SUMMARIES_REFERENCE =
       new TypeReference<List<TestResultSummary>>() {};
 
@@ -82,20 +84,22 @@ public class CxxGtestTestTest {
 
     BuildTarget target = BuildTargetFactory.newInstance("//:test");
     ProjectFilesystem filesystem = new ProjectFilesystem(tmp.getRoot().toPath());
-    SourcePathResolver pathResolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    BuildRuleResolver ruleResolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+    SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
     CxxGtestTest test = new CxxGtestTest(
         new FakeBuildRuleParamsBuilder(target).setProjectFilesystem(filesystem).build(),
         pathResolver,
         new CxxLink(
             new FakeBuildRuleParamsBuilder(BuildTargetFactory.newInstance("//:link")).build(),
             pathResolver,
-            CxxPlatformUtils.DEFAULT_PLATFORM.getLd(),
+            CxxPlatformUtils.DEFAULT_PLATFORM.getLd().resolve(ruleResolver),
             Paths.get("output"),
-            ImmutableList.<Arg>of()),
+            ImmutableList.<Arg>of(),
+            Optional.<RuleScheduleInfo>absent(),
+            /* cacheable */ true),
         new CommandTool.Builder()
-            .addArg(new FakeSourcePath(""))
+            .addArg(new StringArg(""))
             .build(),
         Suppliers.ofInstance(ImmutableMap.<String, String>of()),
         Suppliers.ofInstance(ImmutableList.<String>of()),

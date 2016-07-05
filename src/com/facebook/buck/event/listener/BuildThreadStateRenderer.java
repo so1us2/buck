@@ -19,6 +19,7 @@ package com.facebook.buck.event.listener;
 import com.facebook.buck.event.LeafEvent;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.rules.BuildRuleEvent;
+import com.facebook.buck.rules.TestStatusMessageEvent;
 import com.facebook.buck.rules.TestSummaryEvent;
 import com.facebook.buck.util.Ansi;
 import com.google.common.base.Function;
@@ -42,16 +43,16 @@ public class BuildThreadStateRenderer implements ThreadStateRenderer {
       Map<Long, Optional<? extends BuildRuleEvent>> buildEventsByThread,
       Map<Long, Optional<? extends LeafEvent>> runningStepsByThread,
       Map<BuildTarget, AtomicLong> accumulatedTimesByRule) {
-    this.commonThreadStateRenderer = new CommonThreadStateRenderer(
-        ansi,
-        formatTimeFunction,
-        currentTimeMs,
-        buildEventsByThread.keySet());
     this.threadInformationMap = getThreadInformationMap(
         currentTimeMs,
         buildEventsByThread,
         runningStepsByThread,
         accumulatedTimesByRule);
+    this.commonThreadStateRenderer = new CommonThreadStateRenderer(
+        ansi,
+        formatTimeFunction,
+        currentTimeMs,
+        threadInformationMap);
   }
 
   private static ImmutableMap<Long, ThreadRenderingInformation> getThreadInformationMap(
@@ -93,6 +94,7 @@ public class BuildThreadStateRenderer implements ThreadStateRenderer {
               buildTarget,
               buildRuleEvent,
               Optional.<TestSummaryEvent>absent(),
+              Optional.<TestStatusMessageEvent>absent(),
               runningStep,
               elapsedTimeMs));
     }
@@ -100,8 +102,13 @@ public class BuildThreadStateRenderer implements ThreadStateRenderer {
   }
 
   @Override
-  public ImmutableList<Long> getSortedThreadIds() {
-    return commonThreadStateRenderer.getSortedThreadIds();
+  public int getThreadCount() {
+    return commonThreadStateRenderer.getThreadCount();
+  }
+
+  @Override
+  public ImmutableList<Long> getSortedThreadIds(boolean sortByTime) {
+    return commonThreadStateRenderer.getSortedThreadIds(sortByTime);
   }
 
   @Override
@@ -120,5 +127,15 @@ public class BuildThreadStateRenderer implements ThreadStateRenderer {
         Optional.of("checking local cache"),
         threadInformation.getElapsedTimeMs(),
         lineBuilder);
+  }
+
+  @Override
+  public String renderShortStatus(long threadId) {
+    ThreadRenderingInformation threadInformation = Preconditions.checkNotNull(
+        threadInformationMap.get(threadId));
+    return commonThreadStateRenderer.renderShortStatus(
+        threadInformation.getStartEvent().isPresent(),
+        !threadInformation.getRunningStep().isPresent(),
+        threadInformation.getElapsedTimeMs());
   }
 }

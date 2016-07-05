@@ -55,18 +55,17 @@ public class FakeAppleDeveloperEnvironment {
           }
           ProvisioningProfileStore store = ProvisioningProfileStore.fromSearchPath(searchPath);
           Optional<ProvisioningProfileMetadata> profile =
-              store.getBestProvisioningProfile("*", Optional.<String>absent());
+              store.getBestProvisioningProfile(
+                  "*",
+                  ProvisioningProfileStore.MATCH_ANY_ENTITLEMENT,
+                  ProvisioningProfileStore.MATCH_ANY_IDENTITY);
           return profile.isPresent();
         }
-      }).get().booleanValue();
+      }).get();
 
 
   public static boolean supportsBuildAndInstallToDevice() {
-    if (!supportsCodeSigning()) {
-      return false;
-    }
-
-    return hasWildcardProvisioningProfile;
+    return supportsCodeSigning() && hasWildcardProvisioningProfile;
   }
 
   public static boolean supportsCodeSigning() {

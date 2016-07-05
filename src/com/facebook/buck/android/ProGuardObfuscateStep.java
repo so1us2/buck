@@ -17,6 +17,7 @@
 package com.facebook.buck.android;
 
 import com.facebook.buck.io.ProjectFilesystem;
+import com.facebook.buck.jvm.java.JavaRuntimeLauncher;
 import com.facebook.buck.rules.BuildableContext;
 import com.facebook.buck.shell.ShellStep;
 import com.facebook.buck.step.AbstractExecutionStep;
@@ -50,11 +51,13 @@ public final class ProGuardObfuscateStep extends ShellStep {
     NONE,
   }
 
+  private final JavaRuntimeLauncher javaRuntimeLauncher;
   private final ProjectFilesystem filesystem;
   private final Map<Path, Path> inputAndOutputEntries;
   private final Path pathToProGuardCommandLineArgsFile;
   private final Optional<Path> proguardJarOverride;
   private final String proguardMaxHeapSize;
+  private final Optional<String> proguardAgentPath;
 
   /**
    * Create steps that write out ProGuard's command line arguments to a text file and then run
@@ -64,9 +67,11 @@ public final class ProGuardObfuscateStep extends ShellStep {
    * @param steps Where to append the generated steps.
    */
   public static void create(
+      JavaRuntimeLauncher javaRuntimeLauncher,
       ProjectFilesystem filesystem,
       Optional<Path> proguardJarOverride,
       String proguardMaxHeapSize,
+      Optional<String> proguardAgentPath,
       Path generatedProGuardConfig,
       Set<Path> customProguardConfigs,
       SdkProguardType sdkProguardConfig,
@@ -91,14 +96,17 @@ public final class ProGuardObfuscateStep extends ShellStep {
         pathToProGuardCommandLineArgsFile);
 
     ProGuardObfuscateStep proGuardStep = new ProGuardObfuscateStep(
+        javaRuntimeLauncher,
         filesystem,
         inputAndOutputEntries,
         pathToProGuardCommandLineArgsFile,
         proguardJarOverride,
-        proguardMaxHeapSize);
+        proguardMaxHeapSize,
+        proguardAgentPath);
 
     buildableContext.recordArtifact(commandLineHelperStep.getConfigurationTxt());
     buildableContext.recordArtifact(commandLineHelperStep.getMappingTxt());
+    buildableContext.recordArtifact(commandLineHelperStep.getSeedsTxt());
 
     steps.add(
         commandLineHelperStep,
@@ -115,18 +123,21 @@ public final class ProGuardObfuscateStep extends ShellStep {
    * @param pathToProGuardCommandLineArgsFile Path to file containing arguments to ProGuard.
    */
   private ProGuardObfuscateStep(
+      JavaRuntimeLauncher javaRuntimeLauncher,
       ProjectFilesystem filesystem,
       Map<Path, Path> inputAndOutputEntries,
       Path pathToProGuardCommandLineArgsFile,
       Optional<Path> proguardJarOverride,
-      String proguardMaxHeapSize) {
+      String proguardMaxHeapSize,
+      Optional<String> proguardAgentPath) {
     super(filesystem.getRootPath());
-
+    this.javaRuntimeLauncher = javaRuntimeLauncher;
     this.filesystem = filesystem;
     this.inputAndOutputEntries = ImmutableMap.copyOf(inputAndOutputEntries);
     this.pathToProGuardCommandLineArgsFile = pathToProGuardCommandLineArgsFile;
     this.proguardJarOverride = proguardJarOverride;
     this.proguardMaxHeapSize = proguardMaxHeapSize;
+    this.proguardAgentPath = proguardAgentPath;
   }
 
   @Override
@@ -146,8 +157,11 @@ public final class ProGuardObfuscateStep extends ShellStep {
     }
 
     ImmutableList.Builder<String> args = ImmutableList.builder();
-    args.add("java")
-        .add("-Xmx" + proguardMaxHeapSize)
+    args.add(javaRuntimeLauncher.getCommand());
+    if (proguardAgentPath.isPresent()) {
+       args.add("-agentpath:" + proguardAgentPath.get());
+    }
+    args.add("-Xmx" + proguardMaxHeapSize)
         .add("-jar").add(proguardJar.toString())
         .add("@" + pathToProGuardCommandLineArgsFile);
     return args.build();
@@ -334,6 +348,7 @@ public final class ProGuardObfuscateStep extends ShellStep {
       // -dump
       args.add("-printmapping").add(getMappingTxt().toString());
       args.add("-printconfiguration").add(getConfigurationTxt().toString());
+      args.add("-printseeds").add(getSeedsTxt().toString());
 
       return args.build();
     }
@@ -344,6 +359,10 @@ public final class ProGuardObfuscateStep extends ShellStep {
 
     public Path getMappingTxt() {
       return proguardDirectory.resolve("mapping.txt");
+    }
+
+    public Path getSeedsTxt() {
+      return proguardDirectory.resolve("seeds.txt");
     }
 
     @Override

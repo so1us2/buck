@@ -35,6 +35,7 @@ public class BuckCommand extends AbstractContainerCommand {
       metaVar = "subcommand")
   @SubCommands({
       @SubCommand(name = "audit", impl = AuditCommand.class),
+      @SubCommand(name = "autodeps", impl = AutodepsCommand.class),
       @SubCommand(name = "build", impl = BuildCommand.class),
       @SubCommand(name = "cache", impl = CacheCommand.class),
       @SubCommand(name = "clean", impl = CleanCommand.class),
@@ -44,6 +45,8 @@ public class BuckCommand extends AbstractContainerCommand {
       @SubCommand(name = "publish", impl = PublishCommand.class),
       @SubCommand(name = "query", impl = QueryCommand.class),
       @SubCommand(name = "quickstart", impl = QuickstartCommand.class),
+      @SubCommand(name = "rage", impl = RageCommand.class),
+      @SubCommand(name = "repl", impl = ReplCommand.class),
       @SubCommand(name = "root", impl = RootCommand.class),
       @SubCommand(name = "run", impl = RunCommand.class),
       @SubCommand(name = "server", impl = ServerCommand.class),
@@ -63,6 +66,7 @@ public class BuckCommand extends AbstractContainerCommand {
 
   @Option(
       name = "--help",
+      aliases = {"-h"},
       usage = "Shows this screen and exits.")
   @SuppressWarnings("PMD.UnusedPrivateField")
   private boolean helpScreen;

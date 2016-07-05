@@ -19,6 +19,7 @@ package com.facebook.buck.js;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.RuleKeyBuilderFactory;
+import com.facebook.buck.rules.Tool;
 import com.facebook.buck.rules.keys.AbiRule;
 import com.facebook.buck.rules.AbstractBuildRule;
 import com.facebook.buck.rules.AddToRuleKey;
@@ -29,15 +30,12 @@ import com.facebook.buck.rules.BuildableContext;
 import com.facebook.buck.rules.Sha1HashCode;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
-import com.facebook.buck.shell.ShellStep;
-import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.step.Step;
 import com.facebook.buck.step.fs.MakeCleanDirectoryStep;
 import com.google.common.collect.ImmutableList;
 import com.google.common.base.Optional;
 
 import java.nio.file.Path;
-import java.util.Arrays;
 
 import javax.annotation.Nullable;
 
@@ -57,7 +55,7 @@ public class ReactNativeBundle extends AbstractBuildRule implements AbiRule {
   private final boolean isDevMode;
 
   @AddToRuleKey
-  private final SourcePath jsPackager;
+  private final Tool jsPackager;
 
   @AddToRuleKey
   private final ReactNativePlatform platform;
@@ -80,7 +78,7 @@ public class ReactNativeBundle extends AbstractBuildRule implements AbiRule {
       boolean isDevMode,
       String bundleName,
       Optional<String> packagerFlags,
-      SourcePath jsPackager,
+      Tool jsPackager,
       ReactNativePlatform platform,
       ReactNativeDeps depsFinder) {
     super(ruleParams, resolver);
@@ -108,31 +106,33 @@ public class ReactNativeBundle extends AbstractBuildRule implements AbiRule {
     final Path sourceMapOutput = getPathToSourceMap(getBuildTarget());
     steps.add(new MakeCleanDirectoryStep(getProjectFilesystem(), sourceMapOutput.getParent()));
 
-    steps.add(
-        new ShellStep(getProjectFilesystem().getRootPath()) {
-          @Override
-          public String getShortName() {
-            return "bundle_react_native";
-          }
+    appendWorkerSteps(steps, jsOutput, sourceMapOutput);
 
-          @Override
-          protected ImmutableList<String> getShellCommandInternal(ExecutionContext context) {
-            return getBundleScript(
-                getResolver().getAbsolutePath(jsPackager),
-                getProjectFilesystem().resolve(getResolver().getAbsolutePath(entryPath)),
-                platform,
-                isUnbundle,
-                isDevMode,
-                packagerFlags,
-                getProjectFilesystem().resolve(jsOutput).toString(),
-                getProjectFilesystem().resolve(resource).toString(),
-                getProjectFilesystem().resolve(sourceMapOutput).toString());
-          }
-        });
     buildableContext.recordArtifact(jsOutputDir);
     buildableContext.recordArtifact(resource);
     buildableContext.recordArtifact(sourceMapOutput.getParent());
     return steps.build();
+  }
+
+  private void appendWorkerSteps(
+      ImmutableList.Builder<Step> stepBuilder,
+      Path outputFile,
+      Path sourceMapOutput) {
+    final Path tmpDir = BuildTargets.getScratchPath(getBuildTarget(), "%s__tmp");
+    stepBuilder.add(new MakeCleanDirectoryStep(getProjectFilesystem(), tmpDir));
+    ReactNativeBundleWorkerStep workerStep = new ReactNativeBundleWorkerStep(
+        getProjectFilesystem(),
+        tmpDir,
+        jsPackager.getCommandPrefix(getResolver()),
+        packagerFlags,
+        platform,
+        isUnbundle,
+        getProjectFilesystem().resolve(getResolver().getAbsolutePath(entryPath)),
+        isDevMode,
+        getProjectFilesystem().resolve(outputFile),
+        getProjectFilesystem().resolve(resource),
+        getProjectFilesystem().resolve(sourceMapOutput));
+    stepBuilder.add(workerStep);
   }
 
   public SourcePath getJSBundleDir() {
@@ -164,36 +164,5 @@ public class ReactNativeBundle extends AbstractBuildRule implements AbiRule {
   @Override
   public Sha1HashCode getAbiKeyForDeps(RuleKeyBuilderFactory defaultRuleKeyBuilderFactory) {
     return depsFinder.getInputsHash();
-  }
-
-  public static ImmutableList<String> getBundleScript(
-      Path jsPackager,
-      Path absoluteEntryPath,
-      ReactNativePlatform platform,
-      boolean isUnbundle,
-      boolean isDevMode,
-      Optional<String> packagerFlags,
-      String absoluteBundleOutputPath,
-      String absoluteResourceOutputPath,
-      String absoluteSourceMapOutputPath) {
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
-
-    builder.add(
-      jsPackager.toString(),
-      isUnbundle ? "unbundle" : "bundle",
-      "--entry-file", absoluteEntryPath.toString(),
-      "--platform", platform.toString(),
-      "--dev", isDevMode ? "true" : "false",
-      "--bundle-output", absoluteBundleOutputPath,
-      "--assets-dest", absoluteResourceOutputPath,
-      "--sourcemap-output", absoluteSourceMapOutputPath
-    );
-
-
-    if (packagerFlags.isPresent()) {
-      builder.addAll(Arrays.asList(packagerFlags.get().split(" ")));
-    }
-
-    return builder.build();
   }
 }

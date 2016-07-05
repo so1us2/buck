@@ -22,10 +22,10 @@ import com.facebook.buck.intellij.plugin.lang.psi.BuckPropertyLvalue;
 import com.facebook.buck.intellij.plugin.lang.psi.BuckValue;
 import com.facebook.buck.intellij.plugin.lang.psi.BuckValueArray;
 import com.facebook.buck.intellij.plugin.lang.psi.BuckVisitor;
-
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -34,14 +34,14 @@ import java.util.List;
 /**
  * A utility class for sorting buck dependencies alphabetically.
  */
-public final class DependenciesOptimizer {
+public class DependenciesOptimizer {
+
+  private static final String DEPENDENCIES_KEYWORD = "deps";
 
   private DependenciesOptimizer() {
   }
 
-  private static final String DEPENDENCIES_KEYWORD = "deps";
-
-  public static void optimzeDeps(PsiFile file) {
+  public static void optimzeDeps(@NotNull PsiFile file) {
     final PropertyVisitor visitor = new PropertyVisitor();
     file.accept(new BuckVisitor() {
       @Override
@@ -58,7 +58,7 @@ public final class DependenciesOptimizer {
 
   private static class PropertyVisitor extends BuckVisitor {
     @Override
-    public void visitProperty(BuckProperty property) {
+    public void visitProperty(@NotNull BuckProperty property) {
       BuckPropertyLvalue lValue = property.getPropertyLvalue();
       if (lValue == null || !lValue.getText().equals(DEPENDENCIES_KEYWORD)) {
         return;
@@ -97,21 +97,29 @@ public final class DependenciesOptimizer {
   /**
    * Use our own method to compare 'deps' stings.
    * 'deps' should be sorted with local references ':' preceding any cross-repo references '@'
-   * e.g :inner, //world:empty, //world/asia:jp, //world/europe:uk, @mars, @moon
+   * e.g :inner, //world:empty, //world/asia:jp, @mars, @moon
    */
   private static int compareDependencyStrings(String baseString, String anotherString) {
     for (int i = 0; i < Math.min(baseString.length(), anotherString.length()); ++i) {
       char c1 = baseString.charAt(i);
       char c2 = anotherString.charAt(i);
-      if (c1 != c2) {
-        // ':' should go first when compare ':' with '/' for Buck dependencies.
-        if ((c1 == ':' && c2 == '/') || (c1 == '/' && c2 == ':')) {
-          return c2 - c1;
-        } else {
-          return c1 - c2;
-        }
+      if (c1 == c2) {
+        continue;
+      } else if (c1 == ':') {
+        return -1;
+      } else if (c2 == ':') {
+        return 1;
+      } else if (c1 == '@') {
+        return 1;
+      } else if (c2 == '@') {
+        return -1;
+      } else if (c1 < c2) {
+        return -1;
+      } else {
+        return 1;
       }
     }
-    return baseString.length() - anotherString.length();
+    return baseString.compareTo(anotherString);
   }
+
 }

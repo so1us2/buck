@@ -16,20 +16,17 @@
 
 package com.facebook.buck.cli;
 
-import static com.facebook.buck.util.BuckConstant.GEN_DIR;
 import static org.junit.Assert.assertEquals;
 
 import com.facebook.buck.android.AndroidBinaryBuilder;
 import com.facebook.buck.android.AndroidLibraryBuilder;
-import com.facebook.buck.event.BuckEventBusFactory;
 import com.facebook.buck.jvm.java.JavaLibraryBuilder;
 import com.facebook.buck.jvm.java.JavaTestBuilder;
 import com.facebook.buck.jvm.java.KeystoreBuilder;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.FakeSourcePath;
-import com.facebook.buck.rules.TargetGraphToActionGraph;
-import com.facebook.buck.rules.TargetGraphTransformer;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.testutil.TargetGraphFactory;
 import com.facebook.buck.testutil.TestConsole;
@@ -42,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.SortedSet;
@@ -51,7 +49,6 @@ public class AuditClasspathCommandTest {
   private TestConsole console;
   private AuditClasspathCommand auditClasspathCommand;
   private CommandRunnerParams params;
-  private TargetGraphTransformer targetGraphTransformer;
 
   @Before
   public void setUp() throws IOException, InterruptedException {
@@ -60,9 +57,6 @@ public class AuditClasspathCommandTest {
     params = CommandRunnerParamsForTesting.builder()
         .setConsole(console)
         .build();
-    targetGraphTransformer = new TargetGraphToActionGraph(
-        BuckEventBusFactory.newInstance(),
-        new BuildTargetNodeToBuildRuleTransformer());
   }
 
   @Test
@@ -71,7 +65,6 @@ public class AuditClasspathCommandTest {
     auditClasspathCommand.printClasspath(
         params,
         TargetGraphFactory.newInstance(ImmutableSet.<TargetNode<?>>of()),
-        targetGraphTransformer,
         ImmutableSet.<BuildTarget>of());
     assertEquals("", console.getTextWrittenToStdOut());
     assertEquals("", console.getTextWrittenToStdErr());
@@ -122,7 +115,6 @@ public class AuditClasspathCommandTest {
                 keystoreNode,
                 testAndroidNode,
                 testJavaNode)),
-        targetGraphTransformer,
         ImmutableSet.<BuildTarget>of());
 
     // Still empty.
@@ -142,14 +134,22 @@ public class AuditClasspathCommandTest {
                 keystoreNode,
                 testAndroidNode,
                 testJavaNode)),
-        targetGraphTransformer,
         ImmutableSet.of(
             testAndroidTarget));
 
+    Path root = javaLibraryTarget.getUnflavoredBuildTarget().getCellPath();
     SortedSet<String> expectedPaths = Sets.newTreeSet(
         Arrays.asList(
-            GEN_DIR + "/lib__test-android-library__output/test-android-library.jar",
-            GEN_DIR + "/lib__test-java-library__output/test-java-library.jar"));
+            root.resolve(
+                BuildTargets
+                    .getGenPath(androidLibraryTarget, "lib__%s__output")
+                    .resolve(androidLibraryTarget.getShortName() + ".jar"))
+                .toString(),
+            root.resolve(
+                BuildTargets
+                    .getGenPath(javaLibraryTarget, "lib__%s__output")
+                    .resolve(javaLibraryTarget.getShortName() + ".jar"))
+                .toString()));
     String expectedClasspath = Joiner.on("\n").join(expectedPaths) + "\n";
 
     assertEquals(expectedClasspath, console.getTextWrittenToStdOut());
@@ -169,14 +169,18 @@ public class AuditClasspathCommandTest {
                 keystoreNode,
                 testAndroidNode,
                 testJavaNode)),
-        targetGraphTransformer,
         ImmutableSet.of(
             testAndroidTarget,
             javaLibraryTarget,
             androidLibraryTarget,
             testJavaTarget));
 
-    expectedPaths.add(GEN_DIR + "/lib__project-tests__output/project-tests.jar");
+    expectedPaths.add(
+        root.resolve(
+            BuildTargets
+                .getGenPath(testJavaTarget, "lib__%s__output")
+                .resolve(testJavaTarget.getShortName() + ".jar"))
+            .toString());
     expectedClasspath = Joiner.on("\n").join(expectedPaths) + "\n";
     assertEquals(expectedClasspath, console.getTextWrittenToStdOut());
     assertEquals("", console.getTextWrittenToStdErr());
@@ -186,12 +190,12 @@ public class AuditClasspathCommandTest {
       "{",
       "\"//:test-android-library\":",
       "[",
-      "\"buck-out/gen/lib__test-java-library__output/test-java-library.jar\",",
-      "\"buck-out/gen/lib__test-android-library__output/test-android-library.jar\"",
+      "\"%s\",",
+      "\"%s\"",
       "],",
       "\"//:test-java-library\":",
       "[",
-      "\"buck-out/gen/lib__test-java-library__output/test-java-library.jar\"",
+      "\"%s\"",
       "]",
       "}");
 
@@ -218,13 +222,26 @@ public class AuditClasspathCommandTest {
             ImmutableSet.of(
                 androidNode,
                 javaNode)),
-        targetGraphTransformer,
         ImmutableSet.of(
             androidTarget,
             javaTarget));
 
-    assertEquals(EXPECTED_JSON, console.getTextWrittenToStdOut());
+    Path root = javaTarget.getCellPath();
+    String expected = String.format(EXPECTED_JSON,
+        root.resolve(
+            BuildTargets
+                .getGenPath(javaTarget, "lib__%s__output")
+                .resolve(javaTarget.getShortName() + ".jar")),
+        root.resolve(
+            BuildTargets
+                .getGenPath(androidTarget, "lib__%s__output")
+                .resolve(androidTarget.getShortName() + ".jar")),
+        root.resolve(
+            BuildTargets
+                .getGenPath(javaTarget, "lib__%s__output")
+                .resolve(javaTarget.getShortName() + ".jar")));
+    assertEquals(expected, console.getTextWrittenToStdOut());
+
     assertEquals("", console.getTextWrittenToStdErr());
   }
-
 }

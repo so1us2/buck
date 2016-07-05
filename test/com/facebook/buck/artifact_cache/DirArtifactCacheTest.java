@@ -21,7 +21,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.io.BorrowablePath;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.AddToRuleKey;
@@ -42,6 +44,7 @@ import com.facebook.buck.util.cache.NullFileHashCache;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.HashCode;
@@ -105,12 +108,15 @@ public class DirArtifactCacheTest {
     BuildRule inputRuleX = new BuildRuleForTest(fileX);
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     SourcePathResolver resolver = new SourcePathResolver(ruleResolver);
     RuleKey ruleKeyX = new DefaultRuleKeyBuilderFactory(fileHashCache, resolver).build(inputRuleX);
 
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
+    assertEquals(
+        CacheResultType.MISS,
+        dirArtifactCache.fetch(ruleKeyX, LazyPath.ofInstance(fileX))
+            .getType());
   }
 
   @Test
@@ -133,20 +139,25 @@ public class DirArtifactCacheTest {
     BuildRule inputRuleX = new BuildRuleForTest(fileX);
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     SourcePathResolver resolver = new SourcePathResolver(ruleResolver);
     RuleKey ruleKeyX = new DefaultRuleKeyBuilderFactory(fileHashCache, resolver).build(inputRuleX);
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
+    dirArtifactCache.store(
+        ImmutableSet.of(ruleKeyX),
+        ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
 
     // Test that artifact overwrite works.
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, LazyPath.ofInstance(fileX))
+            .getType());
     assertEquals(inputRuleX, new BuildRuleForTest(fileX));
 
     // Test that artifact creation works.
     Files.delete(fileX);
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, LazyPath.ofInstance(fileX))
+            .getType());
     assertEquals(inputRuleX, new BuildRuleForTest(fileX));
   }
 
@@ -170,17 +181,24 @@ public class DirArtifactCacheTest {
     BuildRule inputRuleX = new BuildRuleForTest(fileX);
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     SourcePathResolver resolver = new SourcePathResolver(ruleResolver);
     RuleKey ruleKeyX = new DefaultRuleKeyBuilderFactory(fileHashCache, resolver).build(inputRuleX);
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
+    dirArtifactCache.store(
+        ImmutableSet.of(ruleKeyX),
+        ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
 
     // Overwrite.
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
+    dirArtifactCache.store(
+        ImmutableSet.of(ruleKeyX),
+        ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
 
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, LazyPath.ofInstance(fileX))
+            .getType());
     assertEquals(inputRuleX, new BuildRuleForTest(fileX));
   }
 
@@ -217,7 +235,7 @@ public class DirArtifactCacheTest {
     assertFalse(inputRuleY.equals(inputRuleZ));
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     ruleResolver.addToIndex(inputRuleY);
     ruleResolver.addToIndex(inputRuleZ);
@@ -230,27 +248,103 @@ public class DirArtifactCacheTest {
     RuleKey ruleKeyY = fakeRuleKeyBuilderFactory.build(inputRuleY);
     RuleKey ruleKeyZ = fakeRuleKeyBuilderFactory.build(inputRuleZ);
 
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyZ, fileZ).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyZ,
+            LazyPath.ofInstance(fileZ)).getType());
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(), fileY);
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(), fileZ);
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileY));
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileZ));
 
     Files.delete(fileX);
     Files.delete(fileY);
     Files.delete(fileZ);
 
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyZ, fileZ).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyZ,
+            LazyPath.ofInstance(fileZ)).getType());
 
     assertEquals(inputRuleX, new BuildRuleForTest(fileX));
     assertEquals(inputRuleY, new BuildRuleForTest(fileY));
     assertEquals(inputRuleZ, new BuildRuleForTest(fileZ));
 
-    assertEquals(6, cacheDir.toFile().listFiles().length);
+    ImmutableList<File> cachedFiles = ImmutableList.copyOf(dirArtifactCache.getAllFilesInCache());
+    assertEquals(6, cachedFiles.size());
+
+    ImmutableSet<String> filenames = FluentIterable.from(cachedFiles).transform(
+        new Function<File, String>() {
+          @Override
+          public String apply(File input) {
+            return input.toPath().getFileName().toString();
+          }
+        }).toSet();
+
+    for (RuleKey ruleKey : ImmutableSet.of(ruleKeyX, ruleKeyY, ruleKeyZ)) {
+      filenames.contains(ruleKey.toString());
+      filenames.contains(ruleKey.toString() + ".metadata");
+    }
+  }
+
+  @Test
+  public void testCacheStoresAndBorrowsPaths() throws IOException {
+    Path cacheDir = tmpDir.newFolder();
+    Path fileX = tmpDir.newFile("x");
+    Path fileY = tmpDir.newFile("y");
+
+    fileHashCache =
+        new FakeFileHashCache(
+            ImmutableMap.of(
+                fileX, HashCode.fromInt(0),
+                fileY, HashCode.fromInt(1)));
+
+    dirArtifactCache = new DirArtifactCache(
+        "dir",
+        new ProjectFilesystem(cacheDir),
+        Paths.get("."),
+        /* doStore */ true,
+        /* maxCacheSizeBytes */ Optional.<Long>absent());
+
+    Files.write(fileX, "x".getBytes(UTF_8));
+    Files.write(fileY, "y".getBytes(UTF_8));
+
+    BuildRule inputRuleX = new BuildRuleForTest(fileX);
+    BuildRule inputRuleY = new BuildRuleForTest(fileY);
+    assertFalse(inputRuleX.equals(inputRuleY));
+    BuildRuleResolver ruleResolver = new BuildRuleResolver(
+        TargetGraph.EMPTY,
+        new DefaultTargetNodeToBuildRuleTransformer());
+    ruleResolver.addToIndex(inputRuleX);
+    ruleResolver.addToIndex(inputRuleY);
+    SourcePathResolver resolver = new SourcePathResolver(ruleResolver);
+
+    DefaultRuleKeyBuilderFactory fakeRuleKeyBuilderFactory =
+        new DefaultRuleKeyBuilderFactory(fileHashCache, resolver);
+
+    RuleKey ruleKeyX = fakeRuleKeyBuilderFactory.build(inputRuleX);
+    RuleKey ruleKeyY = fakeRuleKeyBuilderFactory.build(inputRuleY);
+
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(),
+        BorrowablePath.borrowablePath(fileX));
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileY));
+
+    assertThat(Files.exists(fileX), Matchers.is(false));
+    assertThat(Files.exists(fileY), Matchers.is(true));
   }
 
   @Test
@@ -286,7 +380,7 @@ public class DirArtifactCacheTest {
     assertFalse(inputRuleY.equals(inputRuleZ));
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     ruleResolver.addToIndex(inputRuleY);
     ruleResolver.addToIndex(inputRuleZ);
@@ -299,21 +393,36 @@ public class DirArtifactCacheTest {
     RuleKey ruleKeyY = fakeRuleKeyBuilderFactory.build(inputRuleY);
     RuleKey ruleKeyZ = fakeRuleKeyBuilderFactory.build(inputRuleZ);
 
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyZ, fileZ).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyZ,
+            LazyPath.ofInstance(fileZ)).getType());
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(), fileY);
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(), fileZ);
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileY));
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileZ));
 
     Files.delete(fileX);
     Files.delete(fileY);
     Files.delete(fileZ);
 
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyZ, fileZ).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyZ,
+            LazyPath.ofInstance(fileZ)).getType());
 
     assertEquals(inputRuleX, new BuildRuleForTest(fileX));
     assertEquals(inputRuleY, new BuildRuleForTest(fileY));
@@ -375,10 +484,16 @@ public class DirArtifactCacheTest {
   @Test
   public void testDeleteSome() throws IOException {
     Path cacheDir = tmpDir.newFolder();
-    Path fileW = cacheDir.resolve("w");
-    Path fileX = cacheDir.resolve("x");
-    Path fileY = cacheDir.resolve("y");
-    Path fileZ = cacheDir.resolve("z");
+
+    Path fileW = cacheDir.resolve("11").resolve("11").resolve("w");
+    Path fileX = cacheDir.resolve("22").resolve("22").resolve("x");
+    Path fileY = cacheDir.resolve("33").resolve("33").resolve("y");
+    Path fileZ = cacheDir.resolve("44").resolve("44").resolve("z");
+
+    Files.createDirectories(fileW.getParent());
+    Files.createDirectories(fileX.getParent());
+    Files.createDirectories(fileY.getParent());
+    Files.createDirectories(fileZ.getParent());
 
     dirArtifactCache = new DirArtifactCache(
         "dir",
@@ -401,9 +516,10 @@ public class DirArtifactCacheTest {
 
     dirArtifactCache.deleteOldFiles();
 
+    File[] filesInCache = dirArtifactCache.getAllFilesInCache();
     assertEquals(
         ImmutableSet.of(fileZ, fileW),
-        FluentIterable.of(cacheDir.toFile().listFiles()).transform(
+        FluentIterable.of(filesInCache).transform(
             new Function<File, Path>() {
               @Override
               public Path apply(File input) {
@@ -433,7 +549,7 @@ public class DirArtifactCacheTest {
     dirArtifactCache = new DirArtifactCache(
         "dir",
         new ProjectFilesystem(cacheDir),
-        Paths.get("."),
+        cacheDir,
         /* doStore */ true,
         /* maxCacheSizeBytes */ Optional.of(9L));
 
@@ -446,7 +562,7 @@ public class DirArtifactCacheTest {
     BuildRule inputRuleZ = new BuildRuleForTest(fileZ);
     BuildRuleResolver ruleResolver = new BuildRuleResolver(
         TargetGraph.EMPTY,
-        new BuildTargetNodeToBuildRuleTransformer());
+        new DefaultTargetNodeToBuildRuleTransformer());
     ruleResolver.addToIndex(inputRuleX);
     ruleResolver.addToIndex(inputRuleY);
     ruleResolver.addToIndex(inputRuleZ);
@@ -459,36 +575,51 @@ public class DirArtifactCacheTest {
     RuleKey ruleKeyY = fakeRuleKeyBuilderFactory.build(inputRuleY);
     RuleKey ruleKeyZ = fakeRuleKeyBuilderFactory.build(inputRuleZ);
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(), fileX);
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyX), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileX));
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
 
     Files.setAttribute(
-        cacheDir.resolve(ruleKeyX.toString()),
+        dirArtifactCache.getPathForRuleKey(ruleKeyX, Optional.<String>absent()),
         "lastAccessTime",
         FileTime.fromMillis(0));
     Files.setAttribute(
-        cacheDir.resolve(ruleKeyX.toString() + ".metadata"),
+        dirArtifactCache.getPathForRuleKey(ruleKeyX, Optional.of(".metadata")),
         "lastAccessTime",
         FileTime.fromMillis(0));
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(), fileY);
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyY), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileY));
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
 
     Files.setAttribute(
-        cacheDir.resolve(ruleKeyY.toString()),
+        dirArtifactCache.getPathForRuleKey(ruleKeyY, Optional.<String>absent()),
         "lastAccessTime",
         FileTime.fromMillis(1000));
     Files.setAttribute(
-        cacheDir.resolve(ruleKeyY.toString() + ".metadata"),
+        dirArtifactCache.getPathForRuleKey(ruleKeyY, Optional.of(".metadata")),
         "lastAccessTime",
         FileTime.fromMillis(1000));
 
-    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(), fileZ);
+    dirArtifactCache.store(ImmutableSet.of(ruleKeyZ), ImmutableMap.<String, String>of(),
+        BorrowablePath.notBorrowablePath(fileZ));
 
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyX, fileX).getType());
-    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(ruleKeyY, fileY).getType());
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKeyZ, fileZ).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyX,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.MISS, dirArtifactCache.fetch(
+            ruleKeyY,
+            LazyPath.ofInstance(fileY)).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKeyZ,
+            LazyPath.ofInstance(fileZ)).getType());
   }
 
   @Test
@@ -513,11 +644,15 @@ public class DirArtifactCacheTest {
     dirArtifactCache.store(
         ImmutableSet.of(ruleKey1, ruleKey2),
         ImmutableMap.<String, String>of(),
-        fileX);
+        BorrowablePath.notBorrowablePath(fileX));
 
     // Test that artifact is available via both keys.
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKey1, fileX).getType());
-    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(ruleKey2, fileX).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKey1,
+            LazyPath.ofInstance(fileX)).getType());
+    assertEquals(CacheResultType.HIT, dirArtifactCache.fetch(
+            ruleKey2,
+            LazyPath.ofInstance(fileX)).getType());
   }
 
   @Test
@@ -539,8 +674,8 @@ public class DirArtifactCacheTest {
     filesystem.touch(data);
 
     // Store the artifact with metadata then re-fetch.
-    cache.store(ImmutableSet.of(ruleKey), metadata, data);
-    CacheResult result = cache.fetch(ruleKey, Paths.get("out-data"));
+    cache.store(ImmutableSet.of(ruleKey), metadata, BorrowablePath.notBorrowablePath(data));
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(Paths.get("out-data")));
 
     // Verify that the metadata is correct.
     assertThat(
@@ -549,6 +684,31 @@ public class DirArtifactCacheTest {
     assertThat(
         result.getMetadata(),
         Matchers.equalTo(metadata));
+    assertThat(
+        result.getArtifactSizeBytes(),
+        Matchers.equalTo(filesystem.getFileSize(data)));
+
+    cache.close();
+  }
+
+  @Test
+  public void testFolderLevelsForRuleKeys() throws IOException {
+    DirArtifactCache cache = new DirArtifactCache(
+        "dir",
+        new FakeProjectFilesystem(),
+        Paths.get("cache"),
+        /* doStore */ false,
+        /* maxCacheSizeBytes */ Optional.<Long>absent());
+
+    Path result = cache.getPathForRuleKey(
+        new RuleKey("aabb0123123234e324"),
+        Optional.<String>absent());
+    assertThat(result.endsWith(Paths.get("aa/bb/aabb0123123234e324")), Matchers.equalTo(true));
+
+    result = cache.getPathForRuleKey(
+        new RuleKey("aabb0123123234e324"),
+        Optional.<String>of(".ext"));
+    assertThat(result.endsWith(Paths.get("aa/bb/aabb0123123234e324.ext")), Matchers.equalTo(true));
 
     cache.close();
   }
@@ -565,7 +725,7 @@ public class DirArtifactCacheTest {
           new SourcePathResolver(
               new BuildRuleResolver(
                   TargetGraph.EMPTY,
-                  new BuildTargetNodeToBuildRuleTransformer())));
+                  new DefaultTargetNodeToBuildRuleTransformer())));
       this.file = new PathSourcePath(new FakeProjectFilesystem(), file);
     }
   }

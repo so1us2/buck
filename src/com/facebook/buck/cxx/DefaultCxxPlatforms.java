@@ -18,6 +18,7 @@ package com.facebook.buck.cxx;
 
 import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.ImmutableFlavor;
+import com.facebook.buck.rules.ConstantToolProvider;
 import com.facebook.buck.rules.HashedFileTool;
 import com.facebook.buck.util.environment.Platform;
 import com.google.common.base.Optional;
@@ -36,9 +37,8 @@ public class DefaultCxxPlatforms {
   // Utility class, do not instantiate.
   private DefaultCxxPlatforms() { }
 
-  private static final Flavor FLAVOR = ImmutableFlavor.of("default");
+  public static final Flavor FLAVOR = ImmutableFlavor.of("default");
 
-  private static final Path DEFAULT_AS = Paths.get("/usr/bin/as");
   private static final Path DEFAULT_C_FRONTEND = Paths.get("/usr/bin/gcc");
   private static final Path DEFAULT_CXX_FRONTEND = Paths.get("/usr/bin/g++");
   private static final Path DEFAULT_AR = Paths.get("/usr/bin/ar");
@@ -56,61 +56,86 @@ public class DefaultCxxPlatforms {
   public static CxxPlatform build(
       Platform platform,
       CxxBuckConfig config) {
-    if (platform == Platform.MACOS) {
-      return CxxPlatforms.build(
-          FLAVOR,
-          config,
-          new HashedFileTool(DEFAULT_AS),
-          new ClangPreprocessor(new HashedFileTool(DEFAULT_OSX_C_FRONTEND)),
-          new ClangCompiler(new HashedFileTool(DEFAULT_OSX_C_FRONTEND)),
-          new ClangCompiler(new HashedFileTool(DEFAULT_OSX_CXX_FRONTEND)),
-          new ClangPreprocessor(new HashedFileTool(DEFAULT_OSX_C_FRONTEND)),
-          new ClangPreprocessor(new HashedFileTool(DEFAULT_OSX_CXX_FRONTEND)),
-          new DarwinLinker(new HashedFileTool(DEFAULT_OSX_CXX_FRONTEND)),
-          ImmutableList.<String>of(),
-          new HashedFileTool(DEFAULT_STRIP),
-          new BsdArchiver(new HashedFileTool(DEFAULT_AR)),
-          new HashedFileTool(DEFAULT_RANLIB),
-          new HashedFileTool(DEFAULT_NM),
-          ImmutableList.<String>of(),
-          ImmutableList.<String>of(),
-          ImmutableList.<String>of(),
-          ImmutableList.<String>of(),
-          "dylib",
-          ".%s.dylib",
-          Optional.<DebugPathSanitizer>absent(),
-          ImmutableMap.<String, String>of());
-    }
-
     String sharedLibraryExtension;
     String sharedLibraryVersionedExtensionFormat;
+    Path defaultCFrontend;
+    Path defaultCxxFrontend;
+    LinkerProvider.Type linkerType;
+    Archiver archiver;
     switch (platform) {
       case LINUX:
         sharedLibraryExtension = "so";
         sharedLibraryVersionedExtensionFormat = "so.%s";
+        defaultCFrontend = DEFAULT_C_FRONTEND;
+        defaultCxxFrontend = DEFAULT_CXX_FRONTEND;
+        linkerType = LinkerProvider.Type.GNU;
+        archiver = new GnuArchiver(new HashedFileTool(DEFAULT_AR));
+        break;
+      case MACOS:
+        sharedLibraryExtension = "dylib";
+        sharedLibraryVersionedExtensionFormat = ".%s.dylib";
+        defaultCFrontend = DEFAULT_OSX_C_FRONTEND;
+        defaultCxxFrontend = DEFAULT_OSX_CXX_FRONTEND;
+        linkerType = LinkerProvider.Type.DARWIN;
+        archiver = new BsdArchiver(new HashedFileTool(DEFAULT_AR));
         break;
       case WINDOWS:
         sharedLibraryExtension = "dll";
         sharedLibraryVersionedExtensionFormat = "dll";
+        defaultCFrontend = DEFAULT_C_FRONTEND;
+        defaultCxxFrontend = DEFAULT_CXX_FRONTEND;
+        linkerType = LinkerProvider.Type.GNU;
+        archiver = new GnuArchiver(new HashedFileTool(DEFAULT_AR));
         break;
       //$CASES-OMITTED$
       default:
         throw new RuntimeException(String.format("Unsupported platform: %s", platform));
     }
 
+    // Always use `DEFAULT` for the assemblers (unless an explicit override is set in the
+    // .buckconfig), as we pass special flags when we detect clang which causes unused flag
+    // warnings with assembling.
+    PreprocessorProvider aspp =
+        new PreprocessorProvider(
+            defaultCFrontend,
+            Optional.of(CxxToolProvider.Type.DEFAULT));
+    CompilerProvider as =
+        new CompilerProvider(
+            defaultCFrontend,
+            Optional.of(CxxToolProvider.Type.DEFAULT));
+
+    PreprocessorProvider cpp =
+        new PreprocessorProvider(
+            defaultCFrontend,
+            Optional.<CxxToolProvider.Type>absent());
+    CompilerProvider cc =
+        new CompilerProvider(
+            defaultCFrontend,
+            Optional.<CxxToolProvider.Type>absent());
+    PreprocessorProvider cxxpp =
+        new PreprocessorProvider(
+            defaultCxxFrontend,
+            Optional.<CxxToolProvider.Type>absent());
+    CompilerProvider cxx =
+        new CompilerProvider(
+            defaultCxxFrontend,
+            Optional.<CxxToolProvider.Type>absent());
+
     return CxxPlatforms.build(
         FLAVOR,
         config,
-        new HashedFileTool(DEFAULT_AS),
-        new DefaultPreprocessor(new HashedFileTool(DEFAULT_C_FRONTEND)),
-        new DefaultCompiler(new HashedFileTool(DEFAULT_C_FRONTEND)),
-        new DefaultCompiler(new HashedFileTool(DEFAULT_CXX_FRONTEND)),
-        new DefaultPreprocessor(new HashedFileTool(DEFAULT_C_FRONTEND)),
-        new DefaultPreprocessor(new HashedFileTool(DEFAULT_CXX_FRONTEND)),
-        new GnuLinker(new HashedFileTool(DEFAULT_CXX_FRONTEND)),
+        as,
+        aspp,
+        cc,
+        cxx,
+        cpp,
+        cxxpp,
+        new DefaultLinkerProvider(
+            linkerType,
+            new ConstantToolProvider(new HashedFileTool(defaultCxxFrontend))),
         ImmutableList.<String>of(),
         new HashedFileTool(DEFAULT_STRIP),
-        new GnuArchiver(new HashedFileTool(DEFAULT_AR)),
+        archiver,
         new HashedFileTool(DEFAULT_RANLIB),
         new HashedFileTool(DEFAULT_NM),
         ImmutableList.<String>of(),

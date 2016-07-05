@@ -19,11 +19,12 @@ package com.facebook.buck.android;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.jvm.java.FakeJavaLibrary;
 import com.facebook.buck.jvm.java.JavaLibrary;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
+import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.FakeBuildRuleParamsBuilder;
@@ -35,15 +36,14 @@ import com.google.common.hash.HashCode;
 
 import org.junit.Test;
 
-import java.nio.file.Paths;
-
 public class DexWithClassesTest {
 
   @Test
   public void testIntermediateDexRuleToDexWithClasses() {
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+        SourcePathResolver resolver =
+ new SourcePathResolver(
+         new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+     );
     BuildTarget javaLibraryTarget = BuildTargetFactory.newInstance("//java/com/example:lib");
     JavaLibrary javaLibrary = new FakeJavaLibrary(javaLibraryTarget, resolver);
 
@@ -59,7 +59,8 @@ public class DexWithClassesTest {
                 HashCode.fromString("cafebabe"))));
 
     DexWithClasses dexWithClasses = DexWithClasses.TO_DEX_WITH_CLASSES.apply(dexFromJavaLibrary);
-    assertEquals(Paths.get("buck-out/gen/java/com/example/lib#dex.dex.jar"),
+    assertEquals(
+        BuildTargets.getGenPath(buildTarget, "%s.dex.jar"),
         dexWithClasses.getPathToDexFile());
     assertEquals(ImmutableSet.of("com/example/Main"), dexWithClasses.getClassNames());
     assertEquals(1600, dexWithClasses.getSizeEstimate());
@@ -67,9 +68,9 @@ public class DexWithClassesTest {
 
   @Test
   public void testIntermediateDexRuleToDexWithClassesWhenIntermediateDexHasNoClasses() {
-    SourcePathResolver resolver =
-        new SourcePathResolver(
-            new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer()));
+    SourcePathResolver resolver = new SourcePathResolver(
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer())
+    );
     BuildTarget javaLibraryTarget = BuildTargetFactory.newInstance("//java/com/example:lib");
     JavaLibrary javaLibrary = new FakeJavaLibrary(javaLibraryTarget, resolver);
 

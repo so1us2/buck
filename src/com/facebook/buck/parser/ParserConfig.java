@@ -35,6 +35,8 @@ public class ParserConfig {
   public static final String BUILDFILE_SECTION_NAME = "buildfile";
   public static final String INCLUDES_PROPERTY_NAME = "includes";
 
+  private static final long NUM_PARSING_THREADS_DEFAULT = 1L;
+
   public enum GlobHandler {
     PYTHON,
     WATCHMAN,
@@ -44,6 +46,12 @@ public class ParserConfig {
   public enum AllowSymlinks {
     ALLOW,
     FORBID,
+    ;
+  }
+
+  public enum BuildFileSearchMethod {
+    FILESYSTEM_CRAWL,
+    WATCHMAN,
     ;
   }
 
@@ -103,6 +111,10 @@ public class ParserConfig {
         .or(AllowSymlinks.ALLOW);
   }
 
+  public Optional<BuildFileSearchMethod> getBuildFileSearchMethod() {
+    return delegate.getEnum("project", "build_file_search_method", BuildFileSearchMethod.class);
+  }
+
   public GlobHandler getGlobHandler() {
     return delegate.getEnum("project", "glob_handler", GlobHandler.class).or(GlobHandler.PYTHON);
   }
@@ -112,14 +124,19 @@ public class ParserConfig {
   }
 
   public boolean getEnableParallelParsing() {
-    return delegate.getBooleanValue("project", "parallel_parsing", false);
+    return delegate.getBooleanValue("project", "parallel_parsing", true);
   }
 
   public int getNumParsingThreads() {
-    Optional<Long> value = delegate.getLong("project", "parsing_threads");
-    if (value.isPresent()) {
-      return Math.min(value.get().intValue(), delegate.getNumThreads());
+    if (!getEnableParallelParsing()) {
+      return 1;
     }
-    return delegate.getNumThreads();
+
+    int value = delegate
+        .getLong("project", "parsing_threads")
+        .or(NUM_PARSING_THREADS_DEFAULT)
+        .intValue();
+
+    return Math.min(value, delegate.getNumThreads());
   }
 }

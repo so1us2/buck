@@ -19,7 +19,7 @@ package com.facebook.buck.android;
 import static com.facebook.buck.jvm.java.JavaCompilationConstants.DEFAULT_JAVAC_OPTIONS;
 
 import com.facebook.buck.android.AndroidBinary.PackageType;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -29,6 +29,7 @@ import com.facebook.buck.rules.FakeSourcePath;
 import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
+import com.facebook.buck.rules.coercer.ManifestEntries;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -43,7 +44,7 @@ public class AaptPackageResourcesTest {
   @Test
   public void initializeFromDiskDoesNotAccessOutputFromDeps() throws IOException {
     BuildRuleResolver ruleResolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     SourcePathResolver pathResolver = new SourcePathResolver(ruleResolver);
 
     FilteredResourcesProvider resourcesProvider =
@@ -74,7 +75,8 @@ public class AaptPackageResourcesTest {
             DEFAULT_JAVAC_OPTIONS,
             /* rDotJavaNeedsDexing */ false,
             /* shouldBuildStringSourceMap */ false,
-            /* skipCrunchPngs */ false);
+            /* skipCrunchPngs */ false,
+            /* manifestEntries */ ManifestEntries.empty());
 
     FakeOnDiskBuildInfo onDiskBuildInfo =
         new FakeOnDiskBuildInfo()

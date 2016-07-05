@@ -1,5 +1,5 @@
 from buck import format_watchman_query_params, glob_internal, LazyBuildEnvPartial
-from buck import subdir_glob, BuildFileContext
+from buck import subdir_glob, flatten_dicts, BuildFileContext
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import os
 import shutil
@@ -105,7 +105,7 @@ class TestBuckPlatformBase(object):
                 search_base=search_base))
 
     def test_subdir_glob(self):
-        build_env = BuildFileContext(None, None, None, None, None, None, None, None)
+        build_env = BuildFileContext(None, None, None, None, None, None, None, None, None)
         search_base = self.fake_path(
             'foo',
             glob_results={
@@ -126,7 +126,7 @@ class TestBuckPlatformBase(object):
                 search_base=search_base))
 
     def test_subdir_glob_with_prefix(self):
-        build_env = BuildFileContext(None, None, None, None, None, None, None, None)
+        build_env = BuildFileContext(None, None, None, None, None, None, None, None, None)
         search_base = self.fake_path(
             'foo',
             glob_results={
@@ -324,6 +324,54 @@ class TestBuck(unittest.TestCase):
                 ]
             },
             query_params)
+
+    def test_flatten_dicts_overrides_earlier_keys_with_later_ones(self):
+        base = {
+            'a': 'foo',
+            'b': 'bar',
+        }
+        override = {
+            'a': 'baz',
+        }
+        override2 = {
+            'a': 42,
+            'c': 'new',
+        }
+        self.assertEquals(
+                {
+                    'a': 'baz',
+                    'b': 'bar',
+                },
+                flatten_dicts(base, override))
+        self.assertEquals(
+                {
+                    'a': 42,
+                    'b': 'bar',
+                    'c': 'new',
+                },
+                flatten_dicts(base, override, override2)
+        )
+        # assert none of the input dicts were changed:
+        self.assertEquals(
+                {
+                    'a': 'foo',
+                    'b': 'bar',
+                },
+                base
+        )
+        self.assertEquals(
+                {
+                    'a': 'baz',
+                },
+                override
+        )
+        self.assertEquals(
+                {
+                    'a': 42,
+                    'c': 'new',
+                },
+                override2
+        )
 
 
 if __name__ == '__main__':

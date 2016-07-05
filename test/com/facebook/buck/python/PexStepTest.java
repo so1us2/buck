@@ -26,11 +26,12 @@ import static org.hamcrest.Matchers.startsWith;
 
 import com.facebook.buck.step.TestExecutionContext;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 
 import org.junit.Test;
 
@@ -57,7 +58,7 @@ public class PexStepTest {
       Paths.get("n.so"), Paths.get("/src/n.so"));
   private static final ImmutableSet<Path> PREBUILT_LIBRARIES = ImmutableSet.of(
       Paths.get("/src/p.egg"));
-
+  private static final ImmutableSortedSet<String> PRELOAD_LIBRARIES = ImmutableSortedSet.of();
 
   @Test
   public void testCommandLine() {
@@ -74,6 +75,7 @@ public class PexStepTest {
             RESOURCES,
             NATIVE_LIBRARIES,
             PREBUILT_LIBRARIES,
+            PRELOAD_LIBRARIES,
             /* zipSafe */ true);
     String command = Joiner.on(" ").join(
         step.getShellCommandInternal(TestExecutionContext.newInstance()));
@@ -99,6 +101,7 @@ public class PexStepTest {
             RESOURCES,
             NATIVE_LIBRARIES,
             PREBUILT_LIBRARIES,
+            PRELOAD_LIBRARIES,
             /* zipSafe */ false);
     String command = Joiner.on(" ").join(
         step.getShellCommandInternal(TestExecutionContext.newInstance()));
@@ -122,9 +125,10 @@ public class PexStepTest {
             RESOURCES,
             NATIVE_LIBRARIES,
             PREBUILT_LIBRARIES,
+            PRELOAD_LIBRARIES,
             /* zipSafe */ true);
 
-    Map<String, Object> args = new ObjectMapper().readValue(
+    Map<String, Object> args = ObjectMappers.newDefaultInstance().readValue(
         step.getStdin(TestExecutionContext.newInstance()).get(),
         Map.class);
     assertThat(
@@ -159,6 +163,7 @@ public class PexStepTest {
             RESOURCES,
             NATIVE_LIBRARIES,
             PREBUILT_LIBRARIES,
+            PRELOAD_LIBRARIES,
             /* zipSafe */ true);
     assertThat(
         step.getShellCommandInternal(TestExecutionContext.newInstance()),

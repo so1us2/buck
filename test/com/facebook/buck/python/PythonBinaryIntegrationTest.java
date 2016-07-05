@@ -24,13 +24,18 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assume.assumeThat;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.Config;
+import com.facebook.buck.config.Configs;
+import com.facebook.buck.config.RawConfig;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.config.Config;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.cxx.DefaultCxxPlatforms;
 import com.facebook.buck.event.BuckEventListener;
 import com.facebook.buck.io.FakeExecutableFinder;
 import com.facebook.buck.io.ProjectFilesystem;
+import com.facebook.buck.rules.BuildRuleResolver;
+import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.testutil.ParameterizedTests;
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
@@ -162,6 +167,9 @@ public class PythonBinaryIntegrationTest {
 
   @Test
   public void nativeLibsEnvVarIsPreserved() throws IOException {
+    BuildRuleResolver resolver =
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
+
     assumeThat(
         "TODO(8667197): Native libs currently don't work on El Capitan",
         Platform.detect(),
@@ -171,6 +179,7 @@ public class PythonBinaryIntegrationTest {
         DefaultCxxPlatforms
             .build(new CxxBuckConfig(FakeBuckConfig.builder().build()))
             .getLd()
+            .resolve(resolver)
             .searchPathEnvVar();
     String originalNativeLibsEnvVar = "something";
     workspace.writeContentsToPath(
@@ -264,11 +273,26 @@ public class PythonBinaryIntegrationTest {
     assertThat(secondRuleKey, not(equalTo(firstRuleKey)));
   }
 
+  @Test
+  public void multiplePythonHomes() throws Exception {
+    assumeThat(Platform.detect(), not(Matchers.is(Platform.WINDOWS)));
+    ProjectWorkspace.ProcessResult result =
+        workspace.runBuckBuild(
+            "-c", "python#a.library=//:platform_a",
+            "-c", "python#b.library=//:platform_b",
+            "//:binary_with_extension_a",
+            "//:binary_with_extension_b");
+    result.assertSuccess();
+  }
+
+  @Test
+  public void mainModuleNameIsSetProperly() throws Exception {
+    assumeThat(packageStyle, not(Matchers.is(PythonBuckConfig.PackageStyle.STANDALONE)));
+    workspace.runBuckCommand("run", "//:main_module_bin").assertSuccess();
+  }
+
   private PythonBuckConfig getPythonBuckConfig() throws IOException {
-    Config rawConfig =
-        Config.createDefaultConfig(
-            tmp.getRootPath(),
-            ImmutableMap.<String, ImmutableMap<String, String>>of());
+    Config rawConfig = Configs.createDefaultConfig(tmp.getRootPath(), RawConfig.of());
     BuckConfig buckConfig =
         new BuckConfig(
             rawConfig,

@@ -28,8 +28,8 @@ import com.facebook.buck.model.BuildTargetFactory;
 import com.facebook.buck.model.BuildTargetPattern;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
 import com.facebook.buck.rules.coercer.DefaultTypeCoercerFactory;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
+import com.facebook.buck.util.ObjectMappers;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
@@ -63,7 +63,7 @@ public class TargetNodeTest {
                 "string", "//example/path:one",
                 "target", "//example/path:two",
                 "sourcePaths", ImmutableSortedSet.of())),
-        new DefaultTypeCoercerFactory(),
+        new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance()),
         buildRuleFactoryParams,
         ImmutableSet.<BuildTarget>of(),
         ImmutableSet.<BuildTargetPattern>of(),
@@ -102,7 +102,7 @@ public class TargetNodeTest {
                 "sourcePaths", ImmutableList.of("//example/path:four", "MyClass.java"),
                 "appleSource", "//example/path:five",
                 "source", "AnotherClass.java")),
-        new DefaultTypeCoercerFactory(),
+        new DefaultTypeCoercerFactory(ObjectMappers.newDefaultInstance()),
         buildRuleFactoryParams,
         depsTargets,
         ImmutableSet.<BuildTargetPattern>of(),
@@ -127,7 +127,7 @@ public class TargetNodeTest {
             BuildTargetFactory.newInstance("//example/path:two")));
   }
 
-  public class Arg {
+  public class Arg extends AbstractDescriptionArg {
     public ImmutableSortedSet<BuildTarget> deps;
     public ImmutableSortedSet<SourcePath> sourcePaths;
     public Optional<SourceWithFlags> appleSource;
@@ -169,7 +169,8 @@ public class TargetNodeTest {
       BuildRuleFactoryParams buildRuleFactoryParams,
       Map<String, Object> instance) throws NoSuchBuildTargetException {
     ConstructorArgMarshaller marshaller =
-        new ConstructorArgMarshaller(new DefaultTypeCoercerFactory());
+        new ConstructorArgMarshaller(new DefaultTypeCoercerFactory(
+            ObjectMappers.newDefaultInstance()));
     ProjectFilesystem projectFilesystem = new FakeProjectFilesystem();
     Arg constructorArg = description.createUnpopulatedConstructorArg();
     try {

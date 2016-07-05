@@ -20,11 +20,14 @@ import static com.facebook.buck.android.AndroidBinaryGraphEnhancer.PACKAGE_STRIN
 
 import com.facebook.buck.android.AndroidBinary.ExopackageMode;
 import com.facebook.buck.android.AndroidBinary.PackageType;
+import com.facebook.buck.android.AndroidBinary.RelinkerMode;
 import com.facebook.buck.android.FilterResourcesStep.ResourceFilter;
 import com.facebook.buck.android.NdkCxxPlatforms.TargetCpuType;
 import com.facebook.buck.android.ResourcesFilter.ResourceCompressionMode;
+import com.facebook.buck.cxx.CxxBuckConfig;
 import com.facebook.buck.dalvik.ZipSplitter.DexSplitStrategy;
 import com.facebook.buck.jvm.java.JavaLibrary;
+import com.facebook.buck.jvm.java.JavaOptions;
 import com.facebook.buck.jvm.java.JavacOptions;
 import com.facebook.buck.jvm.java.Keystore;
 import com.facebook.buck.log.Logger;
@@ -33,6 +36,7 @@ import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.Flavored;
 import com.facebook.buck.model.HasBuildTarget;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRule;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
@@ -43,6 +47,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.coercer.BuildConfigFields;
+import com.facebook.buck.rules.coercer.ManifestEntries;
 import com.facebook.buck.rules.macros.ExecutableMacroExpander;
 import com.facebook.buck.rules.macros.LocationMacroExpander;
 import com.facebook.buck.rules.macros.MacroExpander;
@@ -61,6 +66,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,18 +94,24 @@ public class AndroidBinaryDescription
   private static final ImmutableSet<Flavor> FLAVORS = ImmutableSet.of(
       PACKAGE_STRING_ASSETS_FLAVOR);
 
+  private final JavaOptions javaOptions;
   private final JavacOptions javacOptions;
   private final ProGuardConfig proGuardConfig;
+  private final CxxBuckConfig cxxBuckConfig;
   private final ImmutableMap<TargetCpuType, NdkCxxPlatform> nativePlatforms;
   private final ListeningExecutorService dxExecutorService;
 
   public AndroidBinaryDescription(
+      JavaOptions javaOptions,
       JavacOptions javacOptions,
       ProGuardConfig proGuardConfig,
       ImmutableMap<TargetCpuType, NdkCxxPlatform> nativePlatforms,
-      ListeningExecutorService dxExecutorService) {
+      ListeningExecutorService dxExecutorService,
+      CxxBuckConfig cxxBuckConfig) {
+    this.javaOptions = javaOptions;
     this.javacOptions = javacOptions;
     this.proGuardConfig = proGuardConfig;
+    this.cxxBuckConfig = cxxBuckConfig;
     this.nativePlatforms = nativePlatforms;
     this.dxExecutorService = dxExecutorService;
   }
@@ -199,7 +211,10 @@ public class AndroidBinaryDescription
         args.buildConfigValuesFile,
         Optional.<Integer>absent(),
         nativePlatforms,
-        dxExecutorService);
+        args.enableRelinker.or(false) ? RelinkerMode.ENABLED : RelinkerMode.DISABLED,
+        dxExecutorService,
+        args.manifestEntries.get(),
+        cxxBuckConfig);
     AndroidGraphEnhancementResult result = graphEnhancer.createAdditionalBuildables();
 
     if (target.getFlavors().contains(PACKAGE_STRING_ASSETS_FLAVOR)) {
@@ -237,6 +252,7 @@ public class AndroidBinaryDescription
         pathResolver,
         proGuardConfig.getProguardJarOverride(),
         proGuardConfig.getProguardMaxHeapSize(),
+        proGuardConfig.getProguardAgentPath(),
         (Keystore) keystore,
         packageType,
         dexSplitMode,
@@ -261,7 +277,9 @@ public class AndroidBinaryDescription
         args.xzCompressionLevel,
         dxExecutorService,
         args.packageAssetLibraries,
-        args.compressAssetLibraries);
+        args.compressAssetLibraries,
+        args.manifestEntries.or(ManifestEntries.empty()),
+        javaOptions.getJavaRuntimeLauncher());
   }
 
   private DexSplitMode createDexSplitMode(Arg args, EnumSet<ExopackageMode> exopackageModes) {
@@ -290,14 +308,14 @@ public class AndroidBinaryDescription
     if (!args.packageType.isPresent()) {
       return PackageType.DEBUG;
     }
-    return PackageType.valueOf(args.packageType.get().toUpperCase());
+    return PackageType.valueOf(args.packageType.get().toUpperCase(Locale.US));
   }
 
   private ResourceCompressionMode getCompressionMode(Arg args) {
     if (!args.resourceCompression.isPresent()) {
       return ResourceCompressionMode.DISABLED;
     }
-    return ResourceCompressionMode.valueOf(args.resourceCompression.get().toUpperCase());
+    return ResourceCompressionMode.valueOf(args.resourceCompression.get().toUpperCase(Locale.US));
   }
 
   private ImmutableSet<String> addFallbackLocales(ImmutableSet<String> locales) {
@@ -323,7 +341,7 @@ public class AndroidBinaryDescription
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg {
+  public static class Arg extends AbstractDescriptionArg {
     public SourcePath manifest;
     public BuildTarget keystore;
     public Optional<String> packageType;
@@ -362,6 +380,8 @@ public class AndroidBinaryDescription
     public Optional<Integer> xzCompressionLevel;
     public Optional<Boolean> packageAssetLibraries;
     public Optional<Boolean> compressAssetLibraries;
+    public Optional<Boolean> enableRelinker;
+    public Optional<ManifestEntries> manifestEntries;
 
     /** This will never be absent after this Arg is populated. */
     public Optional<BuildConfigFields> buildConfigValues;

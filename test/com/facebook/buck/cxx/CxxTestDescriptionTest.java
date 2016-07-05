@@ -20,12 +20,11 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.cli.BuckConfig;
-import com.facebook.buck.cli.BuildTargetNodeToBuildRuleTransformer;
+import com.facebook.buck.rules.DefaultTargetNodeToBuildRuleTransformer;
 import com.facebook.buck.cli.FakeBuckConfig;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetFactory;
-import com.facebook.buck.model.Flavor;
 import com.facebook.buck.model.FlavorDomain;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
 import com.facebook.buck.rules.BuildRule;
@@ -35,6 +34,7 @@ import com.facebook.buck.rules.FakeBuildContext;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TestCellBuilder;
 import com.facebook.buck.rules.TestRule;
+import com.facebook.buck.rules.args.Arg;
 import com.facebook.buck.rules.coercer.PatternMatchedCollection;
 import com.facebook.buck.shell.Genrule;
 import com.facebook.buck.shell.GenruleBuilder;
@@ -98,7 +98,7 @@ public class CxxTestDescriptionTest {
     CxxTestDescription desc = new CxxTestDescription(
         cxxBuckConfig,
         cxxPlatform,
-        new FlavorDomain<>("platform", ImmutableMap.<Flavor, CxxPlatform>of()),
+        FlavorDomain.<CxxPlatform>of("platform"),
         /* testRuleTimeoutMs */ Optional.<Long>absent());
 
     BuildTarget target = BuildTargetFactory.newInstance("//:target");
@@ -123,7 +123,7 @@ public class CxxTestDescriptionTest {
   public void environmentIsPropagated() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule someRule =
         GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:some_rule"))
             .setOut("someRule")
@@ -157,7 +157,7 @@ public class CxxTestDescriptionTest {
   public void testArgsArePropagated() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule someRule =
         GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:some_rule"))
             .setOut("someRule")
@@ -190,7 +190,7 @@ public class CxxTestDescriptionTest {
     for (CxxTestType framework : CxxTestType.values()) {
       ProjectFilesystem filesystem = new FakeProjectFilesystem();
       BuildRuleResolver resolver =
-          new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+          new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
       CxxTest cxxTest =
           (CxxTest) createTestBuilder(resolver, filesystem)
               .setRunTestSeparately(true)
@@ -212,7 +212,7 @@ public class CxxTestDescriptionTest {
     BuildRuleResolver resolver =
         new BuildRuleResolver(
             TargetGraphFactory.newInstance(cxxLibraryBuilder.build(), cxxBinaryBuilder.build()),
-            new BuildTargetNodeToBuildRuleTransformer());
+            new DefaultTargetNodeToBuildRuleTransformer());
     BuildRule cxxBinary = cxxBinaryBuilder.build(resolver, filesystem);
     cxxLibraryBuilder.build(resolver, filesystem);
     CxxTestBuilder cxxTestBuilder = createTestBuilder(resolver, filesystem)
@@ -227,7 +227,7 @@ public class CxxTestDescriptionTest {
   public void locationMacro() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     Genrule dep =
         (Genrule) GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:dep"))
             .setOut("out")
@@ -243,7 +243,7 @@ public class CxxTestDescriptionTest {
         (CxxLink) resolver.getRule(
             CxxDescriptionEnhancer.createCxxLinkTarget(test.getBuildTarget()));
     assertThat(
-        binary.getArgs(),
+        Arg.stringify(binary.getArgs()),
         Matchers.hasItem(String.format("--linker-script=%s", dep.getAbsoluteOutputFilePath())));
     assertThat(
         binary.getDeps(),
@@ -255,7 +255,7 @@ public class CxxTestDescriptionTest {
   public void platformLinkerFlagsLocationMacroWithMatch() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     Genrule dep =
         (Genrule) GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:dep"))
             .setOut("out")
@@ -278,7 +278,7 @@ public class CxxTestDescriptionTest {
         (CxxLink) resolver.getRule(
             CxxDescriptionEnhancer.createCxxLinkTarget(test.getBuildTarget()));
     assertThat(
-        binary.getArgs(),
+        Arg.stringify(binary.getArgs()),
         Matchers.hasItem(String.format("--linker-script=%s", dep.getAbsoluteOutputFilePath())));
     assertThat(
         binary.getDeps(),
@@ -289,7 +289,7 @@ public class CxxTestDescriptionTest {
   public void platformLinkerFlagsLocationMacroWithoutMatch() throws Exception {
     ProjectFilesystem filesystem = new FakeProjectFilesystem();
     BuildRuleResolver resolver =
-        new BuildRuleResolver(TargetGraph.EMPTY, new BuildTargetNodeToBuildRuleTransformer());
+        new BuildRuleResolver(TargetGraph.EMPTY, new DefaultTargetNodeToBuildRuleTransformer());
     Genrule dep =
         (Genrule) GenruleBuilder.newGenruleBuilder(BuildTargetFactory.newInstance("//:dep"))
             .setOut("out")
@@ -310,7 +310,7 @@ public class CxxTestDescriptionTest {
         (CxxLink) resolver.getRule(
             CxxDescriptionEnhancer.createCxxLinkTarget(test.getBuildTarget()));
     assertThat(
-        binary.getArgs(),
+        Arg.stringify(binary.getArgs()),
         Matchers.not(
             Matchers.hasItem(
                 String.format("--linker-script=%s", dep.getAbsoluteOutputFilePath()))));

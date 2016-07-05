@@ -20,11 +20,17 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import com.facebook.buck.event.BuckEvent;
 import com.facebook.buck.event.BuckEventBus;
+import com.facebook.buck.event.ConsoleEvent;
+import com.facebook.buck.io.LazyPath;
 import com.facebook.buck.model.BuildId;
 import com.facebook.buck.rules.RuleKey;
+import com.facebook.buck.slb.HttpResponse;
 import com.facebook.buck.slb.HttpService;
+import com.facebook.buck.slb.OkHttpResponseWrapper;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
 import com.facebook.buck.timing.IncrementingFakeClock;
 import com.google.common.base.Charsets;
@@ -70,6 +76,8 @@ public class HttpArtifactCacheTest {
   private static final MediaType OCTET_STREAM = MediaType.parse("application/octet-stream");
   private static final ListeningExecutorService DIRECT_EXECUTOR_SERVICE =
       MoreExecutors.newDirectExecutorService();
+  private static final String ERROR_TEXT_TEMPLATE =
+      "{cache_name} encountered an error: {error_message}";
 
   private HttpService fetchService;
   private HttpService storeService;
@@ -120,9 +128,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             new FakeProjectFilesystem(),
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Response response =
                 new Response.Builder()
@@ -134,13 +144,13 @@ public class HttpArtifactCacheTest {
                     .request(requestBuilder.url(SERVER + path).build())
                     .build();
             responseList.add(response);
-            return response;
+            return new OkHttpResponseWrapper(response);
           }
         };
     CacheResult result =
         cache.fetch(
             new RuleKey("00000000000000000000000000000000"),
-            Paths.get("output/file"));
+            LazyPath.ofInstance(Paths.get("output/file")));
     assertEquals(result.getType(), CacheResultType.MISS);
     assertTrue(
         "response wasn't fully read!",
@@ -163,9 +173,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
             Response response =
@@ -181,12 +193,13 @@ public class HttpArtifactCacheTest {
                             data))
                     .build();
             responseList.add(response);
-            return response;
+            return new OkHttpResponseWrapper(response);
           }
         };
-    CacheResult result = cache.fetch(ruleKey, output);
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
     assertEquals(result.cacheError().or(""), CacheResultType.HIT, result.getType());
     assertEquals(Optional.of(data), filesystem.readFileIfItExists(output));
+    assertEquals(result.artifactSizeBytes(), Optional.of(filesystem.getFileSize(output)));
     assertTrue(
         "response wasn't fully read!",
         responseList.get(0).body().source().exhausted());
@@ -207,13 +220,15 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             new FakeProjectFilesystem(),
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
             assertEquals(expectedUri, request.url().getPath());
-            return new Response.Builder()
+            return new OkHttpResponseWrapper(new Response.Builder()
                 .request(request)
                 .protocol(Protocol.HTTP_1_1)
                 .code(HttpURLConnection.HTTP_OK)
@@ -223,10 +238,10 @@ public class HttpArtifactCacheTest {
                         ImmutableMap.<String, String>of(),
                         ByteSource.wrap(new byte[0]),
                         "data"))
-                .build();
+                .build());
           }
         };
-    cache.fetch(ruleKey, Paths.get("output/file"));
+    cache.fetch(ruleKey, LazyPath.ofInstance(Paths.get("output/file")));
     cache.close();
   }
 
@@ -243,9 +258,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
             Response response =
@@ -261,11 +278,11 @@ public class HttpArtifactCacheTest {
                             "data"))
                     .build();
             responseList.add(response);
-            return response;
+            return new OkHttpResponseWrapper(response);
           }
         };
     Path output = Paths.get("output/file");
-    CacheResult result = cache.fetch(ruleKey, output);
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
     assertEquals(CacheResultType.ERROR, result.getType());
     assertEquals(Optional.<String>absent(), filesystem.readFileIfItExists(output));
     assertTrue(
@@ -287,9 +304,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
             Response response =
@@ -305,11 +324,11 @@ public class HttpArtifactCacheTest {
                             "small"))
                     .build();
             responseList.add(response);
-            return response;
+            return new OkHttpResponseWrapper(response);
           }
         };
     Path output = Paths.get("output/file");
-    CacheResult result = cache.fetch(ruleKey, output);
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
     assertEquals(CacheResultType.ERROR, result.getType());
     assertEquals(Optional.<String>absent(), filesystem.readFileIfItExists(output));
     assertTrue(
@@ -329,15 +348,19 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             throw new IOException();
           }
         };
     Path output = Paths.get("output/file");
-    CacheResult result = cache.fetch(new RuleKey("00000000000000000000000000000000"), output);
+    CacheResult result = cache.fetch(
+        new RuleKey("00000000000000000000000000000000"),
+        LazyPath.ofInstance(output));
     assertEquals(CacheResultType.ERROR, result.getType());
     assertEquals(Optional.<String>absent(), filesystem.readFileIfItExists(output));
     cache.close();
@@ -359,9 +382,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response storeCall(Request.Builder requestBuilder)
+          protected HttpResponse storeCall(Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER).build();
             hasCalled.set(true);
@@ -388,11 +413,13 @@ public class HttpArtifactCacheTest {
 
             assertArrayEquals(expectedData, actualData);
 
-            return new Response.Builder()
+            Response response = new Response.Builder()
+                .body(createDummyBody())
                 .code(HttpURLConnection.HTTP_ACCEPTED)
                 .protocol(Protocol.HTTP_1_1)
                 .request(request)
                 .build();
+            return new OkHttpResponseWrapper(response);
           }
         };
     cache.storeImpl(
@@ -417,9 +444,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response storeCall(Request.Builder requestBuilder) throws IOException {
+          protected HttpResponse storeCall(Request.Builder requestBuilder) throws IOException {
             throw new IOException();
           }
         };
@@ -448,9 +477,11 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response storeCall(Request.Builder requestBuilder) throws IOException {
+          protected HttpResponse storeCall(Request.Builder requestBuilder) throws IOException {
             Request request = requestBuilder.url(SERVER).build();
             Buffer buf = new Buffer();
             request.body().writeTo(buf);
@@ -461,11 +492,13 @@ public class HttpArtifactCacheTest {
                 stored.add(new RuleKey(in.readUTF()));
               }
             }
-            return new Response.Builder()
+            Response response = new Response.Builder()
+                .body(createDummyBody())
                 .code(HttpURLConnection.HTTP_ACCEPTED)
                 .protocol(Protocol.HTTP_1_1)
                 .request(request)
                 .build();
+            return new OkHttpResponseWrapper(response);
           }
         };
     cache.storeImpl(
@@ -493,12 +526,14 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
-            return new Response.Builder()
+            Response response = new Response.Builder()
                 .request(request)
                 .protocol(Protocol.HTTP_1_1)
                 .code(HttpURLConnection.HTTP_OK)
@@ -509,10 +544,11 @@ public class HttpArtifactCacheTest {
                         ByteSource.wrap(data.getBytes(Charsets.UTF_8)),
                         data))
                 .build();
+            return new OkHttpResponseWrapper(response);
           }
         };
     Path output = Paths.get("output/file");
-    CacheResult result = cache.fetch(ruleKey, output);
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
     assertEquals(CacheResultType.ERROR, result.getType());
     assertEquals(Optional.<String>absent(), filesystem.readFileIfItExists(output));
     cache.close();
@@ -533,12 +569,14 @@ public class HttpArtifactCacheTest {
             /* doStore */ true,
             filesystem,
             BUCK_EVENT_BUS,
-            DIRECT_EXECUTOR_SERVICE) {
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
           @Override
-          protected Response fetchCall(String path, Request.Builder requestBuilder)
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
               throws IOException {
             Request request = requestBuilder.url(SERVER + path).build();
-            return new Response.Builder()
+            Response response = new Response.Builder()
                 .request(request)
                 .protocol(Protocol.HTTP_1_1)
                 .code(HttpURLConnection.HTTP_OK)
@@ -549,12 +587,109 @@ public class HttpArtifactCacheTest {
                         ByteSource.wrap(data.getBytes(Charsets.UTF_8)),
                         data))
                 .build();
+            return new OkHttpResponseWrapper(response);
           }
         };
-    CacheResult result = cache.fetch(ruleKey, output);
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
     assertEquals(CacheResultType.HIT, result.getType());
     assertEquals(metadata, result.getMetadata());
     cache.close();
   }
 
+  @Test
+  public void errorTextReplaced() throws InterruptedException {
+    FakeProjectFilesystem filesystem = new FakeProjectFilesystem();
+    final String cacheName = "http cache";
+    final RuleKey ruleKey = new RuleKey("00000000000000000000000000000000");
+    final RuleKey otherRuleKey = new RuleKey("11111111111111111111111111111111");
+    final String data = "data";
+    final AtomicBoolean consoleEventReceived = new AtomicBoolean(false);
+    HttpArtifactCache cache =
+        new HttpArtifactCache(
+            cacheName,
+            fetchService,
+            storeService,
+            /* doStore */ true,
+            filesystem,
+            new BuckEventBus(new IncrementingFakeClock(), new BuildId()) {
+              @Override
+              public void post(BuckEvent event) {
+                if (event instanceof ConsoleEvent) {
+                  consoleEventReceived.set(true);
+                  ConsoleEvent consoleEvent = (ConsoleEvent) event;
+                  assertThat(
+                      consoleEvent.getMessage(),
+                      Matchers.containsString(cacheName));
+                  assertThat(
+                      consoleEvent.getMessage(),
+                      Matchers.containsString("incorrect key name"));
+                }
+              }
+            },
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.<Long>absent()) {
+          @Override
+          protected HttpResponse fetchCall(String path, Request.Builder requestBuilder)
+              throws IOException {
+            Request request = requestBuilder.url(SERVER + path).build();
+            Response response = new Response.Builder()
+                .request(request)
+                .protocol(Protocol.HTTP_1_1)
+                .code(HttpURLConnection.HTTP_OK)
+                .body(
+                    createResponseBody(
+                        ImmutableSet.of(otherRuleKey),
+                        ImmutableMap.<String, String>of(),
+                        ByteSource.wrap(data.getBytes(Charsets.UTF_8)),
+                        data))
+                .build();
+            return new OkHttpResponseWrapper(response);
+          }
+        };
+    Path output = Paths.get("output/file");
+    CacheResult result = cache.fetch(ruleKey, LazyPath.ofInstance(output));
+    assertEquals(CacheResultType.ERROR, result.getType());
+    assertEquals(Optional.<String>absent(), filesystem.readFileIfItExists(output));
+    assertTrue(consoleEventReceived.get());
+    cache.close();
+  }
+
+  @Test
+  public void testStoreBiggerThanMaxStoreSize() throws Exception {
+    final RuleKey ruleKey = new RuleKey("00000000000000000000000000000000");
+    final String data = "data";
+    FakeProjectFilesystem filesystem = new FakeProjectFilesystem();
+    Path output = Paths.get("output/file");
+    filesystem.writeContentsToPath(data, output);
+    System.out.println(filesystem.getFileSize(output));
+    HttpArtifactCache cache =
+        new HttpArtifactCache(
+            "http",
+            fetchService,
+            storeService,
+            /* doStore */ true,
+            filesystem,
+            BUCK_EVENT_BUS,
+            DIRECT_EXECUTOR_SERVICE,
+            ERROR_TEXT_TEMPLATE,
+            Optional.of(2L)) {
+          @Override
+          protected HttpResponse storeCall(Request.Builder requestBuilder)
+              throws IOException {
+            fail("should not have called store");
+            throw new IllegalStateException();
+          }
+        };
+    cache.storeImpl(
+        ImmutableSet.of(ruleKey),
+        ImmutableMap.<String, String>of(),
+        output,
+        createFinishedEventBuilder());
+    cache.close();
+  }
+
+  private static ResponseBody createDummyBody() {
+    return ResponseBody.create(MediaType.parse("text/plain"), "SUCCESS");
+  }
 }

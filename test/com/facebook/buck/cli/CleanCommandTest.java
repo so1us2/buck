@@ -21,25 +21,28 @@ import static org.easymock.EasyMock.newCapture;
 import static org.junit.Assert.assertEquals;
 
 import com.facebook.buck.android.AndroidPlatformTarget;
+import com.facebook.buck.artifact_cache.ArtifactCache;
 import com.facebook.buck.event.BuckEventBusFactory;
 import com.facebook.buck.httpserver.WebServer;
 import com.facebook.buck.io.ProjectFilesystem;
 import com.facebook.buck.jvm.java.FakeJavaPackageFinder;
 import com.facebook.buck.jvm.java.intellij.Project;
-import com.facebook.buck.artifact_cache.ArtifactCache;
 import com.facebook.buck.parser.Parser;
+import com.facebook.buck.rules.ActionGraphCache;
 import com.facebook.buck.rules.Cell;
 import com.facebook.buck.rules.TestCellBuilder;
+import com.facebook.buck.step.ExecutionContext;
 import com.facebook.buck.testutil.TestConsole;
 import com.facebook.buck.timing.DefaultClock;
 import com.facebook.buck.util.BuckConstant;
-import com.facebook.buck.util.cache.NullFileHashCache;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.ProcessManager;
+import com.facebook.buck.util.cache.NullFileHashCache;
 import com.facebook.buck.util.environment.Platform;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -47,9 +50,11 @@ import org.easymock.EasyMockSupport;
 import org.junit.Test;
 import org.kohsuke.args4j.CmdLineException;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 
 /**
  * Unit test for {@link CleanCommand}.
@@ -126,6 +131,7 @@ public class CleanCommandTest extends EasyMockSupport {
         AndroidPlatformTarget.EXPLODING_ANDROID_PLATFORM_TARGET_SUPPLIER;
     return new CommandRunnerParams(
         new TestConsole(),
+        new ByteArrayInputStream("".getBytes("UTF-8")),
         cell,
         androidPlatformTargetSupplier,
         createMock(ArtifactCache.class),
@@ -134,14 +140,15 @@ public class CleanCommandTest extends EasyMockSupport {
         Platform.detect(),
         ImmutableMap.copyOf(System.getenv()),
         new FakeJavaPackageFinder(),
-        new ObjectMapper(),
+        ObjectMappers.newDefaultInstance(),
         new DefaultClock(),
         Optional.<ProcessManager>absent(),
         Optional.<WebServer>absent(),
         FakeBuckConfig.builder().build(),
-        new NullFileHashCache());
-
-
+        new NullFileHashCache(),
+        new HashMap<ExecutionContext.ExecutorPool, ListeningExecutorService>(),
+        CommandRunnerParamsForTesting.BUILD_ENVIRONMENT_DESCRIPTION,
+        new ActionGraphCache());
   }
 
 }

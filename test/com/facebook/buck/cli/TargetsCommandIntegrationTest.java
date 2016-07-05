@@ -16,12 +16,12 @@
 
 package com.facebook.buck.cli;
 
+import static com.facebook.buck.util.MoreStringsForTests.normalizeNewlines;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
@@ -29,10 +29,14 @@ import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.ProjectWorkspace.ProcessResult;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.facebook.buck.util.HumanReadableException;
+import com.facebook.buck.util.ObjectMappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 
+import org.hamcrest.MatcherAssert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -102,6 +106,8 @@ public class TargetsCommandIntegrationTest {
 
   @Test
   public void testOutputWithoutTarget() throws IOException {
+    thrown.expect(HumanReadableException.class);
+    thrown.expectMessage("Must specify at least one build target.");
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "output_path", tmp);
     workspace.setUp();
@@ -110,13 +116,12 @@ public class TargetsCommandIntegrationTest {
         "targets",
         "--show-output");
     result.assertFailure();
-    assertThat(
-        result.getStderr(),
-        containsString("Must specify at least one build target.\n"));
   }
 
   @Test
   public void testRuleKeyWithoutTarget() throws IOException {
+    thrown.expect(HumanReadableException.class);
+    thrown.expectMessage("Must specify at least one build target.");
     ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
         this, "output_path", tmp);
     workspace.setUp();
@@ -125,14 +130,11 @@ public class TargetsCommandIntegrationTest {
         "targets",
         "--show-rulekey");
     result.assertFailure();
-    assertThat(
-        result.getStderr(),
-        containsString("Must specify at least one build target.\n"));
   }
 
   private String parseAndVerifyTargetAndHash(String target, String outputLine) {
     List<String> targetAndHash = Splitter.on(' ').splitToList(
-        CharMatcher.WHITESPACE.trimFrom(outputLine));
+        CharMatcher.whitespace().trimFrom(outputLine));
     assertEquals(2, targetAndHash.size());
     assertEquals(target, targetAndHash.get(0));
     assertFalse(targetAndHash.get(1).isEmpty());
@@ -372,5 +374,32 @@ public class TargetsCommandIntegrationTest {
     } catch (HumanReadableException e) {
       assertEquals("//blah/foo must contain exactly one colon (found 0)", e.getMessage());
     }
+  }
+
+  @Test
+  public void testJsonOutputWithShowOptions() throws IOException {
+    ProjectWorkspace workspace = TestDataHelper.createProjectWorkspaceForScenario(
+        this, "output_path", tmp);
+    workspace.setUp();
+    ProcessResult result = workspace.runBuckCommand(
+        "targets", "--json", "--show-output", "//:test");
+    ObjectMapper objectMapper = ObjectMappers.newDefaultInstance();
+
+    // Parse the observed JSON.
+    JsonNode observed = objectMapper.readTree(
+        objectMapper.getFactory().createParser(result.getStdout())
+    );
+
+    System.out.println(observed.toString());
+
+    String expectedJson = workspace.getFileContents("output_path_json.js");
+    JsonNode expected = objectMapper.readTree(
+        objectMapper.getFactory().createParser(normalizeNewlines(expectedJson))
+    );
+
+    MatcherAssert.assertThat(
+        "Output from targets command should match expected JSON.",
+        observed,
+        equalTo(expected));
   }
 }

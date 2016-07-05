@@ -64,6 +64,14 @@ public class CalculateAbiStepTest {
     Object seenHash = metadata.get(AbiRule.ABI_KEY_ON_DISK_METADATA);
 
     assertEquals(expectedHash, seenHash);
+
+    // Hi there! This is hardcoded here because we want to make sure buck always produces the same
+    // jar files across timezones and versions. If the test is failing because of an intentional
+    // modification to how we produce abi .jar files, then just update the hash, otherwise please
+    // investigate why the value is different.
+    // NOTE: If this starts failing on CI for no obvious reason it's possible that the offset
+    // calculation in ZipConstants.getFakeTime() does not account for DST correctly.
+    assertEquals("8678c53b9ba104fac9626416959ff50e6fafc269", seenHash);
   }
 
   @Test

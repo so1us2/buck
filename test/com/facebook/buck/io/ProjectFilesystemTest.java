@@ -24,8 +24,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
-import com.facebook.buck.cli.Config;
-import com.facebook.buck.cli.ConfigBuilder;
+import com.facebook.buck.config.Config;
+import com.facebook.buck.config.ConfigBuilder;
 import com.facebook.buck.io.ProjectFilesystem.CopySourceMode;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.ZipInspector;
@@ -33,9 +33,12 @@ import com.facebook.buck.util.BuckConstant;
 import com.facebook.buck.zip.ZipConstants;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Ordering;
 import com.google.common.io.CharStreams;
 
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
@@ -201,7 +204,7 @@ public class ProjectFilesystemTest {
   @Test
   public void testWriteBytesToPath() throws IOException {
     String content = "Hello, World!";
-    byte[] bytes = content.getBytes();
+    byte[] bytes = content.getBytes(UTF_8);
     filesystem.writeBytesToPath(bytes, Paths.get("hello.txt"));
     assertEquals(
         content,
@@ -210,7 +213,7 @@ public class ProjectFilesystemTest {
 
   @Test
   public void testCopyToPath() throws IOException {
-    InputStream inputStream = new ByteArrayInputStream("Hello, world!".getBytes());
+    InputStream inputStream = new ByteArrayInputStream("Hello, world!".getBytes(UTF_8));
     filesystem.copyToPath(inputStream, Paths.get("bytes.txt"));
 
     assertEquals(
@@ -221,10 +224,10 @@ public class ProjectFilesystemTest {
 
   @Test
   public void testCopyToPathWithOptions() throws IOException {
-    InputStream inputStream = new ByteArrayInputStream("hello!".getBytes());
+    InputStream inputStream = new ByteArrayInputStream("hello!".getBytes(UTF_8));
     filesystem.copyToPath(inputStream, Paths.get("replace_me.txt"));
 
-    inputStream = new ByteArrayInputStream("hello again!".getBytes());
+    inputStream = new ByteArrayInputStream("hello again!".getBytes(UTF_8));
     filesystem.copyToPath(
         inputStream,
         Paths.get("replace_me.txt"),
@@ -448,7 +451,7 @@ public class ProjectFilesystemTest {
         ImmutableMap.of(Paths.get("additional"), "info"));
 
     // Iterate over each of the entries, expecting to see all zeros in the time fields.
-    Date dosEpoch = new Date(ZipUtil.dosToJavaTime(ZipConstants.DOS_EPOCH_START));
+    Date dosEpoch = new Date(ZipUtil.dosToJavaTime(ZipConstants.DOS_FAKE_TIME));
     try (ZipInputStream is = new ZipInputStream(Files.newInputStream(zipFile))) {
       for (ZipEntry entry = is.getNextEntry(); entry != null; entry = is.getNextEntry()) {
         assertEquals(entry.getName(), dosEpoch, new Date(entry.getTime()));
@@ -577,19 +580,20 @@ public class ProjectFilesystemTest {
         "ignore = .git, foo, bar/, baz//, a/b/c");
     Path rootPath = tmp.getRoot();
     ImmutableSet<Path> ignorePaths = new ProjectFilesystem(rootPath, config).getIgnorePaths();
-    assertEquals(
-        "Should ignore paths, sans trailing slashes",
-        ImmutableSet.of(
-            BuckConstant.BUCK_OUTPUT_PATH,
-            Paths.get(".idea"),
-            Paths.get(System.getProperty(ProjectFilesystem.BUCK_BUCKD_DIR_KEY, ".buckd")),
-            Paths.get(BuckConstant.DEFAULT_CACHE_DIR),
-            Paths.get(".git"),
-            Paths.get("foo"),
-            Paths.get("bar"),
-            Paths.get("baz"),
-            Paths.get("a/b/c")),
-        ignorePaths);
+    assertThat(
+        FluentIterable.from(ignorePaths).toSortedSet(Ordering.<Path>natural()),
+        equalTo(
+            ImmutableSortedSet.of(
+                BuckConstant.BUCK_OUTPUT_PATH,
+                BuckConstant.TRASH_PATH,
+                Paths.get(".idea"),
+                Paths.get(System.getProperty(ProjectFilesystem.BUCK_BUCKD_DIR_KEY, ".buckd")),
+                Paths.get(BuckConstant.DEFAULT_CACHE_DIR),
+                Paths.get(".git"),
+                Paths.get("foo"),
+                Paths.get("bar"),
+                Paths.get("baz"),
+                Paths.get("a/b/c"))));
   }
 
   @Test

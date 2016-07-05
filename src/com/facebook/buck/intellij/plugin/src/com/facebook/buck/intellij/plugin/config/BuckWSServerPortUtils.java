@@ -16,19 +16,23 @@
 
 package com.facebook.buck.intellij.plugin.config;
 
+import com.facebook.buck.util.HumanReadableException;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 
 
 public final class BuckWSServerPortUtils {
-  private int mPort = -1;
+  public static final int CONNECTION_FAILED = -1;
 
+  private int mPort = CONNECTION_FAILED;
   private static final String SEARCH_FOR = "http.port=";
 
-  public int getPort(String runInPath) {
+  public int getPort(String runInPath) throws
+      NumberFormatException, IOException, ExecutionException, HumanReadableException {
     String exec = BuckSettingsProvider.getInstance().getState().buckExecutable;
     GeneralCommandLine commandLine = new GeneralCommandLine();
     commandLine.setExePath(exec);
@@ -38,27 +42,29 @@ public final class BuckWSServerPortUtils {
     commandLine.addParameter("--http-port");
     commandLine.setRedirectErrorStream(true);
 
-      try {
-        Process p = null;
-        p = commandLine.createProcess();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    Process p = commandLine.createProcess();
+    BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
-        String line = "";
-        while ((line = reader.readLine()) != null) {
-            if (line.startsWith(BuckWSServerPortUtils.SEARCH_FOR)) {
-                try {
-                    mPort = Integer.parseInt(line.replace(BuckWSServerPortUtils.SEARCH_FOR, ""));
-                    return mPort;
-                } catch (java.lang.NumberFormatException ex) {
-                    mPort = -1;
-                }
-            }
+    String error = "";
+    String line;
+    while ((line = reader.readLine()) != null) {
+      error += line;
+      if (line.startsWith(BuckWSServerPortUtils.SEARCH_FOR)) {
+        mPort = Integer.parseInt(line.replace(BuckWSServerPortUtils.SEARCH_FOR, ""));
+        if (mPort == CONNECTION_FAILED) {
+          // if the buck server is off, and it gives us -1, throw this exception
+          error = "Your buck server may be turned off, since buck has the buck daemon on port " +
+              mPort + ".\nTry adding to your '.buckconfig.local' file:\n" +
+              "[httpserver]\n" +
+              "    port = 0\n" +
+              "After that, try running the command again.\n";
+          break;
         }
-      } catch (ExecutionException e) {
-          mPort = -1;
-      } catch (java.io.IOException e) {
-          mPort = -1;
       }
+    }
+    if (mPort == CONNECTION_FAILED) {
+      throw new HumanReadableException(error);
+    }
     return mPort;
   }
 }

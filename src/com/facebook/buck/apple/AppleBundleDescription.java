@@ -18,7 +18,6 @@ package com.facebook.buck.apple;
 
 import com.facebook.buck.cxx.CxxDescriptionEnhancer;
 import com.facebook.buck.cxx.CxxPlatform;
-import com.facebook.buck.js.ReactNativeFlavors;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargets;
 import com.facebook.buck.model.Either;
@@ -28,6 +27,7 @@ import com.facebook.buck.model.Flavored;
 import com.facebook.buck.model.HasTests;
 import com.facebook.buck.model.ImmutableFlavor;
 import com.facebook.buck.parser.NoSuchBuildTargetException;
+import com.facebook.buck.rules.AbstractDescriptionArg;
 import com.facebook.buck.rules.BuildRuleParams;
 import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.BuildRuleType;
@@ -47,7 +47,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
 import java.nio.file.Path;
-import java.util.Map;
 
 public class AppleBundleDescription implements Description<AppleBundleDescription.Arg>,
     Flavored,
@@ -58,35 +57,37 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
       CxxDescriptionEnhancer.STATIC_FLAVOR,
       CxxDescriptionEnhancer.SHARED_FLAVOR);
 
+  public static final Flavor WATCH_OS_FLAVOR = ImmutableFlavor.of("watchos-armv7k");
+  public static final Flavor WATCH_SIMULATOR_FLAVOR = ImmutableFlavor.of("watchsimulator-i386");
+
   private static final Flavor WATCH = ImmutableFlavor.of("watch");
 
   private final AppleBinaryDescription appleBinaryDescription;
   private final AppleLibraryDescription appleLibraryDescription;
   private final FlavorDomain<CxxPlatform> cxxPlatformFlavorDomain;
-  private final ImmutableMap<Flavor, AppleCxxPlatform> platformFlavorsToAppleCxxPlatforms;
+  private final FlavorDomain<AppleCxxPlatform> appleCxxPlatformsFlavorDomain;
   private final CxxPlatform defaultCxxPlatform;
   private final CodeSignIdentityStore codeSignIdentityStore;
   private final ProvisioningProfileStore provisioningProfileStore;
-  private final AppleDebugFormat defaultDebugInfoFormat;
+  private final AppleDebugFormat defaultDebugFormat;
 
   public AppleBundleDescription(
       AppleBinaryDescription appleBinaryDescription,
       AppleLibraryDescription appleLibraryDescription,
       FlavorDomain<CxxPlatform> cxxPlatformFlavorDomain,
-      Map<Flavor, AppleCxxPlatform> platformFlavorsToAppleCxxPlatforms,
+      FlavorDomain<AppleCxxPlatform> appleCxxPlatformsFlavorDomain,
       CxxPlatform defaultCxxPlatform,
       CodeSignIdentityStore codeSignIdentityStore,
       ProvisioningProfileStore provisioningProfileStore,
-      AppleDebugFormat defaultDebugInfoFormat) {
+      AppleDebugFormat defaultDebugFormat) {
     this.appleBinaryDescription = appleBinaryDescription;
     this.appleLibraryDescription = appleLibraryDescription;
     this.cxxPlatformFlavorDomain = cxxPlatformFlavorDomain;
-    this.platformFlavorsToAppleCxxPlatforms =
-        ImmutableMap.copyOf(platformFlavorsToAppleCxxPlatforms);
+    this.appleCxxPlatformsFlavorDomain = appleCxxPlatformsFlavorDomain;
     this.defaultCxxPlatform = defaultCxxPlatform;
     this.codeSignIdentityStore = codeSignIdentityStore;
     this.provisioningProfileStore = provisioningProfileStore;
-    this.defaultDebugInfoFormat = defaultDebugInfoFormat;
+    this.defaultDebugFormat = defaultDebugFormat;
   }
 
   @Override
@@ -106,9 +107,7 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
     }
     ImmutableSet.Builder<Flavor> flavorBuilder = ImmutableSet.builder();
     for (Flavor flavor : flavors) {
-      if (flavor.equals(ReactNativeFlavors.DO_NOT_BUNDLE) ||
-          flavor.equals(AppleDebugFormat.DWARF_AND_DSYM_FLAVOR) ||
-          flavor.equals(AppleDebugFormat.NO_DEBUG_FLAVOR)) {
+      if (AppleDebugFormat.FLAVOR_DOMAIN.getFlavors().contains(flavor)) {
         continue;
       }
       flavorBuilder.add(flavor);
@@ -123,26 +122,22 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
       BuildRuleParams params,
       BuildRuleResolver resolver,
       A args) throws NoSuchBuildTargetException {
-    AppleDebugFormat flavoredDebugInfoFormat = AppleDebugFormat.FLAVOR_DOMAIN
+    AppleDebugFormat flavoredDebugFormat = AppleDebugFormat.FLAVOR_DOMAIN
         .getValue(params.getBuildTarget())
-        .or(defaultDebugInfoFormat);
-    Flavor debugFormatFlavor = flavoredDebugInfoFormat.getFlavor();
-    if (!params.getBuildTarget().getFlavors().contains(debugFormatFlavor)) {
+        .or(defaultDebugFormat);
+    if (!params.getBuildTarget().getFlavors().contains(flavoredDebugFormat.getFlavor())) {
       return (BuildRuleWithAppleBundle) resolver.requireRule(
-          BuildTarget.builder(params.getBuildTarget())
-              .addFlavors(debugFormatFlavor)
-              .build());
+          params.getBuildTarget().withAppendedFlavor(flavoredDebugFormat.getFlavor()));
     }
     if (!AppleDescriptions.INCLUDE_FRAMEWORKS.getValue(params.getBuildTarget()).isPresent()) {
       return (BuildRuleWithAppleBundle) resolver.requireRule(
-          BuildTarget.builder(params.getBuildTarget())
-              .addFlavors(AppleDescriptions.NO_INCLUDE_FRAMEWORKS_FLAVOR)
-              .build());
+          params.getBuildTarget().withAppendedFlavor(
+              AppleDescriptions.NO_INCLUDE_FRAMEWORKS_FLAVOR));
     }
-    AppleBundle appleBundle = AppleDescriptions.createAppleBundle(
+    return AppleDescriptions.createAppleBundle(
         cxxPlatformFlavorDomain,
         defaultCxxPlatform,
-        platformFlavorsToAppleCxxPlatforms,
+        appleCxxPlatformsFlavorDomain,
         targetGraph,
         params,
         resolver,
@@ -154,19 +149,8 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
         args.infoPlist,
         args.infoPlistSubstitutions,
         args.deps.get(),
-        args.getTests());
-    if (flavoredDebugInfoFormat.getFlavor() == AppleDebugFormat.NO_DEBUG_FLAVOR ||
-        !appleBundle.getBinary().isPresent()) {
-      return appleBundle;
-    }
-    AppleDsym appleDsym = AppleDescriptions.createAppleDsym(
-        cxxPlatformFlavorDomain,
-        defaultCxxPlatform,
-        platformFlavorsToAppleCxxPlatforms,
-        params,
-        resolver,
-        appleBundle);
-    return AppleDescriptions.createAppleBundleWithDsym(appleBundle, appleDsym, params, resolver);
+        args.getTests(),
+        flavoredDebugFormat);
   }
 
   /**
@@ -187,13 +171,13 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
     }
 
     Optional<FatBinaryInfo> fatBinaryInfo =
-        FatBinaryInfo.create(platformFlavorsToAppleCxxPlatforms, buildTarget);
+        FatBinaryInfos.create(appleCxxPlatformsFlavorDomain, buildTarget);
     CxxPlatform cxxPlatform;
     if (fatBinaryInfo.isPresent()) {
       AppleCxxPlatform appleCxxPlatform = fatBinaryInfo.get().getRepresentativePlatform();
       cxxPlatform = appleCxxPlatform.getCxxPlatform();
     } else {
-      cxxPlatform = AppleDescriptions.getCxxPlatformForBuildTarget(
+      cxxPlatform = ApplePlatforms.getCxxPlatformForBuildTarget(
           cxxPlatformFlavorDomain,
           defaultCxxPlatform,
           buildTarget);
@@ -202,12 +186,12 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
     String platformName = cxxPlatform.getFlavor().getName();
     final Flavor actualWatchFlavor;
     if (ApplePlatform.isSimulator(platformName)) {
-      actualWatchFlavor = ImmutableFlavor.builder().name("watchsimulator-i386").build();
+      actualWatchFlavor = WATCH_SIMULATOR_FLAVOR;
     } else if (platformName.startsWith(ApplePlatform.IPHONEOS.getName()) ||
         platformName.startsWith(ApplePlatform.WATCHOS.getName())) {
-      actualWatchFlavor = ImmutableFlavor.builder().name("watchos-armv7k").build();
+      actualWatchFlavor = WATCH_OS_FLAVOR;
     } else {
-      actualWatchFlavor = ImmutableFlavor.builder().name(platformName).build();
+      actualWatchFlavor = ImmutableFlavor.of(platformName);
     }
 
     FluentIterable<BuildTarget> depsExcludingBinary = FluentIterable.from(constructorArg.deps.get())
@@ -256,7 +240,7 @@ public class AppleBundleDescription implements Description<AppleBundleDescriptio
   }
 
   @SuppressFieldNotInitialized
-  public static class Arg implements HasAppleBundleFields, HasTests {
+  public static class Arg extends AbstractDescriptionArg implements HasAppleBundleFields, HasTests {
     public Either<AppleBundleExtension, String> extension;
     public BuildTarget binary;
     public SourcePath infoPlist;

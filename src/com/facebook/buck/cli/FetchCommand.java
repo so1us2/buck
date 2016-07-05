@@ -25,14 +25,12 @@ import com.facebook.buck.file.StackedDownloader;
 import com.facebook.buck.json.BuildFileParseException;
 import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.model.BuildTargetException;
-import com.facebook.buck.model.Pair;
-import com.facebook.buck.rules.ActionGraph;
+import com.facebook.buck.rules.ActionGraphAndResolver;
+import com.facebook.buck.rules.ActionGraphCache;
 import com.facebook.buck.rules.BuildEvent;
-import com.facebook.buck.rules.BuildRuleResolver;
 import com.facebook.buck.rules.CachingBuildEngine;
 import com.facebook.buck.rules.Description;
-import com.facebook.buck.rules.TargetGraph;
-import com.facebook.buck.rules.TargetGraphToActionGraph;
+import com.facebook.buck.rules.TargetGraphAndBuildTargets;
 import com.facebook.buck.step.AdbOptions;
 import com.facebook.buck.step.TargetDevice;
 import com.facebook.buck.step.TargetDeviceOptions;
@@ -67,19 +65,15 @@ public class FetchCommand extends BuildCommand {
     }
 
     FetchTargetNodeToBuildRuleTransformer ruleGenerator = createFetchTransformer(params);
-    TargetGraphToActionGraph transformer = new TargetGraphToActionGraph(
-        params.getBuckEventBus(),
-        ruleGenerator);
-
     int exitCode;
     try (CommandThreadManager pool = new CommandThreadManager(
         "Fetch",
         params.getBuckConfig().getWorkQueueExecutionOrder(),
         getConcurrencyLimit(params.getBuckConfig()))) {
-      Pair<ActionGraph, BuildRuleResolver> actionGraphAndResolver;
+      ActionGraphAndResolver actionGraphAndResolver;
       ImmutableSet<BuildTarget> buildTargets;
       try {
-        Pair<ImmutableSet<BuildTarget>, TargetGraph> result = params.getParser()
+        TargetGraphAndBuildTargets result = params.getParser()
             .buildTargetGraphForTargetNodeSpecs(
                 params.getBuckEventBus(),
                 params.getCell(),
@@ -87,8 +81,13 @@ public class FetchCommand extends BuildCommand {
                 pool.getExecutor(),
                 parseArgumentsAsTargetNodeSpecs(
                     params.getBuckConfig(),
-                    getArguments()));
-        actionGraphAndResolver = Preconditions.checkNotNull(transformer.apply(result.getSecond()));
+                    getArguments()),
+                /* ignoreBuckAutodepsFiles */ false);
+        actionGraphAndResolver = Preconditions.checkNotNull(
+            ActionGraphCache.getFreshActionGraph(
+                params.getBuckEventBus(),
+                ruleGenerator,
+                result.getTargetGraph()));
         buildTargets = ruleGenerator.getDownloadableTargets();
       } catch (BuildTargetException | BuildFileParseException e) {
         params.getBuckEventBus().post(ConsoleEvent.severe(
@@ -98,8 +97,8 @@ public class FetchCommand extends BuildCommand {
 
       try (Build build = createBuild(
           params.getBuckConfig(),
-          actionGraphAndResolver.getFirst(),
-          actionGraphAndResolver.getSecond(),
+          actionGraphAndResolver.getActionGraph(),
+          actionGraphAndResolver.getResolver(),
           params.getAndroidPlatformTargetSupplier(),
           new CachingBuildEngine(
               pool.getExecutor(),
@@ -108,7 +107,7 @@ public class FetchCommand extends BuildCommand {
               params.getBuckConfig().getDependencySchedulingOrder(),
               params.getBuckConfig().getBuildDepFiles(),
               params.getBuckConfig().getBuildMaxDepFileCacheEntries(),
-              actionGraphAndResolver.getSecond()),
+              actionGraphAndResolver.getResolver()),
           params.getArtifactCache(),
           params.getConsole(),
           params.getBuckEventBus(),
@@ -118,7 +117,8 @@ public class FetchCommand extends BuildCommand {
           params.getObjectMapper(),
           params.getClock(),
           Optional.<AdbOptions>absent(),
-          Optional.<TargetDeviceOptions>absent())) {
+          Optional.<TargetDeviceOptions>absent(),
+          params.getExecutors())) {
         exitCode = build.executeAndPrintFailuresToEventBus(
             buildTargets,
             isKeepGoing(),
@@ -141,6 +141,7 @@ public class FetchCommand extends BuildCommand {
   private FetchTargetNodeToBuildRuleTransformer createFetchTransformer(CommandRunnerParams params) {
     DefaultAndroidDirectoryResolver resolver = new DefaultAndroidDirectoryResolver(
         params.getCell().getFilesystem(),
+        Optional.<String>absent(),
         Optional.<String>absent(),
         new DefaultPropertyFinder(params.getCell().getFilesystem(), params.getEnvironment()));
 

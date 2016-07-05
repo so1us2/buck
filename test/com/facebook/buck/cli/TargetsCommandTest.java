@@ -52,7 +52,7 @@ import com.facebook.buck.rules.SourcePath;
 import com.facebook.buck.rules.TargetGraph;
 import com.facebook.buck.rules.TargetNode;
 import com.facebook.buck.rules.TestCellBuilder;
-import com.facebook.buck.rules.coercer.SourceWithFlags;
+import com.facebook.buck.rules.SourceWithFlags;
 import com.facebook.buck.shell.GenruleBuilder;
 import com.facebook.buck.testutil.FakeOutputStream;
 import com.facebook.buck.testutil.FakeProjectFilesystem;
@@ -62,6 +62,7 @@ import com.facebook.buck.testutil.integration.DebuggableTemporaryFolder;
 import com.facebook.buck.testutil.integration.ProjectWorkspace;
 import com.facebook.buck.testutil.integration.ProjectWorkspace.ProcessResult;
 import com.facebook.buck.testutil.integration.TestDataHelper;
+import com.facebook.buck.util.ObjectMappers;
 import com.facebook.buck.util.environment.Platform;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,7 +74,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -85,6 +89,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.SortedMap;
+import java.util.concurrent.Executors;
 
 public class TargetsCommandTest {
 
@@ -94,6 +99,7 @@ public class TargetsCommandTest {
   private CommandRunnerParams params;
   private ObjectMapper objectMapper;
   private ProjectFilesystem filesystem;
+  private ListeningExecutorService executor;
 
   private SortedMap<String, TargetNode<?>> buildTargetNodes(
       ProjectFilesystem filesystem,
@@ -125,7 +131,7 @@ public class TargetsCommandTest {
     AndroidDirectoryResolver androidDirectoryResolver = new FakeAndroidDirectoryResolver();
     ArtifactCache artifactCache = new NoopArtifactCache();
     BuckEventBus eventBus = BuckEventBusFactory.newInstance();
-    objectMapper = new ObjectMapper();
+    objectMapper = ObjectMappers.newDefaultInstance();
 
     targetsCommand = new TargetsCommand();
     params = CommandRunnerParamsForTesting.createCommandRunnerParamsForTesting(
@@ -140,6 +146,12 @@ public class TargetsCommandTest {
         new FakeJavaPackageFinder(),
         objectMapper,
         Optional.<WebServer>absent());
+    executor = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+  }
+
+  @After
+  public void tearDown() {
+    executor.shutdown();
   }
 
   @Test
@@ -150,15 +162,16 @@ public class TargetsCommandTest {
 
     targetsCommand.printJsonForTargets(
         params,
-        nodes);
+        executor,
+        nodes, ImmutableMap.<String, ShowOptions>of());
     String observedOutput = console.getTextWrittenToStdOut();
     JsonNode observed = objectMapper.readTree(
-        objectMapper.getJsonFactory().createJsonParser(observedOutput));
+        objectMapper.getFactory().createParser(observedOutput));
 
     // parse the expected JSON.
     String expectedJson = workspace.getFileContents("TargetsCommandTestBuckJson1.js");
     JsonNode expected = objectMapper.readTree(
-      objectMapper.getJsonFactory().createJsonParser(expectedJson)
+      objectMapper.getFactory().createParser(expectedJson)
         .enable(Feature.ALLOW_COMMENTS)
     );
 
@@ -177,14 +190,14 @@ public class TargetsCommandTest {
 
     // Parse the observed JSON.
     JsonNode observed = objectMapper.readTree(
-      objectMapper.getJsonFactory().createJsonParser(result.getStdout())
+      objectMapper.getFactory().createParser(result.getStdout())
         .enable(Feature.ALLOW_COMMENTS)
     );
 
     // Parse the expected JSON.
     String expectedJson = workspace.getFileContents("TargetsCommandTestBuckJson2.js");
     JsonNode expected = objectMapper.readTree(
-      objectMapper.getJsonFactory().createJsonParser(expectedJson)
+      objectMapper.getFactory().createParser(expectedJson)
         .enable(Feature.ALLOW_COMMENTS)
     );
 
@@ -205,7 +218,9 @@ public class TargetsCommandTest {
     SortedMap<String, TargetNode<?>> buildRules = buildTargetNodes(filesystem, "//:nonexistent");
     targetsCommand.printJsonForTargets(
         params,
-        buildRules);
+        executor,
+        buildRules,
+        ImmutableMap.<String, ShowOptions>of());
 
     String output = console.getTextWrittenToStdOut();
     assertEquals("[\n]\n", output);
@@ -509,7 +524,7 @@ public class TargetsCommandTest {
         .build();
 
     Path genSrc = resDir.resolve("foo.txt");
-    BuildTarget genTarget = BuildTargetFactory.newInstance("//:res");
+    BuildTarget genTarget = BuildTargetFactory.newInstance("//:gen");
     TargetNode<?> genNode = GenruleBuilder.newGenruleBuilder(genTarget)
         .setSrcs(ImmutableList.<SourcePath>of(new PathSourcePath(projectFilesystem, genSrc)))
         .build();

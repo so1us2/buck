@@ -30,6 +30,8 @@ import com.facebook.buck.rules.SourcePathResolver;
 import com.facebook.buck.rules.args.Arg;
 import com.facebook.buck.rules.args.SourcePathArg;
 import com.facebook.buck.rules.coercer.FrameworkPath;
+import com.google.common.base.Optional;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -37,6 +39,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Fake implementation of {@link CxxLibrary} for testing.
@@ -44,27 +47,30 @@ import java.nio.file.Path;
 public final class FakeCxxLibrary
     extends NoopBuildRule
     implements AbstractCxxLibrary, NativeTestable {
+
   private final BuildTarget publicHeaderTarget;
   private final BuildTarget publicHeaderSymlinkTreeTarget;
-  private final Path publicHeaderSymlinkTreeRoot;
   private final BuildTarget privateHeaderTarget;
   private final BuildTarget privateHeaderSymlinkTreeTarget;
-  private final Path privateHeaderSymlinkTreeRoot;
   private final BuildRule archive;
   private final BuildRule sharedLibrary;
   private final Path sharedLibraryOutput;
   private final String sharedLibrarySoname;
   private final ImmutableSortedSet<BuildTarget> tests;
 
+  private final LoadingCache<
+          CxxPreprocessables.CxxPreprocessorInputCacheKey,
+          ImmutableMap<BuildTarget, CxxPreprocessorInput>
+        > transitiveCxxPreprocessorInputCache =
+      CxxPreprocessables.getTransitiveCxxPreprocessorInputCache(this);
+
   public FakeCxxLibrary(
       BuildRuleParams params,
       SourcePathResolver pathResolver,
       BuildTarget publicHeaderTarget,
       BuildTarget publicHeaderSymlinkTreeTarget,
-      Path publicHeaderSymlinkTreeRoot,
       BuildTarget privateHeaderTarget,
       BuildTarget privateHeaderSymlinkTreeTarget,
-      Path privateHeaderSymlinkTreeRoot,
       BuildRule archive,
       BuildRule sharedLibrary,
       Path sharedLibraryOutput,
@@ -73,15 +79,19 @@ public final class FakeCxxLibrary
     super(params, pathResolver);
     this.publicHeaderTarget = publicHeaderTarget;
     this.publicHeaderSymlinkTreeTarget = publicHeaderSymlinkTreeTarget;
-    this.publicHeaderSymlinkTreeRoot = publicHeaderSymlinkTreeRoot;
     this.privateHeaderTarget = privateHeaderTarget;
     this.privateHeaderSymlinkTreeTarget = privateHeaderSymlinkTreeTarget;
-    this.privateHeaderSymlinkTreeRoot = privateHeaderSymlinkTreeRoot;
     this.archive = archive;
     this.sharedLibrary = sharedLibrary;
     this.sharedLibraryOutput = sharedLibraryOutput;
     this.sharedLibrarySoname = sharedLibrarySoname;
     this.tests = tests;
+  }
+
+  @Override
+  public Iterable<? extends CxxPreprocessorDep> getCxxPreprocessorDeps(CxxPlatform cxxPlatform) {
+    return FluentIterable.from(getDeps())
+        .filter(CxxPreprocessorDep.class);
   }
 
   @Override
@@ -91,13 +101,25 @@ public final class FakeCxxLibrary
       switch (headerVisibility) {
         case PUBLIC:
           return CxxPreprocessorInput.builder()
-              .addRules(publicHeaderTarget, publicHeaderSymlinkTreeTarget)
-              .addIncludeRoots(publicHeaderSymlinkTreeRoot)
+              .addIncludes(
+                  CxxSymlinkTreeHeaders.builder()
+                      .setIncludeType(CxxPreprocessables.IncludeType.LOCAL)
+                      .putNameToPathMap(
+                          Paths.get("header.h"),
+                          new BuildTargetSourcePath(publicHeaderTarget))
+                      .setRoot(new BuildTargetSourcePath(publicHeaderSymlinkTreeTarget))
+                      .build())
               .build();
         case PRIVATE:
           return CxxPreprocessorInput.builder()
-              .addRules(privateHeaderTarget, privateHeaderSymlinkTreeTarget)
-              .addIncludeRoots(privateHeaderSymlinkTreeRoot)
+              .addIncludes(
+                  CxxSymlinkTreeHeaders.builder()
+                      .setIncludeType(CxxPreprocessables.IncludeType.LOCAL)
+                      .setRoot(new BuildTargetSourcePath(privateHeaderSymlinkTreeTarget))
+                      .putNameToPathMap(
+                          Paths.get("header.h"),
+                          new BuildTargetSourcePath(privateHeaderTarget))
+                      .build())
               .build();
       }
       throw new RuntimeException("Invalid header visibility value: " + headerVisibility);
@@ -107,19 +129,13 @@ public final class FakeCxxLibrary
   public ImmutableMap<BuildTarget, CxxPreprocessorInput> getTransitiveCxxPreprocessorInput(
       CxxPlatform cxxPlatform,
       HeaderVisibility headerVisibility) throws NoSuchBuildTargetException {
-    ImmutableMap.Builder<BuildTarget, CxxPreprocessorInput> builder = ImmutableMap.builder();
-    builder.put(
-        getBuildTarget(),
-        getCxxPreprocessorInput(cxxPlatform, headerVisibility));
-    for (BuildRule dep : getDeps()) {
-      if (dep instanceof CxxPreprocessorDep) {
-        builder.putAll(
-            ((CxxPreprocessorDep) dep).getTransitiveCxxPreprocessorInput(
-                cxxPlatform,
-                headerVisibility));
-      }
-    }
-    return builder.build();
+    return transitiveCxxPreprocessorInputCache.getUnchecked(
+        ImmutableCxxPreprocessorInputCacheKey.of(cxxPlatform, headerVisibility));
+  }
+
+  @Override
+  public Optional<HeaderSymlinkTree> getExportedHeaderSymlinkTree(CxxPlatform cxxPlatform) {
+    return Optional.absent();
   }
 
   @Override
