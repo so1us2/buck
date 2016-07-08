@@ -405,8 +405,7 @@ public class TestRunningTest {
             createMock(CachingBuildEngine.class),
             executionContext,
             createMock(TestRuleKeyFileHelper.class),
-            true,
-            false));
+            true));
 
     verify(executionContext);
   }
@@ -438,8 +437,7 @@ public class TestRunningTest {
             cachingBuildEngine,
             executionContext,
             createMock(TestRuleKeyFileHelper.class),
-            /* results cache enabled */ true,
-            /* running with test selectors */ false));
+            /* results cache enabled */ true));
 
     verify(executionContext, cachingBuildEngine);
   }
@@ -470,8 +468,7 @@ public class TestRunningTest {
             cachingBuildEngine,
             executionContext,
             createMock(TestRuleKeyFileHelper.class),
-            /* results cache enabled */ true,
-            /* running with test selectors */ false));
+            /* results cache enabled */ true));
 
     verify(executionContext, cachingBuildEngine);
   }
@@ -512,8 +509,7 @@ public class TestRunningTest {
             cachingBuildEngine,
             executionContext,
             testRuleKeyFileHelper,
-            /* results cache enabled */ true,
-            /* running with test selectors */ false));
+            /* results cache enabled */ true));
 
     verify(executionContext, cachingBuildEngine, testRuleKeyFileHelper);
   }

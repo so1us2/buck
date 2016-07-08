@@ -193,7 +193,7 @@ public class TestRunning {
           buildEngine,
           executionContext,
           testRuleKeyFileHelper,
-          options.isResultsCacheEnabled();
+          options.isResultsCacheEnabled());
 
       final Map<String, UUID> testUUIDMap = new HashMap<>();
       TestRule.TestReportingCallback testReportingCallback = new TestRule.TestReportingCallback() {
