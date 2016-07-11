@@ -194,7 +194,7 @@ public class TestRunning {
           executionContext,
           testRuleKeyFileHelper,
           options.isResultsCacheEnabled(),
-          !options.getTestSelectorList().isEmpty();
+          !options.getTestSelectorList().isEmpty());
 
       final Map<String, UUID> testUUIDMap = new HashMap<>();
       TestRule.TestReportingCallback testReportingCallback = new TestRule.TestReportingCallback() {
