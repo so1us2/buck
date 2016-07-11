@@ -193,7 +193,8 @@ public class TestRunning {
           buildEngine,
           executionContext,
           testRuleKeyFileHelper,
-          options.isResultsCacheEnabled());
+          options.isResultsCacheEnabled(),
+          !options.getTestSelectorList().isEmpty();
 
       final Map<String, UUID> testUUIDMap = new HashMap<>();
       TestRule.TestReportingCallback testReportingCallback = new TestRule.TestReportingCallback() {
@@ -568,13 +569,19 @@ public class TestRunning {
       BuildEngine cachingBuildEngine,
       ExecutionContext executionContext,
       TestRuleKeyFileHelper testRuleKeyFileHelper,
-      boolean isResultsCacheEnabled)
+      boolean isResultsCacheEnabled,
+      boolean isRunningWithTestSelectors)
       throws IOException, ExecutionException, InterruptedException {
     boolean isTestRunRequired;
     BuildResult result;
     if (executionContext.isDebugEnabled()) {
       // If debug is enabled, then we should always run the tests as the user is expecting to
       // hook up a debugger.
+      isTestRunRequired = true;
+    } else if (isRunningWithTestSelectors) {
+      // As a feature to aid developers, we'll assume that when we are using test selectors,
+      // we should always run each test (and never look at the cache.)
+      // TODO(edwardspeyer) When #3090004 and #3436849 are closed we can respect the cache again.
       isTestRunRequired = true;
     } else if (((result = cachingBuildEngine.getBuildRuleResult(
         test.getBuildTarget())) != null) &&
