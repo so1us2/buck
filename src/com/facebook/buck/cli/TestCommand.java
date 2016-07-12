@@ -121,7 +121,7 @@ public class TestCommand extends BuildCommand {
   private Boolean isBuildFiltered = null;
 
   @Option(name = "--build-only", usage = "Only build test targets without running tests.")
-  private boolean shouldBuildOnly = false;
+  private boolean isBuildOnly = false;
 
   // TODO(#9061229): See if we can remove this option entirely. For now, the
   // underlying code has been removed, and this option is ignored.
@@ -502,7 +502,7 @@ public class TestCommand extends BuildCommand {
           return exitCode;
         }
 
-        if (shouldBuildOnly) {
+        if (isBuildOnly) {
           return 0;
         }
 
