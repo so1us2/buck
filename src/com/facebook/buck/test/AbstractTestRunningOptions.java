@@ -57,6 +57,11 @@ abstract class AbstractTestRunningOptions {
   }
 
   @Value.Default
+  public boolean isSkipCachedFailures() {
+    return false;
+  }
+
+  @Value.Default
   public boolean isDryRun() {
     return false;
   }
