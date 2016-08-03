@@ -57,7 +57,7 @@ abstract class AbstractTestRunningOptions {
   }
 
   @Value.Default
-  public boolean isSkipCachedFailures() {
+  public boolean isRerunCachedFailures() {
     return false;
   }
 

@@ -124,7 +124,7 @@ public class TestCommand extends BuildCommand {
   private boolean isBuildOnly = false;
 
   @Option(name = "--rerun-cached-failures", usage = "Rerun tests that have a cached failure.")
-  private boolean isSkipCachedFailures = false;
+  private boolean isRerunCachedFailures = false;
 
   // TODO(#9061229): See if we can remove this option entirely. For now, the
   // underlying code has been removed, and this option is ignored.
@@ -255,7 +255,7 @@ public class TestCommand extends BuildCommand {
         .setRunAllTests(isRunAllTests())
         .setTestSelectorList(testSelectorOptions.getTestSelectorList())
         .setShouldExplainTestSelectorList(testSelectorOptions.shouldExplain())
-        .setSkipCachedFailures(isSkipCachedFailures)
+        .setRerunCachedFailures(isRerunCachedFailures)
         .setResultsCacheEnabled(isResultsCacheEnabled(params.getBuckConfig()))
         .setDryRun(isDryRun)
         .setShufflingTests(isShufflingTests)

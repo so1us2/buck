@@ -196,7 +196,7 @@ public class TestRunning {
           options.isResultsCacheEnabled(),
           !options.getTestSelectorList().isEmpty(),
           options.isDryRun(),
-          options.isSkipCachedFailures());
+          options.isRerunCachedFailures());
 
       final Map<String, UUID> testUUIDMap = new HashMap<>();
       TestRule.TestReportingCallback testReportingCallback = new TestRule.TestReportingCallback() {
@@ -574,7 +574,7 @@ public class TestRunning {
       boolean isResultsCacheEnabled,
       boolean isRunningWithTestSelectors,
       boolean isDryRun,
-      boolean isSkipCachedFailures)
+      boolean isRerunCachedFailures)
       throws IOException, ExecutionException, InterruptedException {
     boolean isTestRunRequired;
     BuildResult result;
@@ -594,7 +594,7 @@ public class TestRunning {
             test.hasTestResultFiles(executionContext) &&
             testRuleKeyFileHelper.isRuleKeyInDir(test)) {
       try {
-        if (isSkipCachedFailures && !test.interpretTestResults(
+        if (isRerunCachedFailures && !test.interpretTestResults(
             executionContext,
             isRunningWithTestSelectors,
             isDryRun).call().isSuccess()) {
