@@ -85,7 +85,7 @@ public class ProjectConfig extends NoopBuildRule {
 
     if (srcResourceRoots != null) {
       this.srcResourceRoots = ImmutableList.copyOf(Iterables.transform(srcResourceRoots,
-            srcRootsTransform));
+          SourceRoot::new));
     } else {
       this.srcResourceRoots = null;
     }
@@ -99,7 +99,7 @@ public class ProjectConfig extends NoopBuildRule {
     }
     if (testResourceRoots != null) {
       this.testsResourceRoots = ImmutableList.copyOf(Iterables.transform(testResourceRoots,
-          srcRootsTransform));
+          SourceRoot::new));
     } else {
       this.testsResourceRoots = null;
     }
