@@ -394,6 +394,8 @@ public class PythonTestDescription implements
 
   @SuppressFieldNotInitialized
   public static class Arg extends PythonLibraryDescription.Arg {
+    // TODO(dxxchen): Remove this once all usages of source_under_test are removed.
+    public ImmutableList<String> sourceUnderTest = ImmutableList.of();
     public Optional<String> mainModule;
     public ImmutableSet<String> contacts = ImmutableSet.of();
     public ImmutableSet<Label> labels = ImmutableSet.of();

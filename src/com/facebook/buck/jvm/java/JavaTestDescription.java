@@ -223,6 +223,8 @@ public class JavaTestDescription implements
 
   @SuppressFieldNotInitialized
   public static class Arg extends JavaLibraryDescription.Arg {
+    // TODO(dxxchen): Remove this once all usages of source_under_test are removed.
+    public ImmutableList<String> sourceUnderTest = ImmutableList.of();
     public ImmutableSortedSet<String> contacts = ImmutableSortedSet.of();
     public ImmutableSortedSet<Label> labels = ImmutableSortedSet.of();
     public ImmutableList<String> vmArgs = ImmutableList.of();
