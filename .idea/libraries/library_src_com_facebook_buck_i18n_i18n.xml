@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_src_com_facebook_buck_i18n_i18n">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/src/com/facebook/buck/i18n/lib__i18n__output/i18n.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

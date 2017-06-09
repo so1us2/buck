@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_src_com_facebook_buck_apple_project_generator_project_generator">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/src/com/facebook/buck/apple/project_generator/lib__project_generator__output/project_generator.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

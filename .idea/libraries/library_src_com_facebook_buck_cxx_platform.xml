@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_src_com_facebook_buck_cxx_platform">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/src/com/facebook/buck/cxx/lib__platform__output/platform.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

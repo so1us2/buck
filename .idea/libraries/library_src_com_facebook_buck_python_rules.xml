@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_src_com_facebook_buck_python_rules">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/src/com/facebook/buck/python/lib__rules__output/rules.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

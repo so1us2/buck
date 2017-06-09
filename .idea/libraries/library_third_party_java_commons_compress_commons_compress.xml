@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_commons_compress_commons_compress">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/commons-compress/commons-compress-1.8.1.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="http://commons.apache.org/proper/commons-compress/javadocs/api-1.8.1/" />
+    </JAVADOC>
+    <SOURCES />
+  </library>
+</component>

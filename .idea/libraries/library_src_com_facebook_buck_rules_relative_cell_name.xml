@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_src_com_facebook_buck_rules_relative_cell_name">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/src/com/facebook/buck/rules/lib__relative_cell_name__output/relative_cell_name.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_ddmlib_ddmlib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/ddmlib/ddmlib-22.5.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/ddmlib/ddmlib-22.5.3-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

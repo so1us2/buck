@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_maven_maven_aether_provider">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/maven/maven-aether-provider-3.2.5.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/maven/maven-aether-provider-3.2.5-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

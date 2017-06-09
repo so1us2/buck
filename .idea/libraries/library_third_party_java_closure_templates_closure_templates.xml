@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_closure_templates_closure_templates">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/closure-templates/soy-excluding-deps.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

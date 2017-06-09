@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" packagePrefix="third-party.java.aosp" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/tests/src/com/android/manifmerger" isTestSource="false" packagePrefix="com.android.manifmerger" />
+      <sourceFolder url="file://$MODULE_DIR$/tests/src/com/android/manifmerger/data" isTestSource="true" packagePrefix="com.android.manifmerger.data" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="src_com_facebook_buck" />
+    <orderEntry type="library" name="library_third_party_java_junit_junit" level="project" />
+  </component>
+</module>

@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_okio_okio">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/okio/okio-1.8.0.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="http://square.github.io/okio" />
+    </JAVADOC>
+    <SOURCES />
+  </library>
+</component>

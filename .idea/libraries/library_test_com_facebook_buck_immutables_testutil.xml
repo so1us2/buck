@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_test_com_facebook_buck_immutables_testutil">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/test/com/facebook/buck/immutables/lib__testutil__output/testutil.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

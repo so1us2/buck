@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_caliper_caliper">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/buck-out/gen/third-party/java/caliper/caliper_shaded/caliper_shaded.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

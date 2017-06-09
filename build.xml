@@ -178,7 +178,7 @@
     <pathelement location="${third-party.dir}/java/junit/junit-4.12.jar" />
     <pathelement location="${third-party.dir}/java/hamcrest/hamcrest-junit-2.0.0.0.jar" />
     <pathelement location="${third-party.dir}/java/hamcrest/java-hamcrest-2.0.0.0.jar" />
-    <pathelement location="${third-party.dir}/java/testng/testng-6.8.jar" />
+    <pathelement location="${third-party.dir}/java/testng/testng-6.11.jar" />
     <pathelement location="${third-party.dir}/java/ddmlib/ddmlib-22.5.3.jar" />
   </path>
 

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_eden_eden_thrift_bindings">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/eden/eden.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

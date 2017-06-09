@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false"  packagePrefix="com.facebook.buck"/>
+      <excludeFolder url="file://$MODULE_DIR$/apple/project_generator/uuid_test_app" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/artifact_cache/thrift" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/cli/quickstart" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/distributed/thrift" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/json/buck_parser" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/log/thrift" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/util/exportedfiles" isTestSource="false" />
+
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/distributed/__distributed_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/distributed/__distributed_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/versioncontrol/__versioncontrol_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/versioncontrol/__versioncontrol_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/d/__d_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/d/__d_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/swift/__platform_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/swift/__platform_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/event/__event_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/event/__event_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/__io_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/__io_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/i18n/__i18n_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/i18n/__i18n_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/json/__json_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/json/__json_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/parser/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/parser/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/__rules_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/__rules_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__relative_cell_name_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__relative_cell_name_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/simulator/__simulator_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/simulator/__simulator_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/keys/__keys_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/keys/__keys_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/test/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/test/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/versions/__types_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/versions/__types_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/lua/__lua_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/lua/__lua_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/python/__rules_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/python/__rules_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__types_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__types_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/step/__step_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/step/__step_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/environment/__environment_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/environment/__environment_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/cache/__cache_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/cache/__cache_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/coercer/__coercer_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/coercer/__coercer_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/event/listener/__listener_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/event/listener/__listener_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/haskell/__haskell_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/haskell/__haskell_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/model/__model_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/model/__model_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/__platform_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/__platform_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/config/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/config/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__BuckPaths_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__BuckPaths_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rage/__rage_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rage/__rage_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cxx/__platform_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cxx/__platform_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/bsd/__bsd_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/bsd/__bsd_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__artifact_cache_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__artifact_cache_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/query/__query_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/query/__query_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__watchman_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__watchman_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/versions/__versions_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/versions/__versions_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/model/__macros_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/model/__macros_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/macho/__macho_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/macho/__macho_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/shell/__worker_process_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/shell/__worker_process_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/xcode/__xcode_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/xcode/__xcode_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/log/__log_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/log/__log_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/macros/__macros_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/macros/__macros_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/__util_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/__util_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/go/__go_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/go/__go_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__io_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/io/__io_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cli/__cli_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cli/__cli_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rage/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rage/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cxx/__rules_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/cxx/__rules_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__rules_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__rules_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/network/offline/__offline_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/network/offline/__offline_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/parser/__parser_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/parser/__parser_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/project_generator/__project_generator_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/apple/project_generator/__project_generator_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__build_rule_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/__build_rule_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__binary_protocol_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/artifact_cache/__binary_protocol_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/command/__command_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/command/__command_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/python/__support_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/python/__support_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/args/__args_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/rules/args/__args_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/shell/__worker_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/shell/__worker_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/ocaml/__ocaml_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/ocaml/__ocaml_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/test/__test_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/test/__test_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/doctor/config/__config_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/doctor/config/__config_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/slb/__slb_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/slb/__slb_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/counters/__counters_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/counters/__counters_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/concurrent/__concurrent_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../buck-out/annotation/src/com/facebook/buck/util/concurrent/__concurrent_gen__" isTestSource="false" />
+    </content>
+
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm_java" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_gen" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_aosp" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_eclipse" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jackson" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jetty" scope="COMPILE"  />
+    <orderEntry type="library" name="library_third_party_java_ObjCBridge_ObjCBridge" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_connector_basic" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_impl" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_spi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_transport_http" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_util" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_sdk_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_args4j_args4j" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_asm_asm" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_closure_templates_closure_templates" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_commons_compress_commons_compress" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_concurrent_locks_concurrent_locks" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_dd_plist_dd_plist" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_ddmlib_ddmlib" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_contenttype" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_preferences" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jdt" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jobs" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_osgi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_resources" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_runtime" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eden_eden_thrift_bindings" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eden_java_thrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_gson_gson" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_guava_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_immutables_processor" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_infer_annotations_infer_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_ini4j_ini4j" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_databind_jar" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_datatype_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_datatype_jdk8" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jetty_jetty_all" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jna_jna" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jna_jna_platform" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jsr_jsr305" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_junit_junit" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_maven_maven_aether_provider" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_maven_maven_model" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_maven_maven_model_builder" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nailgun_nailgun" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nuprocess_nuprocess" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okhttp_okhttp" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okio_okio" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_oshi_oshi_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_servlet_api_servlet_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_slf4j_slf4j_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_stringtemplate_stringtemplate" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_testng_testng" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_thrift_libthrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_xz_java_1_5_xz" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_apple_platform" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_apple_project_generator_project_generator" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_apple_rules" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_apple_simulator_simulator" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_apple_xcode_xcode" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_artifact_cache_artifact_cache" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_artifact_cache_binary_protocol" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_artifact_cache_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_bsd_bsd" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_cli_cli" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_command_command" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_config_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_counters_counters" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_cxx_platform" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_cxx_rules" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_d_d" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_distributed_distributed" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_doctor_config_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_event_event" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_event_listener_listener" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_go_go" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_haskell_haskell" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_i18n_i18n" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_io_BuckPaths" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_io_io" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_io_watchman" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_json_json" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_log_log" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_lua_lua" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_macho_macho" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_model_macros" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_model_model" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_ocaml_ocaml" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_parser_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_parser_parser" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_python_rules" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_python_support" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_query_query" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rage_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rage_rage" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_args_args" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_build_rule" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_coercer_coercer" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_keys_keys" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_macros_macros" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_relative_cell_name" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_rules" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_rules_types" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_shell_worker" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_shell_worker_process" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_slb_slb" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_step_step" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_swift_platform" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_test_config" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_test_test" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_cache_cache" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_concurrent_concurrent" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_environment_environment" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_io" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_network_offline_offline" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_util" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_util_versioncontrol_versioncontrol" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_versions_types" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_versions_versions" scope="PROVIDED" level="project"  exported=""  />
+
+  </component>
+</module>

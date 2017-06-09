@@ -1,0 +1,556 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/buck/android" isTestSource="false"  packagePrefix="com.facebook.buck.android"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/aapt" isTestSource="true"  packagePrefix="com.facebook.buck.android.aapt"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/agent" isTestSource="true"  packagePrefix="com.facebook.buck.android.agent"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/android/agent/util/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/relinker" isTestSource="true"  packagePrefix="com.facebook.buck.android.relinker"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_aar_build/caseA" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_aar_build/caseB" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_aar_build.caseB"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_aar_native_deps/cxx_deps" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_aar_native_deps.cxx_deps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_aar_native_deps/ndk_deps" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_apk_integration_test" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_instrumentation_apk_integration_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_apk_integration_test/java/com/sample/app" isTestSource="true"  packagePrefix="com.sample.app"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_apk_integration_test/java/com/sample/lib" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_test_integration_test" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_instrumentation_test_integration_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_test_integration_test/apps" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_instrumentation_test_integration_test.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_test_integration_test/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_test_integration_test/res" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_instrumentation_test_integration_test.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_instrumentation_test_integration_test/test" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_prebuilt_aar" isTestSource="true"  packagePrefix="com.example.activity"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_prebuilt_aar/android_prebuilt_aar-dep" isTestSource="true"  packagePrefix="com.example.activity"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_prebuilt_aar/prebuilt_jar-dep" isTestSource="true"  packagePrefix="com.example.activity"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_prebuilt_aar/third-party" isTestSource="true"  packagePrefix="com.example.activity.third-party"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/apps" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/external_files" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.external_files"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/buildconfigs" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/example" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/preprocess" isTestSource="true"  packagePrefix="com.preprocess"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/sample/app" isTestSource="true"  packagePrefix="com.sample.app"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/sample/lib" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/sample/small" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/java/com/sample2" isTestSource="true"  packagePrefix="com.facebook.sample2"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/keystores" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.keystores"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/kotlin" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.kotlin"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/native" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.native"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/res" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/scala" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.scala"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_project/third-party" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_project.third-party"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/android_resource" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.android_resource"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/bad_android_config" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/build_config" isTestSource="true"  packagePrefix="com.example.buck"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/cached_build" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.cached_build"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/compile_strings" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.compile_strings"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/create_manifest" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.create_manifest"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/cxx_deps" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.cxx_deps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/exopackage-device" isTestSource="true"  packagePrefix="exotest"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/ndk_app_platform" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.ndk_app_platform"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/ndk_debug_paths" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.ndk_debug_paths"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/parse_package_from_manifest" isTestSource="true"  packagePrefix="com.example.activity"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/android/testdata/runtime_stl" isTestSource="true"  packagePrefix="com.facebook.buck.android.testdata.runtime_stl"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple" isTestSource="false"  packagePrefix="com.facebook.buck.apple"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple/clang" isTestSource="true"  packagePrefix="com.facebook.buck.apple.clang"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple/project_generator" isTestSource="false"  packagePrefix="com.facebook.buck.apple.project_generator"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple/simulator" isTestSource="true"  packagePrefix="com.facebook.buck.apple.simulator"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.apple.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/apple/xcode" isTestSource="true"  packagePrefix="com.facebook.buck.apple.xcode"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/apple/xcode/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/artifact_cache" isTestSource="false"  packagePrefix="com.facebook.buck.artifact_cache"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/autodeps" isTestSource="true"  packagePrefix="com.facebook.buck.autodeps"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/benchmarks" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/bsd" isTestSource="true"  packagePrefix="com.facebook.buck.bsd"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/bser" isTestSource="true"  packagePrefix="com.facebook.buck.bser"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/charset" isTestSource="true"  packagePrefix="com.facebook.buck.charset"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli" isTestSource="false"  packagePrefix="com.facebook.buck.cli"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/cli/bootstrapper" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/alias" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.alias"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/apple_app_bundle" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.apple_app_bundle"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/apple_app_bundle_with_device_helper_as_target" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.apple_app_bundle_with_device_helper_as_target"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_config" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_config"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_dependencies" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_dependencies"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_input" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_input"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_input_no_src" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_input_no_src"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_owner" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_owner"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_rules" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_rules"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_rules_respect_configs" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_rules_respect_configs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/audit_tests" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.audit_tests"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers/alternate_bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers/bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers/foo" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers_only_one_public/alternate_bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers_only_one_public/bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_multiple_public_providers_only_one_public/foo" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_provider_available_only_via_exported_deps/bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_provider_available_only_via_exported_deps/foo" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_provider_available_only_via_multiple_exported_deps/bar" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_provider_available_only_via_multiple_exported_deps/foo" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_provider_in_provided_deps" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_single_provider_known_only_via_buckconfig" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/autodeps_java_single_public_provider" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/buck_events" isTestSource="true"  packagePrefix="buck.events"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/buck_py_ignore_paths" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.buck_py_ignore_paths"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/command_line_parser" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.command_line_parser"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/detect_test_changes_with_broken_targets" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.detect_test_changes_with_broken_targets"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/empty_project" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.empty_project"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/exclusive_execution" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.daemon"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/external_test_runner" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.external_test_runner"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/fetch_concrete" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.fetch_concrete"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/fetch_nothing" isTestSource="true"  packagePrefix="com.facebook.buck.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/file_watching" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.file_watching"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/file_watching/apps" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.file_watching.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/file_watching/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/filtered_tests" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.filtered_tests"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/includes_override" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.includes_override"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/includes_removals" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.includes_removals"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/java_library_with_tests" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.java_library_with_tests"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/just_build" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.just_build"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/keep_going" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.keep_going"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/num_threads" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.num_threads"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/output_path" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.output_path"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/path_arguments" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.path_arguments"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/project_slice" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.project_slice"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/project_with_fifteen_aliases" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.project_with_fifteen_aliases"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/project_with_five_aliases" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.project_with_five_aliases"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/project_with_no_alias" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.project_with_no_alias"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/project_with_one_alias" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.project_with_one_alias"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/publish" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.publish"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/publish_fatjar" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/query_command" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.query_command"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/quickstart_expected_ios_project" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.quickstart_expected_ios_project"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/quickstart_expected_project" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.quickstart_expected_project"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/repl_command" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.repl_command"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/run-command" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.run-command"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/run-command-failure" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.run-command-failure"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/suggest_java_partition/app" isTestSource="true"  packagePrefix="app"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/suggest_java_partition/lib" isTestSource="true"  packagePrefix="lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/suggest_java_partition/third-party" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/target_command" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.target_command"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/target_validation" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.target_validation"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cli/testdata/xcode_workspace_with_tests" isTestSource="true"  packagePrefix="com.facebook.buck.cli.testdata.xcode_workspace_with_tests"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/config" isTestSource="false"  packagePrefix="com.facebook.buck.config"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/counters" isTestSource="true"  packagePrefix="com.facebook.buck.counters"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/build-file-names" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.build-file-names"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/circular" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.circular"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/export-file" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.export-file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/include-defs" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.include-defs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/java/primary" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/java/secondary" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/multi-cell" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.multi-cell"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/inter-cell/visibility" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.inter-cell.visibility"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/crosscell/testdata/intracell" isTestSource="true"  packagePrefix="com.facebook.buck.crosscell.testdata.intracell"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cxx" isTestSource="false"  packagePrefix="com.facebook.buck.cxx"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cxx/elf" isTestSource="true"  packagePrefix="com.facebook.buck.cxx.elf"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/cxx/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.cxx.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/d" isTestSource="false"  packagePrefix="com.facebook.buck.d"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/d/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.d.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/dalvik" isTestSource="true"  packagePrefix="com.facebook.buck.dalvik"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/ddplist" isTestSource="true"  packagePrefix="com.facebook.buck.ddplist"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/distributed" isTestSource="true"  packagePrefix="com.facebook.buck.distributed"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/distributed/testdata/empty" isTestSource="true"  packagePrefix="com.facebook.buck.distributed.testdata.empty"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/distributed/testdata/simple_java_target" isTestSource="true"  packagePrefix="foo"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/doctor" isTestSource="true"  packagePrefix="com.facebook.buck.doctor"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/dotnet" isTestSource="false"  packagePrefix="com.facebook.buck.dotnet"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/dotnet/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.dotnet.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/eden" isTestSource="true"  packagePrefix="com.facebook.buck.eden"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/eden/cli" isTestSource="false"  packagePrefix="com.facebook.buck.eden.cli"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/event" isTestSource="false"  packagePrefix="com.facebook.buck.event"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/event/listener" isTestSource="false"  packagePrefix="com.facebook.buck.event.listener"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/event/listener/integration" isTestSource="true"  packagePrefix="com.facebook.buck.event.listener.integration"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/file" isTestSource="false"  packagePrefix="com.facebook.buck.file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/go" isTestSource="false"  packagePrefix="com.facebook.buck.go"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/go/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/graph" isTestSource="true"  packagePrefix="com.facebook.buck.graph"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/graphql" isTestSource="true"  packagePrefix="com.facebook.buck.graphql"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/gwt" isTestSource="true"  packagePrefix="com.facebook.buck.gwt"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/gwt/testdata/gwt_binary" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/halide" isTestSource="false"  packagePrefix="com.facebook.buck.halide"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/hashing" isTestSource="true"  packagePrefix="com.facebook.buck.hashing"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/haskell" isTestSource="false"  packagePrefix="com.facebook.buck.haskell"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/haskell/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/httpserver" isTestSource="true"  packagePrefix="com.facebook.buck.httpserver"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/i18n" isTestSource="true"  packagePrefix="com.facebook.buck.i18n"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/immutables" isTestSource="false"  packagePrefix="com.facebook.buck.immutables"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/io" isTestSource="false"  packagePrefix="com.facebook.buck.io"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/io/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.io.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js" isTestSource="false"  packagePrefix="com.facebook.buck.js"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.android_rn"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn/apps" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.android_rn.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn/java/com/sample/lib" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn/js" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.android_rn.js"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn/keystores" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.android_rn.keystores"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/android_rn/res" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.android_rn.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/js/testdata/ios_rn" isTestSource="true"  packagePrefix="com.facebook.buck.js.testdata.ios_rn"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/json" isTestSource="false"  packagePrefix="com.facebook.buck.json"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/groovy" isTestSource="false"  packagePrefix="com.facebook.buck.jvm.groovy"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/groovy/testdata/groovy_library_description" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/groovy/testdata/groovy_test_description" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.groovy.testdata.groovy_test_description"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java" isTestSource="false"  packagePrefix="com.facebook.buck.jvm.java"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/abi" isTestSource="false"  packagePrefix="com.facebook.buck.jvm.java.abi"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/abi/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.abi.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/autodeps" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.autodeps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/autodeps/testdata/java_library_symbols_finder" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/classes" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.classes"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.app"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app/keystore" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.app.keystore"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app/src/main" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.app.src.main"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app/src/main/assets" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.app.src.main.assets"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app/src/main/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/app/src/main/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.app.src.main.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libA" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libA"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libA/src/main" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libA.src.main"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libA/src/main/assets" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libA.src.main.assets"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libA/src/main/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libA/src/main/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libA.src.main.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libB" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libB"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libB/src/main" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libB.src.main"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libB/src/main/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/android_project_with_gradle_conventions/libB/src/main/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.android_project_with_gradle_conventions.libB.src.main.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/buck_project_multiple_libraries_in_one_build_file" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.buck_project_multiple_libraries_in_one_build_file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project1..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1/libs" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project1.libs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project1.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project1/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project1.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_slice"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_slice..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_slice.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice/modules/dep2" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_slice.modules.dep2"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_slice/modules/dep2/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_source_merge"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_source_merge..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/java/code/modules" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_source_merge.java.code.modules"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/java/code/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_source_merge.java.code.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/java/code/modules/dep1/src" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/java/code/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_source_merge.java.code.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_source_merge/java/code/modules/tip/src" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_artifacts" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_artifacts"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep2" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks.modules.dep2"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep2/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep3" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks.modules.dep3"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep3/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep4" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks.modules.dep4"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep4/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep5" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_custom_sdks.modules.dep5"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_custom_sdks/modules/dep5/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_excluded_resources" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_excluded_resources"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_project_settings" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_project_settings"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_project_settings/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_project_settings..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_project_settings/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_project_settings.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_project_settings/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_with_unused_libraries" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_with_unused_libraries"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_without_artifacts" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_without_artifacts"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_without_autogeneration" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_without_autogeneration"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_without_autogeneration/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_without_autogeneration..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_without_autogeneration/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.experimental_project_without_autogeneration.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/experimental_project_without_autogeneration/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project1..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1/libs" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project1.libs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project1.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project1/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project1.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/libs" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2.libs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/modules/dep1/ignore" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2.modules.dep1.ignore"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project2/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project2.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_001" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_001"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_001/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_001..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_001/apps" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_001.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_001/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_001/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_001.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_002" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_002"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_002/apps" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_002.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_002/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_r_002/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_r_002.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_slice" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_slice"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_slice_with_project_in_different_buck_file" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_slice_with_project_in_different_buck_file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_slice_with_tests" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_slice_with_tests"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_slice_with_tests_dependencies_in_different_buck_file" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_slice_with_tests_dependencies_in_different_buck_file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_slice_with_tests_project_in_different_buck_file" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_slice_with_tests_project_in_different_buck_file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary/apps" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary/java/com/sample/lib" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary/keystores" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary.keystores"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary_autogeneration_disabled"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary_autogeneration_disabled..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled/apps" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary_autogeneration_disabled.apps"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled/java/com/sample/lib" isTestSource="true"  packagePrefix="com.facebook.sample"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled/keystores" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary_autogeneration_disabled.keystores"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_android_binary_autogeneration_disabled/res" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_android_binary_autogeneration_disabled.res"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_custom_android_sdks" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_custom_android_sdks"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_genrule_as_a_src" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_genrule_as_a_src"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_genrule_as_a_src/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_genrule_as_a_src..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_genrule_as_a_src/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_genrule_as_a_src.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_genrule_as_a_src/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_genrule_as_a_src.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_genrule_as_a_src/modules/tip/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_root_iml_already_present"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present/.idea" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_root_iml_already_present..idea"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present/libs" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_root_iml_already_present.libs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present/modules/dep1" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_root_iml_already_present.modules.dep1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present/modules/dep1/src" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/intellij/testdata/project_with_root_iml_already_present/modules/tip" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.intellij.testdata.project_with_root_iml_already_present.modules.tip"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/runner" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.runner"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/abi" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.abi"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/annotation_processors" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/build_rule_source_path_as_src_test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/cached_test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/class_usage_file" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/classpath_corruption_regression" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/deadlock" isTestSource="true"  packagePrefix="com.facebook.buck.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/dep_file_rule_key" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/depend_on_another_test" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.depend_on_another_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/empty_test" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.empty_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/export_directory_entries" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.export_directory_entries"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/external_javac" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.external_javac"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/external_javac_src_zip" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/fat_jar" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.fat_jar"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/generated_resources" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.generated_resources"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/generated_resources/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/genrule_test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/guava_no_deps" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/java_binary_with_blacklist" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/java_test_broken_test" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.java_test_broken_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/java_test_get_class_names" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.java_test_get_class_names"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/java_test_missing_result_file" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.java_test_missing_result_file"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/manifest" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.manifest"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/manifest_key" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/missing_test_deps" isTestSource="true"  packagePrefix="com.facebook.buck.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/prebuilt" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.prebuilt"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/provided_deps" isTestSource="true"  packagePrefix="com.facebook.buck.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/resource_change_causes_repack" isTestSource="true"  packagePrefix="com.facebook.buck.example.resources"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/resources_root" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.resources_root"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/resources_root/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/rulekey_changed_while_abi_stable" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/slow_tests" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/slow_tests_per_rule_timeout" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.slow_tests_per_rule_timeout"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/sourcepath" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.sourcepath"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/spool_class_files_directly_to_jar" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.spool_class_files_directly_to_jar"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/spool_class_files_directly_to_jar_with_annotation_processor" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.spool_class_files_directly_to_jar_with_annotation_processor"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/spool_class_files_directly_to_jar_with_remove_classes" isTestSource="true"  packagePrefix="test.pkg"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/spool_class_files_to_disk" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.spool_class_files_to_disk"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/spool_class_files_to_disk_remove_classes" isTestSource="true"  packagePrefix="test.pkg"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/src_zip" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/static_initialization_test" isTestSource="true"  packagePrefix="com.facebook.buck.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/symbol_finder" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.symbol_finder"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/symbol_finder/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/test_rule_classpath" isTestSource="true"  packagePrefix="test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/test_with_jni" isTestSource="true"  packagePrefix="jlib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/warn_on_transitive" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/testdata/wont_delete" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.testdata.wont_delete"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/java/tracing" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.java.tracing"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/kotlin" isTestSource="false"  packagePrefix="com.facebook.buck.jvm.kotlin"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/kotlin/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.kotlin.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/jvm/scala" isTestSource="true"  packagePrefix="com.facebook.buck.jvm.scala"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/log" isTestSource="true"  packagePrefix="com.facebook.buck.log"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/lua" isTestSource="false"  packagePrefix="com.facebook.buck.lua"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/lua/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/macho" isTestSource="false"  packagePrefix="com.facebook.buck.macho"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/macho/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.macho.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/maven" isTestSource="false"  packagePrefix="com.facebook.buck.maven"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/maven/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.maven.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/message_ipc" isTestSource="true"  packagePrefix="com.facebook.buck.message_ipc"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/model" isTestSource="false"  packagePrefix="com.facebook.buck.model"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/ocaml" isTestSource="true"  packagePrefix="com.facebook.buck.ocaml"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser" isTestSource="false"  packagePrefix="com.facebook.buck.parser"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/allow_empty_glob" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.allow_empty_glob"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/autodeps/java" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/build_file_name" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.build_file_name"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/circular_dependency_detection" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.circular_dependency_detection"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/flavored_build" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.flavored_build"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/glob_ignores" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.glob_ignores"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/groups" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.groups"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/ignored_dirs_err" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.ignored_dirs_err"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/not_allow_empty_glob" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.not_allow_empty_glob"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/parse_rule_with_bad_dependency" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.parse_rule_with_bad_dependency"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/parser_with_method_overrides" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.parser_with_method_overrides"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/pipeline_test" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.pipeline_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/syntax_error" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.syntax_error"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/unflavored_build" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.unflavored_build"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/parser/testdata/visibility" isTestSource="true"  packagePrefix="com.facebook.buck.parser.testdata.visibility"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/python" isTestSource="false"  packagePrefix="com.facebook.buck.python"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/python/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/query" isTestSource="false"  packagePrefix="com.facebook.buck.query"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rage" isTestSource="false"  packagePrefix="com.facebook.buck.rage"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rage/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.rage.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules" isTestSource="false"  packagePrefix="com.facebook.buck.rules"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/args" isTestSource="true"  packagePrefix="com.facebook.buck.rules.args"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/coercer" isTestSource="true"  packagePrefix="com.facebook.buck.rules.coercer"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/keys" isTestSource="true"  packagePrefix="com.facebook.buck.rules.keys"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/macros" isTestSource="true"  packagePrefix="com.facebook.buck.rules.macros"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/testdata/diff_rulekeys_script" isTestSource="true"  packagePrefix="buck"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rules/testdata/java_library_resources_root_target_hash" isTestSource="true"  packagePrefix="com.facebook.buck.rules.testdata.java_library_resources_root_target_hash"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/rust" isTestSource="false"  packagePrefix="com.facebook.buck.rust"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/rust/testdata" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/shell" isTestSource="false"  packagePrefix="com.facebook.buck.shell"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/shell/testdata" isTestSource="true"  packagePrefix="com.facebook.buck.shell.testdata"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/slb" isTestSource="true"  packagePrefix="com.facebook.buck.slb"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/step" isTestSource="false"  packagePrefix="com.facebook.buck.step"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/step/fs" isTestSource="true"  packagePrefix="com.facebook.buck.step.fs"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/swift" isTestSource="true"  packagePrefix="com.facebook.buck.swift"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test" isTestSource="false"  packagePrefix="com.facebook.buck.test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test/labels" isTestSource="true"  packagePrefix="com.facebook.buck.test.labels"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test/labels/testdata/labels" isTestSource="true"  packagePrefix="com.facebook.buck.test.labels.testdata.labels"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test/labels/testdata/labels/lib" isTestSource="true"  packagePrefix="com.facebook.buck.test.labels.testdata.labels.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test/labels/testdata/labels/test" isTestSource="true"  packagePrefix="com.example.science"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/test/selectors" isTestSource="true"  packagePrefix="com.facebook.buck.test.selectors"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/assumption_violations" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.assumption_violations"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/assumption_violations/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.assumption_violations.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/assumption_violations/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/build_then_test" isTestSource="true"  packagePrefix="com.facebook.buck.junit.testdata.build_then_test"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/class_statements" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/dry_run" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.dry_run"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/dry_run/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.dry_run.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/dry_run/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/dry_run_testng" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/overridden_timeouts" isTestSource="true"  packagePrefix="com.example.buck"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/run_with_timeout" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/runwith" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.simple_testng"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.simple_testng.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng_setup" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.simple_testng_setup"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng_setup/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.simple_testng_setup.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/simple_testng_setup/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_call_flow" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors/test" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_annotated_with_runwith" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors_annotated_with_runwith"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_annotated_with_runwith/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors_annotated_with_runwith.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_annotated_with_runwith/src" isTestSource="true"  packagePrefix="com.facebook.buck.junit.testdata.test_selectors_annotated_with_runwith.src"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_annotated_with_runwith/test" isTestSource="true"  packagePrefix="com.example.broken"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_junit_versions/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors_junit_versions.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_junit_versions/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_testless_classes" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors_testless_classes"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_testless_classes/lib" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_selectors_testless_classes.lib"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_selectors_testless_classes/test" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/test_with_logging" isTestSource="true"  packagePrefix="com.facebook.buck.testrunner.testdata.test_with_logging"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testrunner/testdata/timeouts" isTestSource="true"  packagePrefix="com.example"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/testutil" isTestSource="false"  packagePrefix="com.facebook.buck.testutil"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/thrift" isTestSource="true"  packagePrefix="com.facebook.buck.thrift"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/timing" isTestSource="false"  packagePrefix="com.facebook.buck.timing"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util" isTestSource="false"  packagePrefix="com.facebook.buck.util"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/cache" isTestSource="true"  packagePrefix="com.facebook.buck.util.cache"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/collect" isTestSource="true"  packagePrefix="com.facebook.buck.util.collect"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/concurrent" isTestSource="false"  packagePrefix="com.facebook.buck.util.concurrent"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/environment" isTestSource="false"  packagePrefix="com.facebook.buck.util.environment"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/network" isTestSource="false"  packagePrefix="com.facebook.buck.util.network"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/network/hostname" isTestSource="true"  packagePrefix="com.facebook.buck.util.network.hostname"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/network/offline" isTestSource="true"  packagePrefix="com.facebook.buck.util.network.offline"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/perf" isTestSource="true"  packagePrefix="com.facebook.buck.util.perf"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/sha1" isTestSource="true"  packagePrefix="com.facebook.buck.util.sha1"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/shutdown" isTestSource="false"  packagePrefix="com.facebook.buck.util.shutdown"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/unit" isTestSource="true"  packagePrefix="com.facebook.buck.util.unit"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/util/versioncontrol" isTestSource="true"  packagePrefix="com.facebook.buck.util.versioncontrol"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/versions" isTestSource="false"  packagePrefix="com.facebook.buck.versions"/>
+      <sourceFolder url="file://$MODULE_DIR$/buck/zip" isTestSource="true"  packagePrefix="com.facebook.buck.zip"/>
+      <excludeFolder url="file://$MODULE_DIR$/buck/zip/testdata" isTestSource="false" />
+
+    </content>
+    <content url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/haskell/__testutil_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/haskell/__testutil_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/util/environment/__testutil_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/util/environment/__testutil_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/immutables/__testutil_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/immutables/__testutil_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/lua/__testutil_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/lua/__testutil_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/util/__testutil_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../buck-out/annotation/test/com/facebook/buck/util/__testutil_gen__" isTestSource="false" />
+    </content>
+
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="src_com_facebook_buck" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android_agent" scope="TEST"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android_agent_util" scope="TEST"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm_java" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_gen" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_aosp" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_eclipse" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jackson" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jetty" scope="COMPILE"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_spi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_sdk_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_args4j_args4j" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_asm_asm" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_caliper_caliper" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_cglib_cglib" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_closure_templates_closure_templates" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_commons_compress_commons_compress" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_concurrent_locks_concurrent_locks" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_dd_plist_dd_plist" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_ddmlib_ddmlib" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_easymock_easymock" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_contenttype" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_preferences" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jdt" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jobs" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_osgi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_resources" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_runtime" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eden_eden_thrift_bindings" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eden_java_thrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_gson_gson" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_guava_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_hamcrest_hamcrest_junit" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_hamcrest_java_hamcrest" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_immutables_processor" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_infer_annotations_infer_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_ini4j_ini4j" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_databind_jar" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_datatype_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jetty_jetty_all" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jimfs_jimfs" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jna_jna" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jsr_jsr305" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_junit_junit" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_maven_maven_model" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nailgun_nailgun" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nuprocess_nuprocess" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okhttp_okhttp" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okio_okio" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_plexus_plexus_utils" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_servlet_api_servlet_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_stringtemplate_stringtemplate" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_thrift_libthrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_xz_java_1_5_xz" scope="TEST" level="project"  />
+    <orderEntry type="library" name="library_test_com_facebook_buck_haskell_testutil" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_test_com_facebook_buck_immutables_testutil" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_test_com_facebook_buck_lua_testutil" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_test_com_facebook_buck_util_environment_testutil" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_test_com_facebook_buck_util_testutil" scope="PROVIDED" level="project"  exported=""  />
+
+  </component>
+</module>

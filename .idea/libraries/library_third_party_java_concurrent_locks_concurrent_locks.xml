@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_concurrent_locks_concurrent_locks">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/concurrent-locks/concurrent-locks-1.0.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/concurrent-locks/concurrent-locks-1.0.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

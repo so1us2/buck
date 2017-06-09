@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_nuprocess_nuprocess">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/nuprocess/nuprocess-1.1.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/nuprocess/nuprocess-1.1.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

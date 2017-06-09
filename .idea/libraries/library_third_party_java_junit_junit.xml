@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_junit_junit">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/junit/junit-4.12.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="http://junit-team.github.io/junit/javadoc/latest/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/junit/junit-4.12-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

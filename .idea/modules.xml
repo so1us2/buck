@@ -2,9 +2,26 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/third-party/java/aosp/aosp.iml" filepath="$PROJECT_DIR$/third-party/java/aosp/aosp.iml" />
-      <module fileurl="file://$PROJECT_DIR$/buck.iml" filepath="$PROJECT_DIR$/buck.iml" />
-      <module fileurl="file://$PROJECT_DIR$/scripts/scripts.iml" filepath="$PROJECT_DIR$/scripts/scripts.iml" />
-    </modules>
+      <module fileurl="file://$PROJECT_DIR$/project_root.iml" filepath="$PROJECT_DIR$/project_root.iml"  />
+      <module fileurl="file://$PROJECT_DIR$/src-gen/src_gen.iml" filepath="$PROJECT_DIR$/src-gen/src_gen.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/android/agent/src_com_facebook_buck_android_agent.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/android/agent/src_com_facebook_buck_android_agent.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/android/agent/util/src_com_facebook_buck_android_agent_util.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/android/agent/util/src_com_facebook_buck_android_agent_util.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/android/src_com_facebook_buck_android.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/android/src_com_facebook_buck_android.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/intellij/ideabuck/src_com_facebook_buck_intellij_ideabuck.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/intellij/ideabuck/src_com_facebook_buck_intellij_ideabuck.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/src_com_facebook_buck_jvm_java.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/src_com_facebook_buck_jvm_java.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/src_com_facebook_buck_jvm.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/src_com_facebook_buck_jvm.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/src_com_facebook_buck.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/src_com_facebook_buck.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/test/com/facebook/test_com_facebook.iml" filepath="$PROJECT_DIR$/test/com/facebook/test_com_facebook.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/android/third_party_java_android.iml" filepath="$PROJECT_DIR$/third-party/java/android/third_party_java_android.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/aosp/third_party_java_aosp.iml" filepath="$PROJECT_DIR$/third-party/java/aosp/third_party_java_aosp.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/dx/third_party_java_dx.iml" filepath="$PROJECT_DIR$/third-party/java/dx/third_party_java_dx.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/eclipse/third_party_java_eclipse.iml" filepath="$PROJECT_DIR$/third-party/java/eclipse/third_party_java_eclipse.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/hamcrest/third_party_java_hamcrest.iml" filepath="$PROJECT_DIR$/third-party/java/hamcrest/third_party_java_hamcrest.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/intellij/third_party_java_intellij.iml" filepath="$PROJECT_DIR$/third-party/java/intellij/third_party_java_intellij.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jackson/third_party_java_jackson.iml" filepath="$PROJECT_DIR$/third-party/java/jackson/third_party_java_jackson.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jacoco/third_party_java_jacoco.iml" filepath="$PROJECT_DIR$/third-party/java/jacoco/third_party_java_jacoco.iml"  group="modules"  />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jetty/third_party_java_jetty.iml" filepath="$PROJECT_DIR$/third-party/java/jetty/third_party_java_jetty.iml"  group="modules"  />
+
+   </modules>
   </component>
 </project>

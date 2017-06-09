@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_dd_plist_dd_plist">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/dd-plist/dd-plist.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/dd-plist/dd-plist-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

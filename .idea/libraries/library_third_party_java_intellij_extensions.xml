@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_intellij_extensions">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/intellij/extensions.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

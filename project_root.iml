@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/assets" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/buck-out" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/config" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/docs" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/pmd" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/programs" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/py" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/ObjCBridge" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/aether" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/aopalliance" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/args4j" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/asm" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/caliper" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/cglib" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/checkstyle" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/closure-templates" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/commons-codec" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/commons-compress" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/commons-logging" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/concurrent-locks" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/dd-plist" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/ddmlib" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/easymock" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/eden" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/forbiddenapis" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/grammar-kit" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/gson" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/guava" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/guice" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/httpcomponents" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/icu4j" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/immutables" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/infer-annotations" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/ini4j" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/jarjar" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/javase" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/jdk" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/jimfs" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/jna" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/jsr" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/junit" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/kxml2" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/maven" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/nailgun" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/nuprocess" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/objenesis" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/okhttp" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/okio" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/oshi" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/plexus" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/servlet-api" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/slf4j" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/stringtemplate" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/testng" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/thrift" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/java/xz-java-1.5" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/nailgun" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/third-party/py" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/webserver" isTestSource="false" />
+
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

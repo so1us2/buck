@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_aether_aether_spi">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/aether/aether-spi-1.0.2.v20150114.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/aether/aether-spi-1.0.2.v20150114-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

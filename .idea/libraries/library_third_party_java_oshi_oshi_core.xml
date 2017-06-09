@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_oshi_oshi_core">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/oshi/oshi-core-3.3-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/oshi/oshi-core-3.3-SNAPSHOT-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

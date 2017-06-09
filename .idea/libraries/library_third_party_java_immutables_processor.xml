@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_immutables_processor">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/immutables/value-2.3.8.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_eden_java_thrift">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/eden/java-thrift-dependencies.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

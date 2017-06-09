@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_jdk_compiler_tree_api">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/jdk/stub-compiler-tree-api.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="FacetManager">
+    <facet type="android" name="Android">
+      <configuration>
+        <option name="GEN_FOLDER_RELATIVE_PATH_APT" value="/../../../../../buck-out/android/src/com/facebook/buck/android/gen" />
+        <option name="GEN_FOLDER_RELATIVE_PATH_AIDL" value="/../../../../../buck-out/android/src/com/facebook/buck/android/gen" />
+        <option name="MANIFEST_FILE_RELATIVE_PATH" value="/../../../../../android_res/AndroidManifest.xml" />
+        <option name="RES_FOLDERS_RELATIVE_PATH" value="" />
+        <option name="ASSETS_FOLDER_RELATIVE_PATH" value="/assets" />
+        <option name="LIBS_FOLDER_RELATIVE_PATH" value="/libs" />
+        <option name="APK_PATH" value="" />
+        <option name="LIBRARY_PROJECT" value="true" />
+        <option name="RUN_PROCESS_RESOURCES_MAVEN_TASK" value="true" />
+        <option name="GENERATE_UNSIGNED_APK" value="false" />
+        <option name="CUSTOM_DEBUG_KEYSTORE_PATH" value="" />
+        <option name="PACK_TEST_CODE" value="false" />
+        <option name="RUN_PROGUARD" value="false" />
+        <option name="PROGUARD_CFG_PATH" value="" />
+        <option name="ENABLE_SOURCES_AUTOGENERATION" value="true" />
+        <resOverlayFolders />
+        <includeSystemProguardFile>false</includeSystemProguardFile>
+        <includeAssetsFromLibraries>true</includeAssetsFromLibraries>
+        <additionalNativeLibs />
+      </configuration>
+    </facet>
+  </component>
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false"  packagePrefix="com.facebook.buck.android"/>
+
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../buck-out/android/src/com/facebook/buck/android/gen">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../buck-out/android/src/com/facebook/buck/android/gen" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__packageable_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__packageable_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__rules_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__rules_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__apkmodule_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__apkmodule_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__steps_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../buck-out/annotation/src/com/facebook/buck/android/__steps_gen__" isTestSource="false" />
+    </content>
+
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="src_com_facebook_buck" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android_agent_util" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm_java" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_aosp" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_dx" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jackson" scope="COMPILE"  />
+    <orderEntry type="library" name="library_third_party_java_android_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_sdk_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_sdklib" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_asm_asm" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_concurrent_locks_concurrent_locks" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_dd_plist_dd_plist" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_ddmlib_ddmlib" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_gson_gson" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_guava_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_immutables_processor" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_infer_annotations_infer_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_databind_jar" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jna_jna" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jsr_jsr305" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nuprocess_nuprocess" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okhttp_okhttp" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_stringtemplate_stringtemplate" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_thrift_libthrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_android_apkmodule" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_android_packageable" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_android_rules" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_android_steps" scope="PROVIDED" level="project"  exported=""  />
+
+  </component>
+</module>

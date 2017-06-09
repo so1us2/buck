@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" packagePrefix="third-party.java.eclipse" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_contenttype" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_common" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_preferences" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jdt" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jobs" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_osgi" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_resources" level="project" />
+    <orderEntry type="library" name="library_third_party_java_eclipse_runtime" level="project" />
+  </component>
+</module>

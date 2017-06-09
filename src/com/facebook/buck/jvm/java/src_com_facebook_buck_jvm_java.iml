@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_1_6" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$" isTestSource="false"  packagePrefix="com.facebook.buck.jvm.java"/>
+
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/__support_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/__support_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/__steps_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/__steps_gen__" isTestSource="false" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/intellij/__intellij_gen__">
+      <sourceFolder url="file://$MODULE_DIR$/../../../../../../buck-out/annotation/src/com/facebook/buck/jvm/java/intellij/__intellij_gen__" isTestSource="false" />
+    </content>
+
+    <orderEntry type="jdk" jdkName="1.6" jdkType="JavaSDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="src_com_facebook_buck" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="src_com_facebook_buck_jvm" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_android" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_aosp" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_eclipse" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jackson" scope="COMPILE"  />
+    <orderEntry type="module" module-name="third_party_java_jacoco" scope="COMPILE"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_aether_aether_spi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_android_sdk_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_args4j_args4j" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_asm_asm" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_concurrent_locks_concurrent_locks" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_dd_plist_dd_plist" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_contenttype" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_common" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_equinox_preferences" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jdt" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_jobs" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_osgi" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_resources" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_eclipse_runtime" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_gson_gson" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_guava_guava" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_immutables_processor" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_infer_annotations_infer_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_annotations" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jackson_jackson_databind_jar" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jacoco_core" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jacoco_report" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jdk_compiler_tree_api" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jna_jna" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_jsr_jsr305" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_nuprocess_nuprocess" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_okhttp_okhttp" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_plexus_plexus_utils" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_stringtemplate_stringtemplate" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_third_party_java_thrift_libthrift" scope="COMPILE" level="project"  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_fat_jar_main" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_intellij_intellij" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_steps" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_support" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_tracing_api" scope="PROVIDED" level="project"  exported=""  />
+    <orderEntry type="library" name="library_src_com_facebook_buck_jvm_java_tracing_compiler_plugin" scope="PROVIDED" level="project"  exported=""  />
+
+  </component>
+</module>

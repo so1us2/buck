@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_thrift_libthrift">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/thrift/libthrift-0.9.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/thrift/libthrift-0.9.3-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

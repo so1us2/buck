@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_intellij_annotations">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/intellij/annotations.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

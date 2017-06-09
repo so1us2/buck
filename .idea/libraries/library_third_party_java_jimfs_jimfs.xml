@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_jimfs_jimfs">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/jimfs/jimfs-1.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/jimfs/jimfs-1.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="library_third_party_java_jsr_jsr305">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/third-party/java/jsr/jsr305.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
