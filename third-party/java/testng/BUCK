@@ -1,6 +1,7 @@
 prebuilt_jar(
   name = 'testng',
-  binary_jar = 'testng-6.8.jar',
+  binary_jar = 'testng-6.11.jar',
+  source_jar = 'testng-6.11-sources.jar',
   licenses = [
     'LICENSE.txt',
   ],
