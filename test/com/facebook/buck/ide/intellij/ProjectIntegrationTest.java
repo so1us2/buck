@@ -25,9 +25,9 @@ import com.facebook.buck.testutil.integration.ProjectWorkspace.ProcessResult;
 import com.facebook.buck.testutil.integration.TemporaryPaths;
 import com.facebook.buck.testutil.integration.TestDataHelper;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import org.junit.Rule;
 import org.junit.Test;
+import java.io.IOException;
 
 public class ProjectIntegrationTest {
 
@@ -183,6 +183,11 @@ public class ProjectIntegrationTest {
         "save_generated_files_list",
         "--file-with-list-of-generated-files",
         ".idea/generated-files.txt");
+  }
+
+  @Test
+  public void testMixedLibraryAndTest() throws InterruptedException, IOException {
+    runBuckProjectAndVerify("project_with_mixed_library_and_test");
   }
 
   @Test

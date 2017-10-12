@@ -1,0 +1,20 @@
+TEST_SRCS = glob(['test/**/*Test.java'])
+
+java_library(
+    name = "test_utils",
+    srcs = glob(["test/**/*.java"], excludes = TEST_SRCS),
+)
+
+java_test(
+    name = "test",
+    srcs = TEST_SRCS,
+    deps = [":test_utils"],
+)
+
+java_library(
+    name = "lib",
+    srcs = glob(["lib/*.java"]),
+    tests = [
+        ":test",
+    ],
+)
