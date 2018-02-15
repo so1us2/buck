@@ -59,7 +59,7 @@ interface AbstractAndroidGraphEnhancementResult {
 
   @Value.Derived
   default Optional<PreDexMerge> getPreDexMerge() {
-    return getDexMergeRule().transform(left -> Optional.of(left), right -> Optional.empty());
+    return getDexMergeRule().transform(left -> Optional.of(left), right -> Optional.<PreDexMerge>empty());
   }
 
   @Value.Derived
@@ -71,6 +71,6 @@ interface AbstractAndroidGraphEnhancementResult {
   @Value.Derived
   default ImmutableList<SourcePath> getAdditionalRedexInputs() {
     return getDexMergeRule()
-        .transform(left -> ImmutableList.of(), right -> right.getAdditionalRedexInputs());
+        .transform(left -> ImmutableList.<SourcePath>of(), right -> right.getAdditionalRedexInputs());
   }
 }
