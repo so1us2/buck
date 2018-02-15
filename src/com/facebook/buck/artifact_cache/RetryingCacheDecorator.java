@@ -81,8 +81,8 @@ public class RetryingCacheDecorator implements ArtifactCache, CacheDecorator {
           if (!msg.contains(NoHealthyServersException.class.getName())) {
             buckEventBus.post(
                 ConsoleEvent.warning(
-                    "Failed to fetch %s over %s after %d attempts.",
-                    ruleKey, cacheMode.name(), maxFetchRetries));
+                    "Failed to fetch %s over %s after %d attempts: %s",
+                    ruleKey, cacheMode.name(), maxFetchRetries, msg));
           }
           return CacheResult.builder().from(result).setCacheError(msg).build();
         });
