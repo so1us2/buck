@@ -16,6 +16,10 @@
 # Files created during tests
 /test/com/facebook/buck/testutil/integration/testlibs/buck-out/
 
+# IntelliJ
+*.iml
+/.idea
+
 # Compiled Python
 *.pyc
 *py.class

@@ -2,12 +2,31 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/third-party/java/aosp/aosp.iml" filepath="$PROJECT_DIR$/third-party/java/aosp/aosp.iml" />
-      <module fileurl="file://$PROJECT_DIR$/buck.iml" filepath="$PROJECT_DIR$/buck.iml" />
-      <module fileurl="file://$PROJECT_DIR$/tools/consistency_checker/consistency.iml" filepath="$PROJECT_DIR$/tools/consistency_checker/consistency.iml" />
-      <module fileurl="file://$PROJECT_DIR$/programs/programs.iml" filepath="$PROJECT_DIR$/programs/programs.iml" />
-      <module fileurl="file://$PROJECT_DIR$/python-dsl/python-dsl.iml" filepath="$PROJECT_DIR$/python-dsl/python-dsl.iml" />
-      <module fileurl="file://$PROJECT_DIR$/scripts/scripts.iml" filepath="$PROJECT_DIR$/scripts/scripts.iml" />
+      <module fileurl="file://$PROJECT_DIR$/project_root.iml" filepath="$PROJECT_DIR$/project_root.iml" />
+      <module fileurl="file://$PROJECT_DIR$/python-dsl/python_dsl.iml" filepath="$PROJECT_DIR$/python-dsl/python_dsl.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/android/agent/util/src_com_facebook_buck_android_agent_util.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/android/agent/util/src_com_facebook_buck_android_agent_util.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/abi/src_com_facebook_buck_jvm_java_abi.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/abi/src_com_facebook_buck_jvm_java_abi.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/autodeps/src_com_facebook_buck_jvm_java_autodeps.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/autodeps/src_com_facebook_buck_jvm_java_autodeps.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/classes/src_com_facebook_buck_jvm_java_classes.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/classes/src_com_facebook_buck_jvm_java_classes.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/coverage/src_com_facebook_buck_jvm_java_coverage.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/coverage/src_com_facebook_buck_jvm_java_coverage.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/plugin/src_com_facebook_buck_jvm_java_plugin.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/plugin/src_com_facebook_buck_jvm_java_plugin.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/rules/src_com_facebook_buck_jvm_java_rules.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/rules/src_com_facebook_buck_jvm_java_rules.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/runner/src_com_facebook_buck_jvm_java_runner.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/runner/src_com_facebook_buck_jvm_java_runner.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/src_com_facebook_buck_jvm_java.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/src_com_facebook_buck_jvm_java.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/buck/jvm/java/tracing/src_com_facebook_buck_jvm_java_tracing.iml" filepath="$PROJECT_DIR$/src/com/facebook/buck/jvm/java/tracing/src_com_facebook_buck_jvm_java_tracing.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src/com/facebook/src_com_facebook.iml" filepath="$PROJECT_DIR$/src/com/facebook/src_com_facebook.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/src-gen/src_gen.iml" filepath="$PROJECT_DIR$/src-gen/src_gen.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/test/com/facebook/test_com_facebook.iml" filepath="$PROJECT_DIR$/test/com/facebook/test_com_facebook.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/android/third_party_java_android.iml" filepath="$PROJECT_DIR$/third-party/java/android/third_party_java_android.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/aosp/third_party_java_aosp.iml" filepath="$PROJECT_DIR$/third-party/java/aosp/third_party_java_aosp.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/asm/third_party_java_asm.iml" filepath="$PROJECT_DIR$/third-party/java/asm/third_party_java_asm.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/dx/third_party_java_dx.iml" filepath="$PROJECT_DIR$/third-party/java/dx/third_party_java_dx.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/eclipse/third_party_java_eclipse.iml" filepath="$PROJECT_DIR$/third-party/java/eclipse/third_party_java_eclipse.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/immutables/third_party_java_immutables.iml" filepath="$PROJECT_DIR$/third-party/java/immutables/third_party_java_immutables.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jackson/third_party_java_jackson.iml" filepath="$PROJECT_DIR$/third-party/java/jackson/third_party_java_jackson.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jacoco/third_party_java_jacoco.iml" filepath="$PROJECT_DIR$/third-party/java/jacoco/third_party_java_jacoco.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/jetty/third_party_java_jetty.iml" filepath="$PROJECT_DIR$/third-party/java/jetty/third_party_java_jetty.iml" group="modules" />
+      <module fileurl="file://$PROJECT_DIR$/third-party/java/nailgun/third_party_java_nailgun.iml" filepath="$PROJECT_DIR$/third-party/java/nailgun/third_party_java_nailgun.iml" group="modules" />
     </modules>
   </component>
 </project>
