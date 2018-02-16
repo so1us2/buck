@@ -50,6 +50,7 @@ public abstract class AbstractNetworkCache extends AbstractAsynchronousCache {
         new NetworkEventListener(
             args.getBuckEventBus(), args.getCacheName(), new ErrorReporter(args)),
         args.getMaxStoreSizeBytes(),
+        args.getBlacklistFilter(),
         args.getProjectFilesystem());
     this.repository = args.getRepository();
     this.scheduleType = args.getScheduleType();

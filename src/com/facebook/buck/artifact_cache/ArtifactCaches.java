@@ -486,6 +486,8 @@ public class ArtifactCaches implements ArtifactCacheFactory {
             .setHttpWriteExecutorService(httpWriteExecutorService)
             .setHttpFetchExecutorService(httpFetchExecutorService)
             .setErrorTextTemplate(cacheDescription.getErrorMessageFormat())
+            .setMaxStoreSizeBytes(cacheDescription.getMaxStoreSize())
+            .setBlacklistFilter(cacheDescription.getBlacklistFilter())
             .build());
   }
 

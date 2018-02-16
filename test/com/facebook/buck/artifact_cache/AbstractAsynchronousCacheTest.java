@@ -157,6 +157,7 @@ public class AbstractAsynchronousCacheTest {
           service,
           new NoOpEventListener(),
           Optional.empty(),
+          Optional.empty(),
           filesystem);
       this.requestedRuleKeys = requestedRuleKeys;
       this.multiFetchLimit = multiFetchLimit;

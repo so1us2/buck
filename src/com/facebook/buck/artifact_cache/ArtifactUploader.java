@@ -62,7 +62,7 @@ public class ArtifactUploader {
     // Store the artifact, including any additional metadata.
     ListenableFuture<Void> storeFuture =
         artifactCache.store(
-            ArtifactInfo.builder().setRuleKeys(ruleKeys).setMetadata(buildMetadata).build(),
+            ArtifactInfo.builder().setBuildTarget(buildTarget).setRuleKeys(ruleKeys).setMetadata(buildMetadata).build(),
             BorrowablePath.borrowablePath(zip.get()));
     Futures.addCallback(
         storeFuture,

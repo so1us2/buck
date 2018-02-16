@@ -61,6 +61,7 @@ public class ArtifactCacheBuckConfig implements ConfigView<BuckConfig> {
   private static final String HTTP_WRITE_HEADERS_FIELD_NAME = "http_write_headers";
   private static final String HTTP_CACHE_ERROR_MESSAGE_NAME = "http_error_message_format";
   private static final String HTTP_MAX_STORE_SIZE = "http_max_store_size";
+  private static final String HTTP_BLACKLIST_FILTER = "http_blacklist_filter";
   private static final String HTTP_THREAD_POOL_SIZE = "http_thread_pool_size";
   private static final String HTTP_THREAD_POOL_KEEP_ALIVE_DURATION_MILLIS =
       "http_thread_pool_keep_alive_duration_millis";
@@ -76,7 +77,8 @@ public class ArtifactCacheBuckConfig implements ConfigView<BuckConfig> {
           HTTP_READ_HEADERS_FIELD_NAME,
           HTTP_WRITE_HEADERS_FIELD_NAME,
           HTTP_CACHE_ERROR_MESSAGE_NAME,
-          HTTP_MAX_STORE_SIZE);
+          HTTP_MAX_STORE_SIZE,
+          HTTP_BLACKLIST_FILTER);
   private static final String HTTP_MAX_FETCH_RETRIES = "http_max_fetch_retries";
 
   private static final String DIR_FIELD = "dir";
@@ -468,6 +470,7 @@ public class ArtifactCacheBuckConfig implements ConfigView<BuckConfig> {
         getCacheErrorFormatMessage(
             CACHE_SECTION_NAME, HTTP_CACHE_ERROR_MESSAGE_NAME, DEFAULT_HTTP_CACHE_ERROR_MESSAGE));
     builder.setMaxStoreSize(buckConfig.getLong(CACHE_SECTION_NAME, HTTP_MAX_STORE_SIZE));
+    builder.setBlacklistFilter(buckConfig.getValue(CACHE_SECTION_NAME, HTTP_BLACKLIST_FILTER));
 
     return builder.build();
   }
@@ -565,6 +568,8 @@ public class ArtifactCacheBuckConfig implements ConfigView<BuckConfig> {
     public abstract String getErrorMessageFormat();
 
     public abstract Optional<Long> getMaxStoreSize();
+
+    public abstract Optional<String> getBlacklistFilter();
 
     // We're connected to a wifi hotspot that has been explicitly blacklisted from connecting to
     // a distributed cache.

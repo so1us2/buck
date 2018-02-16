@@ -52,4 +52,6 @@ interface AbstractNetworkCacheArgs {
   String getErrorTextTemplate();
 
   Optional<Long> getMaxStoreSizeBytes();
+
+  Optional<String> getBlacklistFilter();
 }

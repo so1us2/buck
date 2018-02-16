@@ -20,6 +20,7 @@ import com.facebook.buck.io.file.BorrowablePath;
 import com.facebook.buck.io.file.LazyPath;
 import com.facebook.buck.io.filesystem.ProjectFilesystem;
 import com.facebook.buck.log.Logger;
+import com.facebook.buck.model.BuildTarget;
 import com.facebook.buck.rules.RuleKey;
 import com.facebook.buck.util.MoreCollectors;
 import com.facebook.buck.util.Scope;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
@@ -56,6 +58,7 @@ public abstract class AbstractAsynchronousCache implements ArtifactCache {
   private final CacheEventListener eventListener;
 
   private final Optional<Long> maxStoreSize;
+  private final Optional<String> blacklistFilter;
   private final ProjectFilesystem projectFilesystem;
   private final ArtifactCacheMode mode;
 
@@ -74,6 +77,7 @@ public abstract class AbstractAsynchronousCache implements ArtifactCache {
       ListeningExecutorService fetchExecutorService,
       CacheEventListener eventListener,
       Optional<Long> maxStoreSize,
+      Optional<String> blacklistFilter,
       ProjectFilesystem projectFilesystem) {
     this.name = name;
     this.cacheReadMode = cacheReadMode;
@@ -81,6 +85,7 @@ public abstract class AbstractAsynchronousCache implements ArtifactCache {
     this.fetchExecutorService = fetchExecutorService;
     this.eventListener = eventListener;
     this.maxStoreSize = maxStoreSize;
+    this.blacklistFilter = blacklistFilter;
     this.projectFilesystem = projectFilesystem;
     this.mode = mode;
   }
@@ -312,6 +317,14 @@ public abstract class AbstractAsynchronousCache implements ArtifactCache {
       return Futures.immediateFuture(null);
     }
 
+    Optional<BuildTarget> buildTarget = info.getBuildTarget();
+    if (isBlacklisted(buildTarget)) {
+      LOG.info(
+          "Artifact is blacklisted so not storing it in the %s cache. " + "file=[%s] buildTarget=[%s]",
+          name, output.getPath(), info.getBuildTarget());
+      return Futures.immediateFuture(null);
+    }
+
     long artifactSizeBytes = getFileSize(output.getPath());
     if (artifactExceedsMaximumSize(artifactSizeBytes)) {
       LOG.info(
@@ -363,6 +376,13 @@ public abstract class AbstractAsynchronousCache implements ArtifactCache {
       projectFilesystem.copyFile(output.getPath(), tmp);
     }
     return tmp;
+  }
+
+  private boolean isBlacklisted(Optional<BuildTarget> buildTarget) {
+    if (!buildTarget.isPresent() || !blacklistFilter.isPresent()) {
+      return false;
+    }
+    return Pattern.matches(blacklistFilter.get(), buildTarget.get().getFullyQualifiedName());
   }
 
   private boolean artifactExceedsMaximumSize(long artifactSizeBytes) {
