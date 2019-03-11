@@ -87,6 +87,7 @@ public class JavaFileParser {
           .put("6", JavaCore.VERSION_1_6)
           .put("7", JavaCore.VERSION_1_7)
           .put("8", JavaCore.VERSION_1_8)
+          .put("11", "11")
           .build();
 
   /**
